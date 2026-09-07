@@ -49,7 +49,8 @@ import { BrandLockup } from "../features/brand/BrandLockup";
 import { PartnerFooter } from "../features/brand/PartnerFooter";
 import { ApplicationFormView } from "../features/application/ApplicationFormView";
 import { confirmNavigation, useUnsavedChanges } from "../features/application/use-unsaved-changes";
-import { labelQuestionControls } from "../features/application/QuestionContent";
+import { labelQuestionControls, QuestionLabelContext } from "../features/application/QuestionContent";
+import { SegmentedChoice } from "../features/ui/SegmentedChoice";
 import {
   formatDanishAmount,
   getDisplaySystemName,
@@ -781,6 +782,7 @@ function Header({
               className={cx(view === item.view && "active")}
               key={item.label}
               type="button"
+              aria-current={view === item.view ? "page" : undefined}
               onClick={() => onNavigate(item.view)}
             >
               {item.label}
@@ -1163,7 +1165,7 @@ function KnowledgeView({
 }
 
 function Question({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
-  return <div className="question" role="group" aria-label={title}><div className="question-copy"><div className="question-title">{title}</div>{hint ? <p>{hint}</p> : null}</div>{labelQuestionControls(children, title)}</div>;
+  return <QuestionLabelContext.Provider value={title}><div className="question" role="group" aria-label={title}><div className="question-copy"><div className="question-title">{title}</div>{hint ? <p>{hint}</p> : null}</div>{labelQuestionControls(children, title)}</div></QuestionLabelContext.Provider>;
 }
 
 function CaseDetail({
@@ -1406,7 +1408,7 @@ function personInitials(name: string | null) {
 }
 
 function YesNoControl({ value, onChange }: { value: "" | "Ja" | "Nej"; onChange: (value: "Ja" | "Nej") => void }) {
-  return <div className="choice-row" role="radiogroup">{(["Ja", "Nej"] as const).map((option) => <button className={value === option ? "selected" : ""} type="button" role="radio" aria-checked={value === option} key={option} onClick={() => onChange(option)}><span aria-hidden="true">{value === option ? <Check size={14} /> : null}</span>{option}</button>)}</div>;
+  return <SegmentedChoice value={value} onChange={onChange} options={[{ value: "Ja", label: "Ja" }, { value: "Nej", label: "Nej" }]} />;
 }
 
 function DgitaApprovalPanel({ value, onSave, lockedReason }: { lockedReason: string | null; value: DgitaApproval; onSave: (value: DgitaApproval) => Promise<boolean> }) {

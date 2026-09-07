@@ -4,6 +4,8 @@ import {
   ArrowRight,
   Building2,
   Check,
+  Eye,
+  EyeOff,
   KeyRound,
   LockKeyhole,
   ShieldCheck,
@@ -36,6 +38,7 @@ export function LoginClient() {
   const [devLoginEnabled, setDevLoginEnabled] = useState(false);
   const [accessCodeRequired, setAccessCodeRequired] = useState(false);
   const [accessCode, setAccessCode] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -128,7 +131,7 @@ export function LoginClient() {
 
           <div className="login-divider"><span>Testmiljø</span></div>
 
-          <form className="login-test-box" onSubmit={(event) => void signInForTesting(event)}>
+          <form className="login-test-box" aria-busy={submitting} onSubmit={(event) => void signInForTesting(event)}>
             <div><strong>Afprøv rollebaseret adgang</strong><small>Kun tilgængelig lokalt eller ved eksplicit testopsætning.</small></div>
             <label>
               Rolle
@@ -139,12 +142,14 @@ export function LoginClient() {
               </select>
             </label>
             {devLoginEnabled && accessCodeRequired ? (
-              <label className={styles.accessCodeField}>
-                Testadgangskode
+              <div className={styles.accessCodeField}>
+                <label htmlFor="test-access-code">Testadgangskode</label>
                 <span className={styles.accessCodeInput}>
                   <LockKeyhole size={17} aria-hidden="true" />
                   <input
-                    type="password"
+                    id="test-access-code"
+                    type={passwordVisible ? "text" : "password"}
+                    aria-label="Testadgangskode"
                     value={accessCode}
                     onChange={(event) => setAccessCode(event.target.value)}
                     autoComplete="current-password"
@@ -155,11 +160,21 @@ export function LoginClient() {
                     disabled={submitting}
                     aria-describedby="test-access-help"
                   />
+                  <button
+                    className={styles.passwordToggle}
+                    type="button"
+                    aria-label={passwordVisible ? "Skjul adgangskode" : "Vis adgangskode"}
+                    aria-controls="test-access-code"
+                    disabled={submitting}
+                    onClick={() => setPasswordVisible((visible) => !visible)}
+                  >
+                    {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                  </button>
                 </span>
                 <small id="test-access-help" className={styles.accessCodeHelp}>
                   Indtast den adgangskode, du har modtaget til testmiljøet.
                 </small>
-              </label>
+              </div>
             ) : null}
             <button className="login-submit" type="submit" disabled={!devLoginEnabled || loading || submitting || (accessCodeRequired && accessCode.length === 0)}>
               {submitting ? "Logger ind…" : "Fortsæt til portalen"}

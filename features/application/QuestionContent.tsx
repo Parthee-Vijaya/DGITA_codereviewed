@@ -1,4 +1,8 @@
-import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+"use client";
+
+import { Children, cloneElement, createContext, isValidElement, type ReactElement, type ReactNode } from "react";
+
+export const QuestionLabelContext = createContext<string | undefined>(undefined);
 
 /** Native controls retain explicit labels; otherwise inherit the question. */
 export function labelQuestionControls(children: ReactNode, title: string): ReactNode {

@@ -26,7 +26,8 @@ import {
 
 import type { CatalogSystem } from "../catalog/search";
 import { useUnsavedChanges } from "./use-unsaved-changes";
-import { labelQuestionControls } from "./QuestionContent";
+import { labelQuestionControls, QuestionLabelContext } from "./QuestionContent";
+import { SegmentedChoice } from "../ui/SegmentedChoice";
 import {
   isAllowedPrivateBlobUrl,
   isAllowedVercelBlobUploadUrl,
@@ -1082,11 +1083,11 @@ function splitList(value: string) {
 
 function Question({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   const titleId = useId();
-  return <div className="question" role="group" aria-labelledby={titleId}><div className="question-copy"><div className="question-title" id={titleId}>{title}</div>{hint ? <p>{hint}</p> : null}</div><div>{labelQuestionControls(children, title)}</div></div>;
+  return <QuestionLabelContext.Provider value={title}><div className="question" role="group" aria-labelledby={titleId}><div className="question-copy"><div className="question-title" id={titleId}>{title}</div>{hint ? <p>{hint}</p> : null}</div><div>{labelQuestionControls(children, title)}</div></div></QuestionLabelContext.Provider>;
 }
 
 function Choice({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <div className="choice-row" role="radiogroup">{options.map((option) => <button className={value === option.value ? "selected" : ""} type="button" role="radio" aria-checked={value === option.value} key={option.value} onClick={() => onChange(option.value)}><span aria-hidden="true">{value === option.value ? <Check size={14} /> : null}</span>{option.label}</button>)}</div>;
+  return <SegmentedChoice value={value} options={options} onChange={onChange} />;
 }
 
 function Money({ id, value, error, onChange }: { id?: string; value: string; error?: string; onChange: (value: string) => void }) {

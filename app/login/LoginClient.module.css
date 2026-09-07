@@ -1,15 +1,17 @@
 .accessCodeField {
   margin-top: 14px;
+  gap: 6px;
 }
 
 .accessCodeInput {
   height: 46px;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   border: 1px solid var(--line-dark);
-  padding: 0 12px;
+  border-radius: var(--radius-control);
+  padding: 0 6px 0 12px;
   background: white;
   color: var(--forest);
   transition: border-color 160ms ease, box-shadow 160ms ease;
@@ -28,6 +30,7 @@
   background: transparent;
   color: var(--ink);
   font: inherit;
+  font-size: 16px;
   letter-spacing: .08em;
 }
 
@@ -38,7 +41,23 @@
 
 .accessCodeHelp {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 450;
   line-height: 1.45;
+}
+
+.passwordToggle {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.passwordToggle:not(:disabled):hover {
+  background: var(--surface-hover);
+  color: var(--ink);
 }

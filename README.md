@@ -8,7 +8,11 @@ Testsager og dokumentindhold er fiktive test-fixtures; projektgruppens navne og 
 
 ## Visuel identitet
 
-Portalens primære tema følger Kalundborg Kommunes aktuelle webidentitet med terracotta, varme lyse flader og mørk tekst. Det officielle Kalundborg-logo bruges i lokal SVG-kopi fra kommunens [logo- og designside](https://www.kalundborg.dk/kommunen/presse-og-kommunikation/billeder-logo-og-design). D-GITA vises som produktnavn, mens det separate officielle DIGIT-logo repræsenterer [Digitaliseringsforeningen Sjælland](https://digitaliseringsforeningen.dk/).
+Portalens primære tema følger Kalundborg Kommunes webidentitet med terracotta, hvide/neutralgrå arbejdsflader og mørk tekst. Det officielle Kalundborg-logo bruges i lokal SVG-kopi fra kommunens [logo- og designside](https://www.kalundborg.dk/kommunen/presse-og-kommunikation/billeder-logo-og-design). D-GITA vises som produktnavn, mens det separate officielle DIGIT-logo repræsenterer [Digitaliseringsforeningen Sjælland](https://digitaliseringsforeningen.dk/).
+
+Komponenterne er forfinet med inspiration fra [Fisher UI](https://jakobfisker.dk/da/ui): kompakte segmenterede valg, diskrete kanter, lette skygger og konsekvente afrundinger. Designprincipperne er implementeret i egen CSS/React; der er ikke importeret komponentkode eller nye biblioteker. Navigationen tilpasser sig alle tre roller, svargrupper understøtter piletaster/Home/End og spørgsmålsnavne til skærmlæsere, og animationer respekterer reduceret bevægelse. Formularmotor, adgangsregler og data er uændrede.
+
+![Forfinet sagsvisning med segmenteret navigation og rolige arbejdsflader](docs/screenshots/interface-refinement.png)
 
 ## Status
 
@@ -244,7 +248,7 @@ Den seneste komplette lokale gennemgang består af:
 
 - produktionsbuild gennem Vinext/Vite
 - native Next.js/Vercel-produktionsbuild
-- 133 beståede enheds- og integrationstests
+- 136 beståede enheds- og integrationstests
 - 75 E2E-kontroller af HTTP/API → D1/R2 → PDF/mail-outbox
 - SQLite `integrity_check` og `foreign_key_check`
 - manuel browsertest af login, roller, ejerskab, formularregler, fuzzy-søgning, D-GITA-felter, admin-editor og tutorial
