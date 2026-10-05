@@ -1,3 +1,5 @@
+import { SYNTHETIC_APPROVERS } from "../workspace/model";
+
 export type YesNo = "ja" | "nej";
 
 export type UploadKind =
@@ -29,7 +31,7 @@ export type SelectedCatalogSystem = {
   kitosStatus?: string;
 };
 
-export const APPROVING_LEADERS = [
+export const LEGACY_APPROVING_LEADERS = [
   {
     id: "kalundborg-consultant-peter-bjerre",
     name: "Peter Bjerre Ahlgren",
@@ -43,6 +45,8 @@ export const APPROVING_LEADERS = [
     name: "Anita Mark Vig Lauridsen",
   },
 ] as const;
+
+export const APPROVING_LEADERS = SYNTHETIC_APPROVERS;
 
 export type ApplicationFormState = {
   schemaVersion: "dgita-v1";
@@ -323,7 +327,7 @@ export const initialApplicationState: ApplicationFormState = {
 };
 
 /** Fixture used exclusively by tests and seeded demonstration cases. */
-export const demoApplicationState: ApplicationFormState = {
+export const legacyDemoApplicationState: ApplicationFormState = {
   schemaVersion: "dgita-v1",
   knownSystem: "ja",
   replacesExisting: "nej",
@@ -400,6 +404,21 @@ export const demoApplicationState: ApplicationFormState = {
     "supplier-checklist": [],
     architecture: [],
   },
+};
+
+/** New test forms use non-deliverable, neutral identities. Historical snapshots are unchanged. */
+export const demoApplicationState: ApplicationFormState = {
+  ...structuredClone(legacyDemoApplicationState),
+  catalogQuery: "Testsystem 01",
+  contactPerson: "contact-01@example.invalid",
+  department: "Testafdeling",
+  dataOwner: "data-owner-01@example.invalid",
+  systemOwner: "system-owner-01@example.invalid",
+  contractOwner: "contract-owner-01@example.invalid",
+  responsibleOrganization: "Testorganisation",
+  crossDepartments: ["Testafdeling 02"],
+  approvingLeaderId: SYNTHETIC_APPROVERS[0].id,
+  approvingLeader: SYNTHETIC_APPROVERS[0].name,
 };
 
 export function isRuleActive(rule: FormRule, state: ApplicationFormState) {
@@ -650,7 +669,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
 }
 
 export function resolveApprovingLeader(id: string, legacyName = "") {
-  const legacy = APPROVING_LEADERS.find(
+  const legacy = [...APPROVING_LEADERS, ...LEGACY_APPROVING_LEADERS].find(
     (leader) => leader.id === id || (!id && leader.name === legacyName.trim()),
   );
   if (legacy) return legacy;

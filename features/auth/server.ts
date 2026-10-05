@@ -3,10 +3,10 @@ import {
   getPersistenceBindings,
 } from "../../db/persistence";
 import {
-  DEMO_VIEWERS,
   type WorkspaceRole,
 } from "../workspace/model";
 import { AuthHttpError } from "./http";
+import { resolvePilotViewer } from "../workspace/pilot-profile";
 import {
   createSessionToken,
   devLoginPolicy,
@@ -166,7 +166,7 @@ export async function createDevSession(
   // page has been visited. The seed itself is gated by the runtime policy.
   const { preparePortalData } = await import("../workspace/server-repository");
   const DB = await preparePortalData();
-  const viewer = DEMO_VIEWERS[role];
+  const viewer = await resolvePilotViewer(DB, role);
   const now = new Date();
   const nowIso = now.toISOString();
   const expiresAt = new Date(
