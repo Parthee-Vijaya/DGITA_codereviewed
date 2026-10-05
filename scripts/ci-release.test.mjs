@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { requireCodeqlEvidence } from "./ci-release-codeql.mjs";
 
 const fixture = fileURLToPath(new URL("./ci-release-fixture.mjs", import.meta.url));
 const sourceSha = "a".repeat(40);
@@ -23,6 +24,27 @@ function execute(mode, env = environment(), data = deployment()) {
   return spawnSync(process.execPath, [fixture, mode], {
     env, encoding: "utf8", input: JSON.stringify(mode === "source" ? data : [data]),
   });
+}
+function codeqlResponses() {
+  const analyses = ["javascript-typescript", "actions"].map((language, index) => ({
+    id: index + 100, category: `/language:${language}`, commit_sha: sourceSha, ref: "refs/heads/main",
+    tool: { name: "CodeQL" }, analysis_key: ".github/workflows/ci.yml:codeql", error: "", rules_count: 20, results_count: index === 0 ? 1 : 0,
+  }));
+  return [analyses, ...analyses.map((analysis) => ({
+    version: "2.1.0", runs: [{
+      tool: { driver: { name: "CodeQL" }, extensions: [{ rules: [{ id: "fixture/security", defaultConfiguration: { level: "warning" }, properties: { "security-severity": "6.3", tags: ["security"] } }] }] },
+      automationDetails: { id: `${analysis.category}/` },
+      versionControlProvenance: [{ branch: "refs/heads/main", revisionId: sourceSha, repositoryUri: "https://github.com/owner/repo" }],
+      results: analysis.results_count ? [{ ruleId: "fixture/security", rule: { id: "fixture/security", index: 0, toolComponent: { index: 0 } }, level: "warning" }] : [],
+    }],
+  }))];
+}
+function verifyEvidence(responses) {
+  return requireCodeqlEvidence(async (path, accept) => {
+    assert.ok(responses.length > 0, "Unexpected API request.");
+    if (/^code-scanning\/analyses\/\d+$/u.test(path)) assert.equal(accept, "application/sarif+json");
+    return responses.shift();
+  }, { sourceSha, repository: "owner/repo" });
 }
 
 test("deployment guard accepts the verified staged production artifact", () => {
@@ -72,8 +94,80 @@ test("source guard rejects an unprotected branch and unsuccessful exact-commit C
       { merge_base_commit: { sha: scenario === "wrong-ancestor" ? "c".repeat(40) : sourceSha } },
       { workflow_runs: [{ id: scenario === "invalid-run-id" ? "10\rspoof=true" : 10, head_sha: sourceSha, head_branch: "main", event: "push", status: "completed", conclusion: scenario === "failed-ci" ? "failure" : "success" }] },
       { jobs: scenario === "missing-gate" ? [] : [{ name: "Required quality gate", conclusion: "success" }] },
+      ...codeqlResponses(),
     ];
     const result = execute("source", environment(), responses);
     if (scenario === "valid") assert.equal(result.status, 0, result.stderr); else assert.notEqual(result.status, 0);
   }
+});
+
+test("release CodeQL gate accepts exact-commit evidence with medium findings", async () => {
+  await verifyEvidence(codeqlResponses());
+});
+test("release CodeQL gate follows analysis pagination and uses the latest matching analysis", async () => {
+  const responses = codeqlResponses();
+  const unrelated = Array.from({ length: 100 }, () => ({ ...responses[0][0], commit_sha: "f".repeat(40) }));
+  await verifyEvidence([unrelated, ...responses]);
+  const older = codeqlResponses();
+  older[0].unshift({ ...older[0][0], id: 102, error: "analysis failed" });
+  await assert.rejects(verifyEvidence(older), /execution error/u);
+});
+test("release CodeQL gate requires both categories on main at the exact SHA", async () => {
+  for (const change of [
+    (a) => { a.pop(); },
+    (a) => { a[0].commit_sha = "c".repeat(40); },
+    (a) => { a[0].ref = "refs/pull/3/merge"; },
+    (a) => { a[0].analysis_key = ".github/workflows/other.yml:scan"; },
+    (a) => { a[0].tool.name = "Other"; },
+  ]) {
+    const responses = codeqlResponses(); change(responses[0]);
+    await assert.rejects(verifyEvidence(responses), /Missing exact-commit/u);
+  }
+});
+test("release CodeQL gate blocks high, critical and error results including dismissed historical findings", async () => {
+  for (const change of [
+    (run) => { run.tool.extensions[0].rules[0].properties["security-severity"] = "7.0"; },
+    (run) => { run.tool.extensions[0].rules[0].properties["security-severity"] = "9.8"; run.results[0].suppressions = [{ kind: "external", status: "accepted" }]; },
+    (run) => { run.results[0].level = "error"; },
+    (run) => { delete run.results[0].level; run.tool.extensions[0].rules[0].defaultConfiguration.level = "error"; },
+  ]) {
+    const responses = codeqlResponses(); change(responses[1].runs[0]);
+    await assert.rejects(verifyEvidence(responses), /blocks release/u);
+  }
+});
+test("release CodeQL gate fails closed on malformed, incomplete or mismatched evidence", async () => {
+  for (const change of [
+    (r) => { r[0] = {}; },
+    (r) => { r[0][0].error = "analysis failed"; },
+    (r) => { r[0][0].rules_count = 0; },
+    (r) => { r[0][0].results_count = 2; },
+    (r) => { r[1].version = "unknown"; },
+    (r) => { r[1].runs = []; },
+    (r) => { r[1].runs[0].versionControlProvenance[0].revisionId = "d".repeat(40); },
+    (r) => { r[1].runs[0].versionControlProvenance[0].branch = "refs/heads/other"; },
+    (r) => { r[1].runs[0].versionControlProvenance[0].repositoryUri = "https://github.com/other/repo"; },
+    (r) => { r[1].runs[0].automationDetails.id = "/language:other/"; },
+    (r) => { r[1].runs[0].invocations = [{ executionSuccessful: false }]; },
+    (r) => { delete r[1].runs[0].results; },
+    (r) => { r[1].runs[0].results[0].rule.index = 999; },
+    (r) => { r[1].runs[0].results[0].rule.toolComponent.index = 999; },
+    (r) => { r[1].runs[0].tool.extensions[0].rules[0].properties["security-severity"] = "unknown"; },
+    (r) => { delete r[1].runs[0].tool.extensions[0].rules[0].properties["security-severity"]; },
+  ]) {
+    const responses = codeqlResponses(); change(responses);
+    await assert.rejects(verifyEvidence(responses));
+  }
+});
+test("source validation fails on missing CodeQL evidence, denied API access and malformed API JSON", () => {
+  for (const failure of [[], { __httpStatus: 403 }, { __httpStatus: 503 }, { __rawBody: "{" }]) {
+    const responses = [
+      { protected: true, commit: { sha: sourceSha } }, { merge_base_commit: { sha: sourceSha } },
+      { workflow_runs: [{ id: 10, head_sha: sourceSha, head_branch: "main", event: "push", status: "completed", conclusion: "success" }] },
+      { jobs: [{ name: "Required quality gate", conclusion: "success" }] }, failure,
+    ];
+    assert.notEqual(execute("source", environment(), responses).status, 0);
+  }
+});
+test("release CodeQL gate fails closed when fetching evidence fails", async () => {
+  await assert.rejects(requireCodeqlEvidence(async () => { throw new Error("Network unavailable"); }, { sourceSha, repository: "owner/repo" }), /Network unavailable/u);
 });

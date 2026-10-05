@@ -28,6 +28,7 @@ import { canonicalCatalogSelection } from "../catalog/selection";
 import { canonicalizeApprovingLeader } from "./approver-repository";
 import { assertAttachmentScanAllowed, scanUploadBytes, type AttachmentScanStatus } from "./malware-scan";
 import { deploymentStage, readRuntimeEnvironment } from "../runtime/environment";
+import { newCaseNumber } from "./case-number";
 
 type ApplicationRow = {
   id: string;
@@ -1667,11 +1668,6 @@ function assertCanCreate(actor: ServerActor) {
       "D-GITA-konsulenter kan behandle sager, men ikke oprette ansøgninger.",
     );
   }
-}
-
-function newCaseNumber() {
-  const value = crypto.getRandomValues(new Uint32Array(1))[0] % 100_000_000;
-  return `ITA-${String(value).padStart(8, "0")}`;
 }
 
 function isUniqueConstraint(error: unknown) {

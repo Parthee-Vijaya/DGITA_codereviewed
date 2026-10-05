@@ -1,6 +1,6 @@
 # DGITA - fortsættelse efter produktionsklargøring
 
-Fremtidigt arbejde pushes til `origin`: Parthee-Vijaya/DGITA_codereviewed. Det oprindelige DGITA-repo er bevaret som `upstream`; push ikke ændringer dertil. Klargøringen leveres gennem PR #3.
+Fremtidigt arbejde pushes til `origin`: Parthee-Vijaya/DGITA_codereviewed. Det oprindelige DGITA-repo er bevaret som `upstream`; push ikke ændringer dertil. Klargøringen er flettet gennem PR #3 med efterfølgende rettelser fra den fulde CodeQL-baseline. Se hovedbranchens historik og daterede rapporter for endelig SHA.
 
 ## Status og kildeorden
 

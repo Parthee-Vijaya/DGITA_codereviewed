@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { appendFile, readFile, readdir, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
+import { requireCodeqlEvidence } from "./ci-release-codeql.mjs";
 
 const mode = process.argv[2];
 const environment = process.env;
@@ -24,9 +25,9 @@ async function output(name, value) {
   assert.match(value, formats.get(name), `Invalid release output: ${name}`);
   if (environment.GITHUB_OUTPUT) await appendFile(environment.GITHUB_OUTPUT, `${name}=${value}\n`);
 }
-async function github(path) {
+async function github(path, accept = "application/vnd.github+json") {
   const response = await fetch(`https://api.github.com/repos/${environment.GITHUB_REPOSITORY}/${path}`, {
-    headers: { Authorization: `Bearer ${environment.GH_TOKEN}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    headers: { Authorization: `Bearer ${environment.GH_TOKEN}`, Accept: accept, "X-GitHub-Api-Version": "2022-11-28" },
     signal: AbortSignal.timeout(20_000),
   });
   assert.ok(response.ok, `GitHub release validation failed: HTTP ${response.status}`);
@@ -45,6 +46,7 @@ async function requireVerifiedSource() {
   assert.ok(Number.isSafeInteger(run.id) && run.id > 0, "GitHub must return a valid workflow run identifier.");
   const jobs = await github(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`);
   assert.ok(jobs.jobs.some((job) => job.name === "Required quality gate" && job.conclusion === "success"), "Required quality gate is missing or unsuccessful.");
+  await requireCodeqlEvidence(github, { sourceSha, repository: environment.GITHUB_REPOSITORY });
   await output("sha", sourceSha);
   await output("ci_run", String(run.id));
   console.log(`Verified release source ${sourceSha}; quality run ${run.id}.`);
