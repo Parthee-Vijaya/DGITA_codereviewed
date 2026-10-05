@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { includeInTestWorkspace } from "./ci-workspace-policy.mjs";
+import { readSourceState, requireCleanSource, requireUnchangedSource, sourceEvidence } from "./ci-source-provenance.mjs";
 import { startProviderFixtures } from "../tests/runtime/provider-server.mjs";
 
 const mode = process.argv[2];
@@ -23,6 +24,21 @@ let cleaned = false;
 let serverLog;
 let testLog;
 let providers;
+let sourceStart = null;
+let sourceEnd = null;
+const runId = randomUUID();
+const startedAt = new Date().toISOString();
+
+async function writeEvidence(status) {
+  const identity = { schemaVersion: 2, runId, mode, status, runtime: process.version, startedAt,
+    ...(status === "running" ? {} : { completedAt: new Date().toISOString() }),
+    source: sourceEvidence(sourceStart, sourceEnd) };
+  // Overwrite both files even before source validation, so failed starts cannot leave old proof.
+  await writeFile(join(output, "result.json"), JSON.stringify(identity, null, 2));
+  if (mode === "next-e2e") await writeFile(join(output, "providers.json"), JSON.stringify({
+    ...identity, type: "local HTTP fixtures; no cloud acceptance", ...(providers?.evidence ?? {}),
+  }, null, 2));
+}
 
 function stopProcess(child, signal = "SIGTERM") {
   if (!child.pid) return;
@@ -52,12 +68,16 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 try {
   await mkdir(output, { recursive: true });
-  await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "running", runtime: process.version }, null, 2));
+  await writeEvidence("running");
+  sourceStart = await readSourceState(project);
+  requireCleanSource(sourceStart);
+  await writeEvidence("running");
   await cp(project, workspace, {
     recursive: true,
     filter: (path) => includeInTestWorkspace(relative(project, path), workerRuntime),
   });
   await symlink(join(project, "node_modules"), join(workspace, "node_modules"), "dir");
+  requireUnchangedSource(sourceStart, await readSourceState(project));
   const port = await new Promise((done, fail) => {
     const socket = createServer();
     socket.once("error", fail);
@@ -144,7 +164,6 @@ try {
       const report = providers.evidence;
       assert.equal(report.unexpectedRequests, 0);
       for (const field of ["blobWrites", "directBlobWrites", "blobReads", "scanClean", "scanRejected", "scanUnavailable", "mailAccepted", "approvalLinks"]) assert.ok(report[field] > 0, `Provider contract was not exercised: ${field}`);
-      await writeFile(join(output, "providers.json"), JSON.stringify({ type: "local HTTP fixtures; no cloud acceptance", ...report }, null, 2));
     }
   } else {
     const request = (path, options = {}) => fetch(`${origin}${path}`, { ...options, redirect: "manual", signal: AbortSignal.timeout(10_000) });
@@ -173,11 +192,14 @@ try {
     assert.equal(devLogin.status, 403);
     assert.equal((await devLogin.json()).code, "TEST_LOGIN_DISABLED");
   }
-  await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "passed", runtime: process.version, completedAt: new Date().toISOString() }, null, 2));
+  await cleanup();
+  sourceEnd = await readSourceState(project);
+  requireUnchangedSource(sourceStart, sourceEnd);
+  await writeEvidence("passed");
   console.log(`${mode}: passed (isolated workspace, local server, synthetic data).`);
 } catch (error) {
-  if (providers) await writeFile(join(output, "providers.json"), JSON.stringify(providers.evidence, null, 2));
-  await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "failed", runtime: process.version }, null, 2));
+  sourceEnd = await readSourceState(project).catch(() => null);
+  await writeEvidence("failed");
   throw error;
 } finally {
   await cleanup();
