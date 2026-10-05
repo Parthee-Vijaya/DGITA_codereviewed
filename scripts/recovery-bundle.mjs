@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { chmod, copyFile, lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, copyFile, lstat, mkdir, open, rename, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
 import { readMigrations } from "./migration-runner.mjs";
@@ -107,9 +108,24 @@ function decisionEvidence(database) {
 }
 
 async function readRegularFile(filename, limit) {
-  const stat = await lstat(filename);
-  assert.ok(stat.isFile() && !stat.isSymbolicLink() && stat.size <= limit, "UNSAFE_BUNDLE_FILE");
-  return readFile(filename);
+  // Open once without following a final symlink, then inspect and read that same
+  // descriptor. A pathname swap cannot replace the file after validation.
+  const handle = await open(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await handle.stat();
+    assert.ok(stat.isFile() && stat.size <= limit, "UNSAFE_BUNDLE_FILE");
+    const chunks = [];
+    let size = 0;
+    while (true) {
+      const chunk = Buffer.alloc(Math.min(1024 * 1024, limit - size + 1));
+      const { bytesRead } = await handle.read(chunk, 0, chunk.byteLength, null);
+      if (!bytesRead) break;
+      size += bytesRead;
+      assert.ok(size <= limit, "UNSAFE_BUNDLE_FILE");
+      chunks.push(chunk.subarray(0, bytesRead));
+    }
+    return Buffer.concat(chunks, size);
+  } finally { await handle.close(); }
 }
 
 function bundleDigest(manifest) {

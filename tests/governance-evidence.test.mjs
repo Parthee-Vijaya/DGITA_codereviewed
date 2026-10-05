@@ -84,10 +84,10 @@ test("real child failure is recorded while synthetic test title, stdout, stderr 
   const directory = mkdtempSync(new URL("run-", base));
   const path = resolve(directory, "canary.test.mjs");
   const canary = `synthetic-private-${crypto.randomUUID()}@example.invalid`;
-  writeFileSync(path, `import test from 'node:test';\ntest(${JSON.stringify(canary)}, () => { console.log(${JSON.stringify(canary)}); console.error(${JSON.stringify(canary)}); throw new Error(${JSON.stringify(canary)}); });\n`);
+  writeFileSync(path, `import test from "node:test";\nconst canary = process.env.DGITA_TEST_CANARY;\ntest(canary, () => { console.log(canary); console.error(canary); throw new Error(canary); });\n`);
   try {
     const run = spawnSync(process.execPath, ["--test", "--test-reporter", new URL("../scripts/redacted-test-reporter.mjs", import.meta.url).pathname, path], {
-      encoding: "utf8", env: { TZ: "UTC" }, timeout: 15_000, maxBuffer: 100_000,
+      encoding: "utf8", env: { TZ: "UTC", DGITA_TEST_CANARY: canary }, timeout: 15_000, maxBuffer: 100_000,
     });
     assert.equal(run.status, 1);
     assert.equal((run.stdout + run.stderr).includes(canary), false);

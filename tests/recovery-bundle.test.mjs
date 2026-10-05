@@ -90,7 +90,7 @@ test("database/files roundtrip preserves case versions, receipt and append-only 
   } finally { await f.close(); }
 });
 
-for (const change of ["missing-object","changed-object","changed-database","changed-manifest"]) {
+for (const change of ["missing-object","changed-object","symlink-object","changed-database","changed-manifest"]) {
   test(`verification rejects ${change} before creating a restore target`, async () => {
     const f = await fixture();
     try {
@@ -98,6 +98,11 @@ for (const change of ["missing-object","changed-object","changed-database","chan
       const objectPath = path.join(f.bundle,"objects",sha(f.objects.get("private/attachment")));
       if (change === "missing-object") await rm(objectPath);
       if (change === "changed-object") await writeFile(objectPath,"tampered");
+      if (change === "symlink-object") {
+        const replacement = path.join(f.directory,"replacement.txt");
+        await writeFile(replacement,f.objects.get("private/attachment"));
+        await rm(objectPath); await fsPromises.symlink(replacement,objectPath);
+      }
       if (change === "changed-database") { const db=new DatabaseSync(path.join(f.bundle,"database.sqlite")); db.exec("UPDATE portal_users SET display_name='changed'"); db.close(); }
       if (change === "changed-manifest") { const file=path.join(f.bundle,"manifest.json"); const manifest=JSON.parse(await readFile(file)); manifest.objects=[]; await writeFile(file,JSON.stringify(manifest)); }
       await assert.rejects(verifyRecoveryBundle(f.bundle,exported.digest));
