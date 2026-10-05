@@ -425,7 +425,7 @@
     },
     {
       "table": "portal_bootstrap_state",
-      "purpose": "Holdbar versionsmarkør for seed og testprofil.",
+      "purpose": "Holdbar versionsmarkør for seed/testprofil samt redigeret scheduler-heartbeat. Scope adskiller profiler fra observation; ingen rå driftslog.",
       "flow": "operations",
       "columns_by_category": {
         "linked-operational-metadata": [
@@ -990,14 +990,21 @@
       "path": [
         "Serverkonfiguration",
         "DB-miljø/seedmarkør",
-        "Kontrol af miljø og version"
+        "Kontrol af miljø og version",
+        "Redigeret scheduler-heartbeat i bootstrap-state",
+        "Adminbeskyttet tenantaggregat",
+        "Konfigureret alarm-HTTP-sink med kun flags/varighed"
       ],
       "external": [
-        "Ingen rå konfiguration/secrets i almindelige logs."
+        "Ingen rå konfiguration/secrets i almindelige logs.",
+        "Jobinterval/queuegrænse skal konfigureres; backup og historisk scannerfejltotal er unknown. Ekstern vagt/monitor/retention afventer accept."
       ],
       "code": [
         "db/persistence.ts",
-        "features/workspace/pilot-profile.ts"
+        "features/workspace/pilot-profile.ts",
+        "features/operations/store.ts",
+        "features/operations/status.ts",
+        "features/operations/alarms.ts"
       ]
     },
     "legacy-document": {
@@ -1032,11 +1039,17 @@
     "events": [
       "auth.unexpected_error",
       "scheduler.completed",
-      "scheduler.failed"
+      "scheduler.failed",
+      "scanner.completed",
+      "scanner.failed",
+      "operations.telemetry_failed",
+      "operations.alarm_delivery"
     ],
     "allowed": [
       "Internt genereret eventId og timestamp",
-      "For scheduler: bounded tællere/varighed/køalder + configured/cleanupFailed"
+      "For scheduler: bounded tællere/varighed/køalder + configured/cleanupFailed",
+      "Scanner: fast udfaldskategori og bounded varighed; ingen checksum/bytes/filnavne",
+      "Alarmlevering: fast udfaldskategori; ingen modtager-URL/token/fejltekst"
     ],
     "forbidden": [
       "Tokens/headers/query",

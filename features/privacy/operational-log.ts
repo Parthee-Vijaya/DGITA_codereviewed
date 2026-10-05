@@ -1,6 +1,9 @@
 /** Operational telemetry is deliberately separate from the protected audit trail. */
 export type OperationalLogEvent =
-  | { event: "auth.unexpected_error" }
+  | { event: "auth.unexpected_error" | "operations.telemetry_failed" }
+  | { event: "scanner.completed"; outcome: "clean" | "not_configured"; durationMs: number }
+  | { event: "scanner.failed"; outcome: "input_rejected" | "infected" | "not_configured" | "unavailable" | "unexpected"; durationMs: number }
+  | { event: "operations.alarm_delivery"; outcome: "not_configured" | "invalid_configuration" | "delivered" | "failed" }
   | {
       event: "scheduler.completed" | "scheduler.failed";
       tenants: number;
@@ -37,7 +40,21 @@ function ownValue(input: object, key: string): unknown {
 function projectEvent(input: OperationalLogEvent): Pick<LogRecord, "event" | "level"> & Record<string, string | number | boolean> {
   if (!input || typeof input !== "object") return { event: "operational.invalid_event", level: "error" };
   const event = ownValue(input, "event");
-  if (event === "auth.unexpected_error") return { event, level: "error" };
+  if (event === "auth.unexpected_error" || event === "operations.telemetry_failed") return { event, level: "error" };
+  if (event === "scanner.completed" || event === "scanner.failed") {
+    const durationMs = ownValue(input, "durationMs");
+    const outcome = ownValue(input, "outcome");
+    const allowed = event === "scanner.completed" ? ["clean", "not_configured"] : ["input_rejected", "infected", "not_configured", "unavailable", "unexpected"];
+    if (boundedInteger(durationMs, MAX_DURATION_MS) && typeof outcome === "string" && allowed.includes(outcome)) {
+      return { event, level: event === "scanner.failed" ? "error" : "info", outcome, durationMs };
+    }
+  }
+  if (event === "operations.alarm_delivery") {
+    const outcome = ownValue(input, "outcome");
+    if (typeof outcome === "string" && ["not_configured", "invalid_configuration", "delivered", "failed"].includes(outcome)) {
+      return { event, level: outcome === "delivered" ? "info" : "error", outcome };
+    }
+  }
   if (event === "scheduler.completed" || event === "scheduler.failed") {
     const tenants = ownValue(input, "tenants");
     const processed = ownValue(input, "processed");
