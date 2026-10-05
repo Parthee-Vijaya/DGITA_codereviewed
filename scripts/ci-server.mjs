@@ -100,6 +100,7 @@ try {
       BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_fixture_synthetic",
       DGITA_FIXTURE_ORIGIN: providers.origin,
       DGITA_E2E_PROVIDER_FIXTURES: "true",
+      CRON_SECRET: randomBytes(32).toString("hex"),
       DGITA_MALWARE_SCAN_URL: "https://scanner.example.invalid/scan",
       DGITA_MALWARE_SCAN_TOKEN: randomBytes(32).toString("hex"),
       DGITA_GRAPH_TENANT_ID: "fixture-tenant", DGITA_GRAPH_CLIENT_ID: "fixture-client",

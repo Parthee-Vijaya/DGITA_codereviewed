@@ -256,8 +256,14 @@ async function main() {
   expectStatus(approvalRequest.response.status, 202, "opret ledergodkendelse", approvalRequest.payload);
   assert.equal(approvalRequest.payload.status, "pending");
   if (providerFixtures) {
-    const delivered = await admin.json("/api/mail/process", { method: "POST", body: { limit: 10 } });
-    expectStatus(delivered.response.status, 200, "send godkendelseslink før beslutning", delivered.payload);
+    const forbiddenCron = await anonymous.json("/api/cron/mail");
+    expectStatus(forbiddenCron.response.status, 401, "cron afviser manglende jobidentitet", forbiddenCron.payload);
+    const delivered = await anonymous.json("/api/cron/mail", { headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` } });
+    expectStatus(delivered.response.status, 200, "scheduler sender godkendelseslink før beslutning", delivered.payload);
+    assert.equal(delivered.payload.alarm, false);
+    const machineAudit = await fixtureDatabase.execute("SELECT actor_subject, actor_user_id FROM portal_audit_events WHERE event_type = 'mail.sent'");
+    assert.ok(machineAudit.rows.length > 0);
+    assert.ok(machineAudit.rows.every((row) => row.actor_subject === "service:mail-scheduler" && row.actor_user_id === null));
   }
   const approvalToken = await approvalTokenForRequest(approvalRequest.payload.id, baseUrl);
 

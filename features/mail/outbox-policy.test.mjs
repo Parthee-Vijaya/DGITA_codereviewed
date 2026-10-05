@@ -96,6 +96,25 @@ test("a stale worker cannot cancel or send a newer processing attempt", async ()
   assert.deepEqual(await DB.prepare("SELECT status,attempt_count FROM portal_mail_outbox WHERE id='machine-reclaimed'").first(),{status:"processing",attempt_count:4});
 });
 
+test("explicit provider rejection retries with backoff; ambiguous send failure never retries", async () => {
+  await queue("machine-backoff");
+  globalThis.fetch = async (url) => String(url).includes("/oauth2/")
+    ? Response.json({access_token:"synthetic",expires_in:3600})
+    : Response.json({error:{code:"Throttled"}},{status:429,headers:{"retry-after":"60"}});
+  await processScheduledOutbox();
+  const queued=await DB.prepare("SELECT status,next_attempt_at,attempt_count FROM portal_mail_outbox WHERE id='machine-backoff'").first();
+  assert.equal(queued.status,"queued");assert.equal(queued.attempt_count,1);assert.ok(Date.parse(queued.next_attempt_at)>Date.now());
+  assert.equal((await processScheduledOutbox()).processed,0);
+  await DB.prepare("UPDATE portal_mail_outbox SET next_attempt_at=NULL WHERE id='machine-backoff'").run();
+  acceptingTransport();await processScheduledOutbox();
+  assert.equal(await DB.prepare("SELECT status FROM portal_mail_outbox WHERE id='machine-backoff'").first("status"),"sent");
+  await queue("machine-ambiguous");
+  globalThis.fetch = async (url) => { if(String(url).includes("/oauth2/")) return Response.json({access_token:"synthetic",expires_in:3600});throw Error("socket closed after send"); };
+  await processScheduledOutbox();
+  assert.equal(await DB.prepare("SELECT status FROM portal_mail_outbox WHERE id='machine-ambiguous'").first("status"),"failed");
+  acceptingTransport();const before=acceptedCalls;await processScheduledOutbox();assert.equal(acceptedCalls,before);
+});
+
 test("recovery quarantine blocks new mail and a claim already in progress", async () => {
   await queue("machine-quarantine");
   acceptingTransport(async () => {

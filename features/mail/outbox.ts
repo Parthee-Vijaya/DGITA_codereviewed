@@ -213,7 +213,7 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
 
 type MailPrincipal = { tenantId: string; subject: string; userId: string | null };
 
-async function processTenantOutbox(actor: MailPrincipal, limit: number) {
+async function processTenantOutbox(actor: MailPrincipal, limit: number, deadline = Infinity) {
   const DB = await preparePortalData();
   const activeTenant = await DB.prepare("SELECT id FROM portal_tenants WHERE id = ? AND status = 'active'")
     .bind(actor.tenantId).first<{ id: string }>();
@@ -267,6 +267,7 @@ async function processTenantOutbox(actor: MailPrincipal, limit: number) {
     status: "sent" | "queued" | "failed" | "cancelled";
   }> = [];
   for (const row of rows.results) {
+    if (Date.now() >= deadline) break;
     const claimed = await DB.prepare(`
       UPDATE portal_mail_outbox
       SET status = 'processing', attempt_count = attempt_count + 1,
@@ -380,17 +381,25 @@ export async function processScheduledOutbox(limitPerTenant = 10) {
   `).bind(now, new Date(Date.now() - 15 * 60_000).toISOString()).all<{ tenant_id: string; oldest: string }>();
   let processed = 0;
   let failed = 0;
-  let queueAgeSeconds = 0;
+  const queue = await DB.prepare(`SELECT MIN(mail.created_at) AS oldest FROM portal_mail_outbox mail
+    JOIN portal_tenants tenant ON tenant.id = mail.tenant_id AND tenant.status = 'active'
+    WHERE mail.status IN ('queued', 'processing')
+      AND NOT EXISTS (SELECT 1 FROM portal_bootstrap_state quarantine WHERE quarantine.tenant_id = mail.tenant_id AND quarantine.scope = 'recovery-quarantine')`).first<{ oldest: string | null }>();
+  const queuedAt = queue?.oldest;
+  const age = queuedAt ? Math.floor((Date.now() - Date.parse(queuedAt.replace(" ", "T") + (queuedAt.includes("Z") ? "" : "Z"))) / 1000) : 0;
+  const queueAgeSeconds = Number.isFinite(age) ? Math.min(365 * 86400, Math.max(0, age)) : 0;
+  let processedTenants = 0;
+  const deadline = Date.now() + 45_000;
   for (const tenant of tenants.results) {
-    const age = Math.floor((Date.now() - Date.parse(tenant.oldest.replace(" ", "T") + (tenant.oldest.includes("Z") ? "" : "Z"))) / 1000);
-    if (Number.isFinite(age)) queueAgeSeconds = Math.min(365 * 86400, Math.max(queueAgeSeconds, age, 0));
+    if (Date.now() >= deadline) break;
+    processedTenants += 1;
     try {
-      const result = await processTenantOutbox({ tenantId: tenant.tenant_id, userId: null, subject: "service:mail-scheduler" }, limitPerTenant);
+      const result = await processTenantOutbox({ tenantId: tenant.tenant_id, userId: null, subject: "service:mail-scheduler" }, limitPerTenant, deadline);
       processed += result.processed;
       failed += result.abandoned + result.results.filter((item) => item.status === "failed").length;
     } catch { failed += 1; }
   }
-  return { configured: true, tenants: tenants.results.length, processed, failed, queueAgeSeconds };
+  return { configured: true, tenants: processedTenants, processed, failed, queueAgeSeconds };
 }
 
 async function materializeMailContent(DB: D1Database, row: OutboxRow) {

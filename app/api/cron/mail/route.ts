@@ -1,7 +1,6 @@
 import { noStoreJson } from "../../../../features/auth/http";
-import { cleanupAbandonedDirectApplicationUploads } from "../../../../features/application/direct-upload-server";
+import { runScheduledMaintenance } from "../../../../features/runtime/scheduled-maintenance";
 import { getCronAuthorizationStatus } from "../../../../features/mail/cron-auth";
-import { processScheduledOutbox } from "../../../../features/mail/outbox";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +30,6 @@ export async function GET(request: Request) {
     );
   }
 
-  const uploadCleanup = await cleanupAbandonedDirectApplicationUploads().catch(() => ({
-    pendingQuarantined: 0,
-    verifyingDiscarded: 0,
-    blobsDeleted: 0,
-    blobsPendingRetry: 0,
-    failed: true as const,
-  }));
-  const mail = await processScheduledOutbox(10);
-  return noStoreJson({ ...mail, uploadCleanup });
+  const result = await runScheduledMaintenance();
+  return noStoreJson(result, { status: result.alarm ? 503 : 200 });
 }

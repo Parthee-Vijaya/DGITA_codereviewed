@@ -1,0 +1,13 @@
+# Schedulerens kontrakt
+
+Begge adaptere kalder `runScheduledMaintenance`: Vercels `/api/cron/mail` efter eksakt CRON_SECRET-kontrol og Cloudflares native scheduled-handler. Begge kører samme oprydning og mailbehandling. Oprydningsfejl stopper ikke mailpasset, men giver alarm. Jobbet bruger `service:mail-scheduler` med tomt person-id; manuelle adminhandlinger beholder deres egen auditidentitet.
+
+En mail claim'es med compare-and-set og forsøgsnummer. Materialisering, kvitteringer og før-send-kontrollen kræver fortsat samme tenant, modtager, mailtype, bilagsreferencer og forsøg. Lederlink kræver desuden aktivt mandat og den aktuelle version. Suspenderede tenants og recovery-quarantine udelukkes. Ældre processing-poster markeres `MAIL_DELIVERY_STATE_UNKNOWN` efter 15 minutter; de gensendes ikke automatisk. HTTP-afvisning fra Graph kan genkøes med backoff; en tvetydig netværksfejl efter afsendelsesstart kræver operatørafklaring.
+
+Hvert tick behandler højst 50 tenants og 10 poster per tenant. Efter 45 sekunder claim'es ingen nye poster. Igangværende provider- og databasekald afsluttes efter deres egen timeout; 45 sekunder er derfor et claimbudget, ikke en garanti for maksimal samlet runtime. Kapacitet og platform-timeouts skal måles med det valgte miljø.
+
+Køalder beregnes fra ældste queued/processing-post, også under backoff. 10 minutters køalder, fejl, manglende mailkonfiguration eller fejlet oprydning giver `scheduler.failed`, HTTP 503 på Vercel og et fejlet scheduled-resultat på Cloudflare. Øvrige ticks giver `scheduler.completed`. Driftsloggen indeholder kun tilladte tællere, alder, varighed og booleske flag. Manglende ticks skal detekteres af en ekstern monitor; koden påstår ikke selv at kunne alarmere, når intet job kører.
+
+Vercel beholder den eksisterende daglige cron `0 6 * * *`; Cloudflare beholder `*/2 * * * *`. Den daglige Vercel-plan er ikke accepteret som en responsiv mailservice. Før frigivelse skal miljøejeren vælge en hyppigere understøttet scheduler og teste interval, køalder, retries og alarmmodtager. Dette ændrer ingen betalt plan. Ifølge [Vercels aktuelle cronbegrænsninger](https://vercel.com/docs/cron-jobs/usage-and-pricing) kan Hobby kun køre dagligt, mens Pro/Enterprise tillader minutintervaller. Previewmiljøets lokale gentagne kald beviser jobkontrakten, ikke live cronfrekvens eller maillevering.
+
+Lokal evidens: `tests/scheduled-maintenance.test.mjs`, `features/mail/outbox-policy.test.mjs`, `features/mail/receipt-claim.test.mjs` og det fulde Next-forløb med autentificeret cron, syntetisk Graph og privat Blob-fixture. En operatør skal fortsat acceptere kommunale forbindelser, livelevering og alarmkæde før produktion.

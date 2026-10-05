@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { processScheduledOutbox } from "../features/mail/outbox";
+import { runScheduledMaintenance } from "../features/runtime/scheduled-maintenance";
 
 interface Env {
   ASSETS: Fetcher;
@@ -49,7 +49,9 @@ const worker = {
     _env: Env,
     ctx: ExecutionContext,
   ) {
-    ctx.waitUntil(processScheduledOutbox(10));
+    ctx.waitUntil(runScheduledMaintenance().then((result) => {
+      if (result.alarm) throw new Error("SCHEDULED_MAINTENANCE_ALARM");
+    }));
   },
 };
 
