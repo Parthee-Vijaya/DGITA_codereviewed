@@ -1,4 +1,5 @@
 import { GraphMailError, GraphMailValidationError } from "./errors";
+import { assertMailDeliveryAllowed } from "./delivery-policy";
 import type {
   AcceptedMail,
   FetchLike,
@@ -48,12 +49,17 @@ export class MicrosoftGraphMailTransport implements MailTransport {
     this.now = dependencies.now ?? Date.now;
   }
 
-  async send(mail: OutgoingMail): Promise<AcceptedMail> {
+  async send(mail: OutgoingMail, options?: { beforeSend?: () => Promise<void> }): Promise<AcceptedMail> {
     const payload = graphPayload(mail);
+    assertMailDeliveryAllowed(mail, this.config.deliveryPolicy);
     const token = await this.accessToken();
     const endpoint = `${this.config.graphBaseUrl}/users/${encodeURIComponent(
       this.config.sender,
     )}/sendMail`;
+
+    // Revalidate workflow authority after any asynchronous token acquisition.
+    // A rejected guard is preserved for the outbox's cancellation handling.
+    await options?.beforeSend?.();
 
     let response: Response;
     try {

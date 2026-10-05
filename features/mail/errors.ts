@@ -1,6 +1,7 @@
 export type GraphMailErrorCode =
   | "MAIL_CONFIGURATION_ERROR"
   | "MAIL_VALIDATION_ERROR"
+  | "MAIL_RECIPIENT_NOT_ALLOWED"
   | "GRAPH_AUTHENTICATION_ERROR"
   | "GRAPH_SEND_ERROR"
   | "GRAPH_NETWORK_ERROR"
@@ -55,6 +56,17 @@ export class GraphMailValidationError extends GraphMailError {
   constructor(message: string) {
     super("MAIL_VALIDATION_ERROR", message, { stage: "validation" });
     this.name = "GraphMailValidationError";
+  }
+}
+
+export class GraphMailDeliveryPolicyError extends GraphMailError {
+  constructor() {
+    super(
+      "MAIL_RECIPIENT_NOT_ALLOWED",
+      "Mailen blev blokeret: alle modtagere skal være eksplicit tilladt i dette miljø.",
+      { stage: "validation", retryable: false },
+    );
+    this.name = "GraphMailDeliveryPolicyError";
   }
 }
 

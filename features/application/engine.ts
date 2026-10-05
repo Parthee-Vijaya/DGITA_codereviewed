@@ -650,9 +650,17 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
 }
 
 export function resolveApprovingLeader(id: string, legacyName = "") {
-  return APPROVING_LEADERS.find(
+  const legacy = APPROVING_LEADERS.find(
     (leader) => leader.id === id || (!id && leader.name === legacyName.trim()),
-  ) ?? null;
+  );
+  if (legacy) return legacy;
+  // Structural client validation only. Submission and leader-link issuance
+  // independently require a live tenant-scoped approver mandate in SQL.
+  if (/^[A-Za-z0-9:_-]{1,200}$/u.test(id) && legacyName.trim().length > 0 &&
+      legacyName.length <= 256 && !/[\r\n\u0000]/u.test(legacyName)) {
+    return { id, name: legacyName.trim() };
+  }
+  return null;
 }
 
 export function normalizeApprovingLeader(state: ApplicationFormState) {

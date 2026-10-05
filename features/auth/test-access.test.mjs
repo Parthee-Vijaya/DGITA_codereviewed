@@ -7,7 +7,7 @@ import { AuthHttpError } from "./http.ts";
 const publicUrl = "https://portal.example.dk/login";
 const validEnvironment = {
   DGITA_ENABLE_DEV_LOGIN: "true",
-  DGITA_TEST_ACCESS_SECRET: "Parti3411",
+  DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
 };
 
 test("offentligt testlogin fejler lukket uden en gyldig serverkode", async () => {

@@ -1,10 +1,9 @@
 import { hashSessionToken } from "../auth/primitives";
+import { approvalMandateSql, hasApprovalMandate } from "./mandate";
+import { assertAttachmentScanAllowed } from "../application/malware-scan";
 import { getPersistenceBindings } from "../../db/persistence";
 import type { ServerActor } from "../auth/types";
-import {
-  resolveApprovingLeader,
-  type ApplicationFormState,
-} from "../application/engine";
+import type { ApplicationFormState } from "../application/engine";
 import { preparePortalData, resolveActorUserId } from "../workspace/server-repository";
 import {
   APPROVAL_TOKEN_PLACEHOLDER,
@@ -168,12 +167,16 @@ export async function createLeaderApprovalRequest(
     );
   }
   const snapshot = parseSnapshot(application.snapshot_json);
-  const selectedApprover = resolveApprovingLeader(
-    snapshot.approvingLeaderId || "",
-    snapshot.approvingLeader,
-  );
-  if (!selectedApprover) {
+  const selectedApproverId = snapshot.approvingLeaderId;
+  if (!selectedApproverId) {
     throw new ApprovalWorkflowError(422, "APPROVER_MISSING", "Der er ikke valgt en godkendende leder.");
+  }
+  if (selectedApproverId === application.owner_user_id) {
+    throw new ApprovalWorkflowError(
+      422,
+      "SELF_APPROVAL_FORBIDDEN",
+      "Ansøgeren kan ikke godkende sin egen ansøgning. Vælg en anden godkendende leder.",
+    );
   }
   const approver = await DB.prepare(`
     SELECT id, email, display_name
@@ -182,15 +185,22 @@ export async function createLeaderApprovalRequest(
       AND EXISTS (
         SELECT 1 FROM portal_user_roles role
         WHERE role.tenant_id = user.tenant_id AND role.user_id = user.id
-          AND role.role IN ('user', 'dgita_consultant', 'admin')
+          AND role.role = 'approver'
       )
     LIMIT 1
-  `).bind(actor.tenantId, selectedApprover.id).first<{ id: string; email: string; display_name: string }>();
+  `).bind(actor.tenantId, selectedApproverId).first<{ id: string; email: string; display_name: string }>();
   if (!approver) {
     throw new ApprovalWorkflowError(
       422,
       "APPROVER_NOT_FOUND",
-      "Den valgte leder har ingen aktiv portalidentitet eller mailadresse.",
+      "Den valgte leder har ikke en aktiv godkenderrettighed i kommunen.",
+    );
+  }
+  if (approver.email.trim().toLowerCase() === application.owner_email.trim().toLowerCase()) {
+    throw new ApprovalWorkflowError(
+      422,
+      "SELF_APPROVAL_FORBIDDEN",
+      "Ansøger og godkendende leder skal have forskellige personlige mailadresser.",
     );
   }
 
@@ -476,7 +486,7 @@ export async function authorizePublicApprovalAttachment(
   }
   if (request.status !== "pending") throw new ApprovalWorkflowError(410, "APPROVAL_LINK_USED", "Beslutningen er allerede registreret. Bilag kan herefter åbnes i portalen.");
   const attachment = await DB.prepare(`
-    SELECT original_name, content_type, storage_key, checksum_sha256, size_bytes
+    SELECT original_name, content_type, storage_key, checksum_sha256, size_bytes, scan_status
     FROM portal_attachments
     WHERE id = ? AND tenant_id = ? AND application_id = ?
       AND application_version_id = ? AND status = 'ready'
@@ -492,8 +502,10 @@ export async function authorizePublicApprovalAttachment(
     storage_key: string;
     checksum_sha256: string;
     size_bytes: number;
+    scan_status: string;
   }>();
   if (!attachment) throw invalidLink();
+  await assertAttachmentScanAllowed(attachment.scan_status);
   return {
     filename: attachment.original_name,
     contentType: attachment.content_type,
@@ -564,6 +576,7 @@ export async function decideLeaderApproval(
       UPDATE portal_approval_requests
       SET status = ?, decision_comment = ?, decided_at = ?
       WHERE id = ? AND status = 'pending'
+        AND ${approvalMandateSql("portal_approval_requests")}
     `).bind(
       transitionStatus,
       effectiveComment || null,
@@ -612,6 +625,7 @@ export async function decideLeaderApproval(
         AND EXISTS (
           SELECT 1 FROM portal_approval_requests request
           WHERE request.id = ? AND request.status = ?
+            AND ${approvalMandateSql()}
         )
     `).bind(
       nextStatus,
@@ -634,6 +648,10 @@ export async function decideLeaderApproval(
           AND application.current_version_id = ? AND application.status = ?
           AND application.updated_at = ?
       )
+      AND EXISTS (
+        SELECT 1 FROM portal_approval_requests request
+        WHERE request.id = ? AND request.status = ? AND ${approvalMandateSql()}
+      )
     `).bind(
       auditId,
       row.tenant_id,
@@ -648,6 +666,8 @@ export async function decideLeaderApproval(
       row.application_version_id,
       nextStatus,
       decisionStartedAt,
+      row.id,
+      transitionStatus,
     ),
     DB.prepare(`
       INSERT OR IGNORE INTO portal_notifications
@@ -709,6 +729,7 @@ export async function decideLeaderApproval(
       UPDATE portal_approval_requests
       SET status = ?
       WHERE id = ? AND status = ? AND decided_at = ?
+        AND ${approvalMandateSql("portal_approval_requests")}
         AND EXISTS (
           SELECT 1 FROM portal_applications application
           WHERE application.id = ? AND application.tenant_id = ?
@@ -759,7 +780,7 @@ export async function decideLeaderApproval(
 }
 
 async function approvalRequestByHash(DB: D1Database, tokenHash: string) {
-  return DB.prepare(`
+  const row = await DB.prepare(`
     SELECT request.id, request.tenant_id, request.application_id,
            request.application_version_id, request.approver_email,
            request.approver_name, request.status, request.decision_comment,
@@ -770,6 +791,8 @@ async function approvalRequestByHash(DB: D1Database, tokenHash: string) {
            application.owner_user_id, owner.display_name AS owner_name,
            owner.email AS owner_email
     FROM portal_approval_requests request
+    INNER JOIN portal_tenants tenant
+      ON tenant.id = request.tenant_id AND tenant.status = 'active'
     INNER JOIN portal_applications application
       ON application.id = request.application_id AND application.tenant_id = request.tenant_id
     INNER JOIN portal_application_versions version
@@ -781,6 +804,9 @@ async function approvalRequestByHash(DB: D1Database, tokenHash: string) {
     WHERE request.token_hash = ?
     LIMIT 1
   `).bind(tokenHash).first<ApprovalRequestRow>();
+  if (!row) return null;
+
+  return await hasApprovalMandate(DB, row.id) ? row : null;
 }
 
 function toPublicRequest(row: ApprovalRequestRow): PublicApprovalRequest {

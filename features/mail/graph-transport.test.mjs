@@ -10,6 +10,8 @@ import {
 import { MicrosoftGraphMailTransport } from "./graph-transport.ts";
 
 const environment = {
+  DGITA_ENVIRONMENT: "pilot",
+  DGITA_MAIL_ALLOWED_RECIPIENTS: "ansoeger@kalundborg.dk,leder@kalundborg.dk",
   DGITA_GRAPH_TENANT_ID: "11111111-2222-3333-4444-555555555555",
   DGITA_GRAPH_CLIENT_ID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
   DGITA_GRAPH_CLIENT_SECRET: "server-secret-value",

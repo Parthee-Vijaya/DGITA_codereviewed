@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // Isolated database, never the developer's or public test environment.
+process.env.DGITA_ENVIRONMENT = "pilot";
+process.env.DGITA_ENABLE_DEV_LOGIN = "true";
 process.env.TURSO_DATABASE_URL = ":memory:";
 process.env.TURSO_AUTH_TOKEN = "enterprise-test-only";
 process.env.BLOB_READ_WRITE_TOKEN = "enterprise-test-only";

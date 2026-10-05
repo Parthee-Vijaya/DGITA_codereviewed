@@ -3,7 +3,7 @@ const seedPromises = new WeakMap<object, Map<string, Promise<void>>>();
 export const PORTAL_DEFAULT_SEED = {
   tenantId: "kalundborg",
   scope: "demo-defaults",
-  version: "2026-08-30-v2",
+  version: "2026-10-05-v3",
 } as const;
 
 type SeedIdentity = {

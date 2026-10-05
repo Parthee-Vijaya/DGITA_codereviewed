@@ -1,4 +1,5 @@
 import type { WorkspaceRole } from "../workspace/model";
+import { permitsTestSessions } from "../runtime/environment";
 
 export const SESSION_COOKIE_NAME = "dgita_session";
 export const SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -107,6 +108,13 @@ export function devLoginPolicy(
   requestUrl: string | URL,
   environment: AuthEnvironment = {},
 ) {
+  if (!permitsTestSessions(environment)) {
+    return {
+      enabled: false,
+      accessCodeRequired: false,
+      configurationValid: true,
+    } as const;
+  }
   if (isLocalRequestUrl(requestUrl)) {
     return {
       enabled: true,

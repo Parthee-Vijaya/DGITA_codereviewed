@@ -92,8 +92,8 @@ async function main() {
     manualSystemName: `E2E testsystem ${runId}`,
     catalogQuery: "",
     selectedSystem: null,
-    approvingLeaderId: "demo-user-partheepan",
-    approvingLeader: "Partheepan Vijayamohan",
+    approvingLeaderId: "kalundborg-consultant-peter-bjerre",
+    approvingLeader: "Peter Bjerre Ahlgren",
     consent: true,
   });
   assert.deepEqual(getAllErrors(state), [], "E2E-ansøgningen skal være gyldig");

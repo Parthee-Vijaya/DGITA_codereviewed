@@ -36,6 +36,7 @@ export function LoginClient() {
   const router = useRouter();
   const [role, setRole] = useState<WorkspaceRole>("user");
   const [devLoginEnabled, setDevLoginEnabled] = useState(false);
+  const [entraEnabled, setEntraEnabled] = useState(false);
   const [accessCodeRequired, setAccessCodeRequired] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -45,12 +46,25 @@ export function LoginClient() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const entraError = new URLSearchParams(window.location.search).get("entra");
+    void fetch("/api/auth/entra/status", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        setEntraEnabled(Boolean(payload && typeof payload === "object" && "enabled" in payload && payload.enabled === true));
+      })
+      .catch(() => { /* An unavailable provider stays disabled; test login remains independent. */ });
     void fetch("/api/auth/session", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = (await response.json()) as SessionResponse;
         if (payload.authenticated) {
           router.replace("/");
           return;
+        }
+        if (entraError === "access-not-assigned") {
+          setError("Du har ikke fået adgang til D-GITA endnu. Kontakt systemadministratoren.");
+        } else if (entraError === "login-failed") {
+          setError("Kommunens login kunne ikke gennemføres. Prøv at logge ind igen.");
         }
         setDevLoginEnabled(Boolean(payload.devLoginEnabled));
         setAccessCodeRequired(Boolean(payload.devLoginAccessCodeRequired));
@@ -116,15 +130,16 @@ export function LoginClient() {
           <h2 id="login-title">Log ind på D-GITA</h2>
           <p className="login-intro">Vælg den adgangsløsning, din kommune anvender. Din rolle og kommune fastlægges ved login.</p>
 
+          <form id="entra-login" action="/api/auth/entra/start" method="get" />
           <div className="login-provider-list" aria-label="Kommunale loginmuligheder">
-            <button type="button" disabled title="Aktiveres, når kommunens Entra-app er registreret">
+            <button type="submit" form="entra-login" disabled={!entraEnabled || submitting} title={entraEnabled ? "Log ind med din kommunale konto" : "Kommunens login er ikke tilsluttet endnu"}>
               <span><KeyRound size={20} /></span>
-              <div><strong>Microsoft Entra ID</strong><small>Klar til kommunal tilkobling</small></div>
+              <div><strong>Microsoft Entra ID</strong><small>{entraEnabled ? "Log ind med din kommunale konto" : "Ikke tilsluttet"}</small></div>
               <ArrowRight size={18} />
             </button>
             <button type="button" disabled title="Aktiveres, når Context Handler-klienten er registreret">
               <span><Building2 size={20} /></span>
-              <div><strong>Fælleskommunal Adgangsstyring</strong><small>Klar til kommunal tilkobling</small></div>
+              <div><strong>Fælleskommunal Adgangsstyring</strong><small>Ikke tilsluttet</small></div>
               <ArrowRight size={18} />
             </button>
           </div>
@@ -183,7 +198,7 @@ export function LoginClient() {
           </form>
 
           {error ? <p className="login-error" role="alert">{error}</p> : null}
-          {!loading && !devLoginEnabled && !error ? <p className="login-status" role="status">Testlogin er deaktiveret i dette miljø. Kommunens identitetsforbindelse skal konfigureres af en administrator.</p> : null}
+          {!loading && !devLoginEnabled && !entraEnabled && !error ? <p className="login-status" role="status">Kommunens identitetsforbindelse skal konfigureres af en administrator.</p> : null}
 
           <div className="login-privacy"><LockKeyhole size={16} /><p>Login og adgang kontrolleres på serveren. Rollen kan ikke ændres ved at manipulere browseren.</p></div>
         </div>

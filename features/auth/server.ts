@@ -27,6 +27,7 @@ import {
   clearTestLoginRateLimit,
   consumeTestLoginRateLimit,
 } from "./test-login-rate-limit";
+import { permitsTestSessions, readRuntimeEnvironment } from "../runtime/environment";
 
 type ActorRow = {
   user_id: string;
@@ -56,25 +57,7 @@ const DB_ROLE_BY_ACTOR_ROLE: Record<WorkspaceRole, string> = {
 };
 
 export async function getAuthEnvironment(): Promise<AuthEnvironment> {
-  const result: AuthEnvironment = {};
-
-  if (typeof process !== "undefined") {
-    for (const [key, value] of Object.entries(process.env)) {
-      if (typeof value === "string") result[key] = value;
-    }
-  }
-
-  try {
-    const { env } = await import("cloudflare:workers");
-    for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
-      if (typeof value === "string") result[key] = value;
-    }
-  } catch {
-    // Cloudflare bindings findes først i Sites/Workers-runtime. Lokalt kan
-    // almindelige procesvariabler bruges.
-  }
-
-  return result;
+  return readRuntimeEnvironment();
 }
 
 export async function getActor(request: Request) {
@@ -128,6 +111,9 @@ export async function getActorFromCookieHeader(
     .bind(tokenHash, now.toISOString())
     .first<ActorRow>();
 
+  if (row?.provider === "dev" && !permitsTestSessions(await getAuthEnvironment())) {
+    return null;
+  }
   return row ? actorFromRow(row) : null;
 }
 
@@ -176,8 +162,10 @@ export async function createDevSession(
     await clearTestLoginRateLimit(rateLimitSubject);
   }
 
-  await ensurePortalSchema();
-  const { DB } = await getPersistenceBindings();
+  // A test session must be usable on its first request, before the workspace
+  // page has been visited. The seed itself is gated by the runtime policy.
+  const { preparePortalData } = await import("../workspace/server-repository");
+  const DB = await preparePortalData();
   const viewer = DEMO_VIEWERS[role];
   const now = new Date();
   const nowIso = now.toISOString();

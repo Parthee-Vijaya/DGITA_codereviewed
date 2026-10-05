@@ -4,6 +4,7 @@ import test from "node:test";
 process.env.TURSO_DATABASE_URL = ":memory:";
 process.env.TURSO_AUTH_TOKEN = "test-login-rate-limit-database-token";
 process.env.BLOB_READ_WRITE_TOKEN = "test-login-rate-limit-blob-token";
+process.env.DGITA_TRUSTED_PROXY = "vercel";
 
 const {
   TEST_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
@@ -91,4 +92,10 @@ test("platform-IP pseudonymiseres, og spoofet standardheader ignoreres", async (
     await testLoginRateLimitSubject(first),
     await testLoginRateLimitSubject(otherPlatformIp),
   );
+});
+
+test("forged provider headers cannot rotate the rate-limit key on an untrusted host", async () => {
+  const first = publicRequest("203.0.113.40", { "cf-ray": "fake", "cf-connecting-ip": "203.0.113.45" });
+  const second = publicRequest("203.0.113.41", { "cf-ray": "other", "cf-connecting-ip": "203.0.113.46" });
+  assert.equal(await testLoginRateLimitSubject(first, {}), await testLoginRateLimitSubject(second, {}));
 });

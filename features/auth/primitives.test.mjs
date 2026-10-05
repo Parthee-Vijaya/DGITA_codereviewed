@@ -99,11 +99,11 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
 
   const environment = {
     DGITA_ENABLE_DEV_LOGIN: "true",
-    DGITA_TEST_ACCESS_SECRET: "Parti3411",
+    DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
   };
   assert.equal(
     await verifyTestAccessCode(
-      "Parti3411",
+      "synthetic-test-access",
       environment,
     ),
     true,
@@ -119,9 +119,9 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
     true,
   );
   assert.equal(
-    await verifyTestAccessCode("Parti3411", {
+    await verifyTestAccessCode("synthetic-test-access", {
       DGITA_ENABLE_DEV_LOGIN: "true",
-      DGITA_TEST_ACCESS_SECRET: "Parti3411",
+      DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
       DGITA_DEMO_ACCESS_SECRET: "legacykode",
     }),
     true,
@@ -129,7 +129,7 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
   assert.equal(
     await verifyTestAccessCode("legacykode", {
       DGITA_ENABLE_DEV_LOGIN: "true",
-      DGITA_TEST_ACCESS_SECRET: "Parti3411",
+      DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
       DGITA_DEMO_ACCESS_SECRET: "legacykode",
     }),
     false,

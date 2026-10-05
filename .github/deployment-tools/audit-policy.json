@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-05",
+  "reviewDeadline": "2026-11-04",
+  "scope": "Separate development-only deployment toolchain. One exact known build-glob advisory. No critical, new advisory or runtime exception.",
+  "exceptions": [
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "source": 1240992,
+      "vulnerablePackage": "braces",
+      "range": "<=3.0.3",
+      "severity": "high",
+      "expiresAt": "2026-11-04T00:00:00Z",
+      "owner": "Repository maintainer / municipal technical owner before production",
+      "reason": "Deployment-tool development dependency only. Fixed repository/build glob patterns on isolated runners; no untrusted glob input or public server. No upstream patched braces release exists. All other original CLI advisories are removed by exact overrides, including critical tar. This exception is not a declaration of zero tooling risk.",
+      "remediation": "Update braces and its parent packages when a supported fixed version is published. Untrusted deeply nested glob expressions must not be accepted.",
+      "allowedAffectedNodes": [
+        {
+          "package": "@ts-morph/common",
+          "path": "node_modules/@ts-morph/common",
+          "version": "0.11.1"
+        },
+        {
+          "package": "@vercel/backends",
+          "path": "node_modules/@vercel/backends",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/cervel",
+          "path": "node_modules/@vercel/cervel",
+          "version": "0.1.73"
+        },
+        {
+          "package": "@vercel/elysia",
+          "path": "node_modules/@vercel/elysia",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/express",
+          "path": "node_modules/@vercel/express",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/fastify",
+          "path": "node_modules/@vercel/fastify",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/h3",
+          "path": "node_modules/@vercel/h3",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/hono",
+          "path": "node_modules/@vercel/hono",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/hydrogen",
+          "path": "node_modules/@vercel/hydrogen",
+          "version": "14.0.0"
+        },
+        {
+          "package": "@vercel/koa",
+          "path": "node_modules/@vercel/koa",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/nestjs",
+          "path": "node_modules/@vercel/nestjs",
+          "version": "13.0.0"
+        },
+        {
+          "package": "@vercel/node",
+          "path": "node_modules/@vercel/node",
+          "version": "18.0.0"
+        },
+        {
+          "package": "@vercel/redwood",
+          "path": "node_modules/@vercel/redwood",
+          "version": "15.0.0"
+        },
+        {
+          "package": "@vercel/remix-builder",
+          "path": "node_modules/@vercel/remix-builder",
+          "version": "18.0.0"
+        },
+        {
+          "package": "@vercel/static-build",
+          "path": "node_modules/@vercel/static-build",
+          "version": "15.0.0"
+        },
+        {
+          "package": "@vercel/static-config",
+          "path": "node_modules/@vercel/static-config",
+          "version": "3.4.4"
+        },
+        {
+          "package": "braces",
+          "path": "node_modules/braces",
+          "version": "3.0.3"
+        },
+        {
+          "package": "fast-glob",
+          "path": "node_modules/fast-glob",
+          "version": "3.3.3"
+        },
+        {
+          "package": "micromatch",
+          "path": "node_modules/micromatch",
+          "version": "4.0.8"
+        },
+        {
+          "package": "ts-morph",
+          "path": "node_modules/ts-morph",
+          "version": "12.0.0"
+        },
+        {
+          "package": "vercel",
+          "path": "node_modules/vercel",
+          "version": "62.2.0"
+        }
+      ]
+    }
+  ]
+}
