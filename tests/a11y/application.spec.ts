@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { demoApplicationState } from "../../features/application/engine";
 
@@ -11,6 +11,13 @@ test.beforeEach(({ page }) => {
 test.afterEach(({ page }) => expect(clientErrors.get(page)).toEqual([]));
 
 async function audit(page: Page, scope?: string) {
+  // Inspect the settled state, including disabled-to-enabled color transitions.
+  // Waiting for actual finite animations avoids sampling an intermediate color.
+  await page.evaluate(async () => {
+    await Promise.all(document.getAnimations()
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map((animation) => animation.finished.catch(() => {})));
+  });
   let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]);
   if (scope) builder = builder.include(scope);
   const result = await builder.analyze();
@@ -28,7 +35,9 @@ async function openForm(page: Page) {
   // Accessibility fixtures isolate rendering/focus from persistence; API lifecycle has its own E2E suite.
   await page.route("**/api/drafts**", async (route) => {
     if (route.request().method() === "GET") return route.fulfill({ json: { draft: { id: "a11y-draft", caseNumber: "A11Y-001", state, rowVersion: 1 } } });
-    return route.fulfill({ json: { id: "a11y-draft", caseNumber: "A11Y-001", status: "draft", rowVersion: 2 } });
+    const submitted = route.request().postDataJSON()?.status === "submitted";
+    return route.fulfill({ json: { id: "a11y-draft", caseNumber: "A11Y-001", status: submitted ? "submitted" : "draft", rowVersion: 2,
+      ...(submitted ? { versionNumber: 1, submittedAt: "2026-10-05T10:00:00.000Z", mode: "draft" } : {}) } });
   });
   await page.goto("/?view=application&draft=A11Y-001");
   await expect(page.getByRole("heading", { name: "Generelle oplysninger", exact: true })).toBeVisible();
@@ -184,4 +193,101 @@ test("leader approval and version-bound HTML receipt preserve focus, access and 
     expect(denied.status()).toBe(307);
     expect(denied.headers().location).toContain("/login");
   } finally { await anonymous.close(); }
+});
+
+
+async function expectReflow(page: Page, info: TestInfo, scope: string, label: string) {
+  const measured = await page.evaluate((selector) => {
+    const viewport = document.documentElement.clientWidth;
+    const root = document.querySelector(selector)!;
+    const overflow = [root, ...root.querySelectorAll("*")].flatMap((element) => {
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      if (box.width === 0 || box.height === 0 || style.visibility === "hidden") return [];
+      if (box.left >= -1 && box.right <= viewport + 1) return [];
+      return [{ tag: element.tagName, class: element.className, left: Math.round(box.left), right: Math.round(box.right) }];
+    });
+    return { viewport, documentWidth: document.documentElement.scrollWidth, overflow };
+  }, scope);
+  if (measured.documentWidth > measured.viewport + 1 || measured.overflow.length) {
+    await info.attach(`reflow-${label}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  }
+  expect(measured, `No horizontal page/content overflow at ${label}`).toEqual({ viewport: 320, documentWidth: 320, overflow: [] });
+}
+
+async function expectFocusUncovered(page: Page, info: TestInfo, label: string) {
+  try {
+    await expect.poll(async () => page.evaluate(() => {
+      const target = document.activeElement!.getBoundingClientRect();
+      const headerBottom = document.querySelector(".site-header")?.getBoundingClientRect().bottom ?? 0;
+      return { belowHeader: target.top >= Math.max(0, headerBottom) - 1, aboveBottom: target.bottom <= innerHeight + 1 };
+    }), { message: "Focused item must remain visible below the sticky header" }).toEqual({ belowHeader: true, aboveBottom: true });
+  } catch (error) {
+    await info.attach(`focus-${label}`, { body: await page.screenshot(), contentType: "image/png" });
+    throw error;
+  }
+}
+
+test("320 CSS-pixel form reflows through all steps and submits with keyboard", async ({ page }, info) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await openForm(page);
+  await page.getByRole("button", { name: "Generelle oplysninger", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  const steps = ["Generelle oplysninger", "Systemoplysninger", "Anskaffelsesform", "Værdi for kommunen", "Investering", "Risiko & data", "Implementering", "IT-krav", "Øvrige", "Gennemse"];
+  for (const [index, step] of steps.entries()) {
+    await expect(page.getByRole("heading", { name: step, exact: true })).toBeFocused();
+    await expectReflow(page, info, ".application-page", `step-${index + 1}`);
+    await expectFocusUncovered(page, info, `step-${index + 1}`);
+    await audit(page, ".application-sheet");
+    if (index < steps.length - 1) {
+      await page.getByRole("button", { name: "Fortsæt", exact: true }).focus();
+      await page.keyboard.press("Enter");
+    }
+  }
+  const submit = page.getByRole("button", { name: "Gem og indsend", exact: true });
+  await submit.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".form-message.error")).toBeFocused();
+  await expectReflow(page, info, ".application-page", "final-validation");
+  await expectFocusUncovered(page, info, "final-validation");
+  const consent = page.getByRole("checkbox");
+  await consent.focus();
+  await page.keyboard.press("Space");
+  await expect(consent).toBeChecked();
+  // Walk the native tab order to the final action instead of clicking it.
+  for (let index = 0; index < 5 && !(await submit.evaluate((element) => element === document.activeElement)); index++) await page.keyboard.press("Tab");
+  await expect(submit).toBeFocused();
+  await expectFocusUncovered(page, info, "action");
+  const sent = page.waitForRequest((request) => request.url().includes("/api/drafts") && request.method() === "POST" && request.postDataJSON()?.status === "submitted");
+  await page.keyboard.press("Enter");
+  expect((await sent).postDataJSON().draft.consent).toBe(true);
+  await expect(page.getByText("Ansøgningen er versionslåst og indsendt sikkert.", { exact: true })).toBeVisible();
+});
+
+test("320 CSS-pixel HTML receipt reflows and its actions work in native keyboard order", async ({ page }, info) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.addInitScript(() => localStorage.setItem("dgita-onboarding-v1-complete", "true"));
+  const headers = { Origin: process.env.DGITA_E2E_BASE_URL! };
+  expect((await page.request.post("/api/auth/dev-login", { headers, data: { role: "user" } })).status()).toBe(200);
+  const { approvers } = await (await page.request.get("/api/approvers")).json();
+  const state = { ...structuredClone(demoApplicationState), knownSystem: "nej", selectedSystem: null, manualCatalogEntry: false,
+    manualSystemName: "Syntetisk kvittering ved smal visning", catalogQuery: "", approvingLeaderId: approvers[0].id, approvingLeader: approvers[0].name,
+    remarks: "Lang ubrudt syntetisk reference: " + "REFERENCE".repeat(18), consent: true };
+  const submitted = await page.request.post("/api/drafts", { headers, data: { id: crypto.randomUUID(), draft: state, status: "submitted" } });
+  expect(submitted.status()).toBe(200);
+  const { caseNumber } = await submitted.json();
+  await page.goto(`/cases/${caseNumber}/receipt?kind=submission`);
+  await expect(page.getByRole("heading", { name: "Indsendelseskvittering", exact: true })).toBeVisible();
+  await expectReflow(page, info, ".receipt-document", "receipt");
+  await audit(page);
+  const back = page.getByRole("link", { name: "Tilbage til sagen", exact: true });
+  const pdf = page.getByRole("link", { name: "Hent indsendelseskvittering som PDF", exact: true });
+  await page.keyboard.press("Tab"); await expect(back).toBeFocused(); await expectFocusUncovered(page, info, "action");
+  await page.keyboard.press("Tab"); await expect(pdf).toBeFocused(); await expectFocusUncovered(page, info, "action");
+  const download = page.waitForEvent("download");
+  await page.keyboard.press("Enter");
+  expect((await download).suggestedFilename()).toMatch(/\.pdf$/);
+  await page.keyboard.press("Shift+Tab"); await expect(back).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: state.manualSystemName, exact: true })).toBeVisible();
 });

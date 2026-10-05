@@ -132,8 +132,13 @@ export function ApplicationFormView({
     const target = focusRequest.target === "errors"
       ? sheetRef.current?.querySelector<HTMLElement>(".form-message.error") ?? headingRef.current
       : headingRef.current;
-    target?.focus({ preventScroll: true });
-    target?.scrollIntoView({ block: "start", behavior: "instant" });
+    // Step height changes can move the browser's scroll anchor after React's
+    // commit. Position focus on the next frame, once the new layout is ready.
+    const frame = requestAnimationFrame(() => {
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [focusRequest]);
   const [form, setForm] = useState<ApplicationFormState>(() =>
     structuredClone(initialApplicationState),
