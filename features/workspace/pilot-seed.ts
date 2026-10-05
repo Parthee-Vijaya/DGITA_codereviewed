@@ -3,7 +3,7 @@ import {
   SYNTHETIC_VIEWERS, SYNTHETIC_EXTRA_USERS, SYNTHETIC_APPROVERS, SYNTHETIC_CASES,
   type CaseRecord, type DgitaApproval, type WorkspaceRole,
 } from "./model";
-import { LEGACY_APPROVING_LEADERS, legacyDemoApplicationState, initialApplicationState } from "../application/engine";
+import { LEGACY_APPROVING_LEADERS, legacyDemoApplicationState, demoApplicationState } from "../application/engine";
 import { resolvePilotProfile, type PilotProfile } from "./pilot-profile";
 
 const DEFAULT_APPROVALS: Record<string, DgitaApproval> = {
@@ -377,11 +377,7 @@ function parseDemoDate(value: string) {
 function demoSnapshotForCase(item: CaseRecord, fixtures: PilotFixtures) {
   const leader = fixtures.approvers.find((candidate) => candidate.name === item.leader);
   return {
-    ...structuredClone(fixtures.profile === "legacy-v1" ? legacyDemoApplicationState : {
-      ...initialApplicationState, purpose: "Afprøvning med syntetiske testsager.",
-      dataOwner: "data-owner@example.invalid", systemOwner: "system-owner@example.invalid",
-      contractOwner: "contract-owner@example.invalid", department: "Testafdeling",
-    }),
+    ...structuredClone(fixtures.profile === "legacy-v1" ? legacyDemoApplicationState : demoApplicationState),
     knownSystem: "nej" as const,
     catalogQuery: "",
     selectedSystem: null,
