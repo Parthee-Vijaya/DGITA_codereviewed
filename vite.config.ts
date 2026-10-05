@@ -1,4 +1,5 @@
 import vinext from "vinext";
+import { workerdDevConsole } from "./build/workerd-dev-console.mjs";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json" with { type: "json" };
 import { sites } from "./build/sites-vite-plugin.js";
@@ -49,6 +50,7 @@ export default defineConfig(async () => {
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
     plugins: [
+      workerdDevConsole(),
       vinext(),
       sites(),
       cloudflare({
