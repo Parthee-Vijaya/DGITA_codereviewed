@@ -2,7 +2,7 @@
 
 En moderne, webbaseret portal til kommunale IT-anskaffelser. Løsningen samler ansøgning, dokumentation, sagsbehandling, ledergodkendelse, Outlook-mail, PDF-kvitteringer og administration i ét responsivt workspace.
 
-Testsager og dokumentindhold er fiktive test-fixtures; projektgruppens navne og kontaktoplysninger fra den eksisterende portal bruges i test- og vejledningsindhold. Systemkataloget er normaliseret fra de udleverede KITOS- og Kalundborg-regneark og følger med repositoryet som deploybar runtime-data.
+Nye testsager og testidentiteter bruger syntetiske fixtures. Den eksisterende pilots identiteter og indhold bevares ved opgradering; kildens vejledningsmateriale gennemgås særskilt i datafortegnelsen. Systemkataloget er normaliseret fra de udleverede KITOS- og Kalundborg-regneark og følger med repositoryet som deploybar runtime-data.
 
 ![D-GITA-forsiden](docs/screenshots/home.jpg)
 
@@ -15,6 +15,8 @@ Komponenterne er forfinet med inspiration fra [Fisher UI](https://jakobfisker.dk
 ![Forfinet sagsvisning med segmenteret navigation og rolige arbejdsflader](docs/screenshots/interface-refinement.png)
 
 ## Status
+
+Den lokale [K01–K12-kandidat og dens restopgaver](docs/candidate-readiness.md) samler implementering, reproducerbare prøver og grænserne for evidensen. [Miljøacceptpakken](docs/municipal-acceptance.md) beskriver de efterfølgende kommunale prøver.
 
 Fremtidigt arbejde og releases hører til [DGITA_codereviewed](https://github.com/Parthee-Vijaya/DGITA_codereviewed). Det tidligere DGITA-repo er bevaret som `upstream`. Produktionsforberedelserne omfatter sikkerhedsrettelser og CI/CD, men en kommunal produktionsaccept kræver stadig de eksterne kontroller i [driftsvejledningen](docs/production-operations.md).
 
