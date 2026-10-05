@@ -22,10 +22,10 @@ import {
 
 import {
   isSafeContentUrl,
-  isSafeImageUrl,
   type ContentEntry,
   type ImageEntry,
 } from "../workspace/model";
+import { safeImagePreviewSource } from "./image-preview";
 
 export type EditorSelection =
   | { kind: "content"; entry: ContentEntry }
@@ -214,6 +214,7 @@ export function EditorDrawer({
   }, [onClose, selection]);
 
   if (!selection || !draft) return null;
+  const imagePreviewSource = draft.kind === "image" ? safeImagePreviewSource(draft.entry.src) : null;
 
   async function uploadImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -257,7 +258,7 @@ export function EditorDrawer({
       }
       return;
     }
-    if (!isSafeImageUrl(currentDraft.entry.src)) {
+    if (!safeImagePreviewSource(currentDraft.entry.src)) {
       setError("Brug en sikker https-adresse, en intern /sti eller upload en billedfil.");
       return;
     }
@@ -309,8 +310,10 @@ export function EditorDrawer({
           ) : (
             <>
               <div className="cms-image-preview">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={draft.entry.src} alt="Forhåndsvisning af valgt portalbillede" />
+                {imagePreviewSource ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imagePreviewSource} alt="Forhåndsvisning af valgt portalbillede" />
+                ) : <p role="status">Skriv en gyldig billedadresse, eller upload et billede.</p>}
               </div>
               <label>Billedadresse<input value={draft.entry.src} onChange={(event) => setDraft({ kind: "image", entry: { ...draft.entry, src: event.target.value } })} /></label>
               <label>Alttekst<input value={draft.entry.alt} onChange={(event) => setDraft({ kind: "image", entry: { ...draft.entry, alt: event.target.value } })} /></label>

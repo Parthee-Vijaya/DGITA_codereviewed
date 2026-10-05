@@ -37,6 +37,10 @@ env:
 jobs:
   validate:
     name: Validate immutable release source
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -130,6 +134,10 @@ jobs:
 
   promote:
     name: Approve and promote the verified candidate
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
     if: inputs.promote
     needs: [validate, stage]
     environment:

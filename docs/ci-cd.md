@@ -67,7 +67,7 @@ Følgende er konfigureret og læst tilbage via GitHub API den 5. oktober 2026. D
 | Dependabot | Advisories og security updates aktiveret; ugentlige konfigurerede opdateringer | Følg nye PR'er og advisories; restundtagelser udløber 4. november |
 | Private vulnerability reporting | Aktiveret | Fastlæg sikkerhedskontakt, responstider og beredskab |
 | CodeQL | Advanced workflow for JS/TS og Actions; faktiske analyser er gennemført | Analysefund skal triageres særskilt; et grønt analysejob er ikke nul fund |
-| Code scanning merge protection | CodeQL-jobs er del af den obligatoriske gate | Et selvstændigt ruleset med alarmtærskel skal kontrolleres separat |
+| Code scanning merge protection | Aktivt ruleset `CodeQL security gate` (24493001) på `main`, ingen bypass; blokerer CodeQL errors og high/critical sikkerhedsfund | Kontrollér både analyse og alerts; et grønt uploadjob betyder ikke nul fund |
 | GitHub environments | `pilot` og `production`: kun beskyttede branches, Parthee som required reviewer, deployment slået fra | Særskilte cloudprojekter/credentials mangler. Selv-review er tilladt, indtil en anden ansvarlig er udpeget |
 
 Begge miljøer har `DGITA_DEPLOYMENT_ENABLED=false`; produktion har også `DGITA_PRODUCTION_APPROVED=false`. Disse spærrer må først ændres efter konkret teknisk og organisatorisk accept. Ingen live-deployment er udført af denne klargøring. Den eksisterende onlinepilot og dens testkode er bevaret.
@@ -89,7 +89,7 @@ Undtagelser udløber **4. november 2026 kl. 00.00 UTC**. De skal revurderes før
 
 ## Manuel Vercel-release
 
-`Manual Vercel release` kræver en fuld 40-tegn commit-SHA, miljøet `pilot` eller `production` og et eksplicit valg om promotion (standard: fra). Workflowet skal startes fra `main`. Guard-scriptet kræver beskyttet `main`, at SHA findes på denne branch, og at seneste push-CI på netop denne SHA samt `Required quality gate` er gennemført med succes. Kilde og CI kontrolleres igen efter godkendelse før promotion.
+`Manual Vercel release` kræver en fuld 40-tegn commit-SHA, miljøet `pilot` eller `production` og et eksplicit valg om promotion (standard: fra). Workflowet skal startes fra `main`. Guard-scriptet kræver beskyttet `main`, at SHA findes på denne branch, og at seneste push-CI på netop denne SHA samt `Required quality gate` er gennemført med succes. Det læser også de faktiske SARIF-resultater for CodeQL JS/TS og Actions på samme SHA og `main`: manglende eller ugyldig analyse, errors samt high/critical sikkerhedsfund stopper frigivelsen. Denne kontrol bruger `security-events: read` og blokerer også en gammel sårbar commit, selv om dens fund senere er rettet på hovedbranchen. Kilde, CI og analyser kontrolleres igen efter godkendelse før promotion.
 
 `pilot` og `production` skal pege på **hver sit Vercel-projekt, database og private fillager**. Begge bygger mod eget projekts Vercel Production-konfiguration. `DGITA_ENVIRONMENT=pilot` beholder testlogin; produktionsprojektet skal have `DGITA_ENVIRONMENT=production` og `DGITA_ENABLE_DEV_LOGIN=false`. Den lokale production-preflight køres på de hentede miljøværdier. Secrets og `.vercel/output` uploades aldrig som Actions-artifacts; den hentede env-fil slettes efter jobbet.
 
@@ -133,3 +133,5 @@ Vercel-token, projekter, adskilte dataressourcer, miljøgodkendelser, migrations
 ## CodeQL-triage af klargøringen
 
 PR #3 blev genanalyseret på `d556194` i [run 37289411823](https://github.com/Parthee-Vijaya/DGITA_codereviewed/actions/runs/37289411823). Tre mediumfund i testharnessets dynamiske kodekonstruktion blev lukket ved at bruge en statisk child-process med JSON på stdin. To `js/http-to-file-access`-fund blev individuelt gennemgået og markeret falsk positive med begrundelse i GitHub: #4 er en tilsigtet download, hvis committed SHA-256 verificeres før skrivning/udpakning; #5 er valideret metadata til runnerens outputfil med faste navne, snævre formater og CR/LF-afvisning. Der er ingen generel query-suppression. Nul åbne fund på denne PR-ref er verificeret; fremtidige commits skal analyseres igen.
+
+Den første fulde `main`-analyse på `c5a2bfd` fandt desuden to arvede high-fund, som ikke fremgik af PR-differencen: billededitorens preview brugte kladde-URL uden den URL-validering, som allerede fandtes ved gemning, og generatoren af offentlige sagsnumre brugte modulo uden rejection sampling. Begge er rettet i opfølgningen. Sagsnummeret er en offentlig reference, ikke en adgangshemmelighed. Produktionsaccept skal altid baseres på den fulde hovedbranches analyse; PR-differencen er utilstrækkelig som baseline.
