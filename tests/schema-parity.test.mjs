@@ -105,3 +105,12 @@ test("contract detects CHECK, FK grouping and expression-index drift on real SQL
       ["indexes", "foreignKeys", "checks"].map((kind) => ({ table: "portal_child", kind })));
   } finally { original.close(); modified.close(); }
 });
+
+test("a trigger outside the portal naming convention cannot evade the contract", async () => {
+  const db = fixture(portalSchemaStatements);
+  try {
+    const before = await readSchemaContract(adapter(db));
+    db.exec("CREATE TRIGGER unexpected_side_effect AFTER UPDATE ON portal_users BEGIN SELECT 1; END");
+    assert.deepEqual(compareSchemaContracts(before, await readSchemaContract(adapter(db))), [{ table: "portal_users", kind: "triggers" }]);
+  } finally { db.close(); }
+});

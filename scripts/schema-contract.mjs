@@ -41,7 +41,7 @@ function normalizedDefault(value) {
 /** Reads schema metadata only. No application rows, secrets or ledger writes. */
 export async function readSchemaContract(database) {
   const query = async (sql) => (await database.execute(sql)).rows.map((row) => ({ ...row }));
-  const objects = await query("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name GLOB 'portal_*' ORDER BY type, name");
+  const objects = await query("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name GLOB 'portal_*' OR tbl_name GLOB 'portal_*' ORDER BY type, name");
   const tables = {};
   for (const table of objects.filter((object) => object.type === "table")) {
     const columns = await query(`PRAGMA table_xinfo(${identifier(table.name)})`);
