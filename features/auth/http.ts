@@ -1,4 +1,5 @@
 import type { AuthEnvironment } from "./primitives";
+import { writeOperationalLog } from "../privacy/operational-log";
 
 export class AuthHttpError extends Error {
   readonly status: number;
@@ -143,10 +144,8 @@ export function authErrorResponse(error: unknown) {
     );
   }
 
-  const eventId = crypto.randomUUID();
-  const name = error instanceof Error && /^[A-Za-z0-9_.-]{1,80}$/u.test(error.name) ? error.name : "UnknownError";
-  // Provider errors can embed connection strings, SQL parameters or tokens.
-  console.error("Authentication request failed", { eventId, errorName: name });
+  // Even Error.name may contain provider or request-controlled content.
+  writeOperationalLog({ event: "auth.unexpected_error" });
   return noStoreJson(
     {
       code: "AUTH_UNAVAILABLE",
