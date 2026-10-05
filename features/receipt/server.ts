@@ -7,6 +7,7 @@ import {
 } from "pdf-lib";
 
 import { getPersistenceBindings } from "../../db/persistence";
+import { assertMailStillAuthorized, MailAttachmentReferenceError, type ClaimedMail } from "../mail/claim-authorization";
 import type { ServerActor } from "../auth/types";
 import type { ApplicationFormState } from "../application/engine";
 import { preparePortalData, resolveActorUserId } from "../workspace/server-repository";
@@ -60,13 +61,30 @@ export async function getOrCreateReceipt(
 ) {
   const DB = await preparePortalData();
   const actorUserId = await resolveActorUserId(DB, actor);
-  const application = await findAccessibleApplication(
-    DB,
-    actor,
-    actorUserId,
-    caseNumber,
-    expectedApplicationVersionId,
-  );
+  const application = await findReceiptApplication(DB, actor.tenantId, caseNumber, expectedApplicationVersionId, actor.role === "user" ? actorUserId : undefined);
+  return materializeReceipt(DB, actor, actorUserId, application, kind);
+}
+
+/** Internal job capability: a current DB claim and its exact immutable reference are mandatory. */
+export async function getOrCreateOutboxReceipt(claim: ClaimedMail, kind: ReceiptKind, versionId: string) {
+  const DB = await preparePortalData();
+  await assertMailStillAuthorized(DB, claim);
+  let references: unknown;
+  try { references = JSON.parse(claim.attachments_json); } catch { throw new MailAttachmentReferenceError(); }
+  if (!Array.isArray(references) || !references.some((item) => item?.receiptKind === kind && item?.applicationVersionId === versionId)) {
+    throw new MailAttachmentReferenceError();
+  }
+  const target = await DB.prepare("SELECT case_number FROM portal_applications WHERE id = ? AND tenant_id = ?")
+    .bind(claim.application_id, claim.tenant_id).first<{ case_number: string }>();
+  if (!target) throw new MailAttachmentReferenceError();
+  const application = await findReceiptApplication(DB, claim.tenant_id, target.case_number, versionId);
+  return materializeReceipt(DB, { tenantId: claim.tenant_id, subject: "service:mail-scheduler" }, null, application, kind, () => assertMailStillAuthorized(DB, claim));
+}
+
+async function materializeReceipt(
+  DB: D1Database, actor: Pick<ServerActor, "tenantId" | "subject">, actorUserId: string | null,
+  application: ReceiptApplicationRow, kind: ReceiptKind, assertAuthorized: () => Promise<void> = async () => {},
+) {
   if (
     !application.receipt_version_id ||
     application.receipt_version_number === null ||
@@ -129,6 +147,7 @@ export async function getOrCreateReceipt(
     },
   });
 
+  await assertAuthorized();
   await DB.batch([
       DB.prepare(`
         INSERT INTO portal_receipts
@@ -176,14 +195,14 @@ export async function getOrCreateReceipt(
   return { bytes, filename: receiptFilename(application.case_number, kind), checksum };
 }
 
-async function findAccessibleApplication(
+async function findReceiptApplication(
   DB: D1Database,
-  actor: ServerActor,
-  actorUserId: string,
+  tenantId: string,
   caseNumber: string,
   expectedApplicationVersionId?: string,
+  ownerUserId?: string,
 ) {
-  const ownerClause = actor.role === "user" ? "AND a.owner_user_id = ?" : "";
+  const ownerClause = ownerUserId ? "AND a.owner_user_id = ?" : "";
   const statement = DB.prepare(`
     SELECT a.id, a.case_number, a.system_name, a.status, a.owner_user_id,
            owner.display_name AS owner_name, owner.email AS owner_email,
@@ -214,9 +233,9 @@ async function findAccessibleApplication(
     WHERE a.tenant_id = ? AND a.case_number = ? ${ownerClause}
     LIMIT 1
   `);
-  const row = actor.role === "user"
-    ? await statement.bind(expectedApplicationVersionId ?? null, actor.tenantId, caseNumber, actorUserId).first<ReceiptApplicationRow>()
-    : await statement.bind(expectedApplicationVersionId ?? null, actor.tenantId, caseNumber).first<ReceiptApplicationRow>();
+  const row = ownerUserId
+    ? await statement.bind(expectedApplicationVersionId ?? null, tenantId, caseNumber, ownerUserId).first<ReceiptApplicationRow>()
+    : await statement.bind(expectedApplicationVersionId ?? null, tenantId, caseNumber).first<ReceiptApplicationRow>();
   if (!row) throw new ReceiptError(404, "Sagen findes ikke, eller du har ikke adgang.");
   return row;
 }

@@ -1,10 +1,10 @@
 import type { ServerActor } from "../auth/types";
-import { approvalMandateSql } from "../approval/mandate";
+import { assertMailStillAuthorized, MailCancelledError, MailAttachmentReferenceError } from "./claim-authorization";
 import {
   APPROVAL_TOKEN_PLACEHOLDER,
   approvalTokenForRequest,
 } from "../approval/token-service";
-import { getOrCreateReceipt, ReceiptError } from "../receipt/server";
+import { getOrCreateOutboxReceipt, ReceiptError } from "../receipt/server";
 import { preparePortalData, resolveActorUserId } from "../workspace/server-repository";
 import {
   createGraphMailTransport,
@@ -49,19 +49,6 @@ export class OutboxError extends Error {
   }
 }
 
-class MailAttachmentReferenceError extends Error {
-  constructor() {
-    super("Mailens bilagsreferencer er ugyldige.");
-    this.name = "MailAttachmentReferenceError";
-  }
-}
-
-class MailCancelledError extends Error {
-  constructor() {
-    super("Mailen er ikke længere aktuel.");
-    this.name = "MailCancelledError";
-  }
-}
 
 export async function getMailDashboard(actor: ServerActor) {
   requireAdmin(actor);
@@ -221,12 +208,21 @@ export async function queueStatusMail(
 
 export async function processOutbox(actor: ServerActor, limit = 5) {
   requireAdmin(actor);
+  return processTenantOutbox(actor, limit);
+}
+
+type MailPrincipal = { tenantId: string; subject: string; userId: string | null };
+
+async function processTenantOutbox(actor: MailPrincipal, limit: number) {
   const DB = await preparePortalData();
   const activeTenant = await DB.prepare("SELECT id FROM portal_tenants WHERE id = ? AND status = 'active'")
     .bind(actor.tenantId).first<{ id: string }>();
   if (!activeTenant) {
     throw new OutboxError(403, "TENANT_INACTIVE", "Kommunen er ikke aktiv. Ingen mails er sendt.");
   }
+  const quarantined = await DB.prepare("SELECT 1 AS blocked FROM portal_bootstrap_state WHERE tenant_id = ? AND scope = 'recovery-quarantine'")
+    .bind(actor.tenantId).first();
+  if (quarantined) throw new OutboxError(403, "MAIL_RECOVERY_QUARANTINED", "Mail er spærret efter gendannelse og kræver operatørens frigivelse.");
   const normalizedLimit = Math.min(10, Math.max(1, Math.trunc(limit)));
   const environment = await getGraphMailEnvironment();
   let transport;
@@ -242,7 +238,7 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
 
   const now = new Date().toISOString();
   const abandonedBefore = new Date(Date.now() - 15 * 60_000).toISOString();
-  await DB.prepare(`
+  const abandoned = await DB.prepare(`
     UPDATE portal_mail_outbox
     SET status = 'failed', next_attempt_at = NULL,
         last_error = 'MAIL_DELIVERY_STATE_UNKNOWN', updated_at = ?
@@ -277,13 +273,14 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
           updated_at = ?, last_error = NULL
       WHERE id = ? AND tenant_id = ? AND status = 'queued' AND attempt_count = ?
         AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+        AND NOT EXISTS (SELECT 1 FROM portal_bootstrap_state quarantine WHERE quarantine.tenant_id = portal_mail_outbox.tenant_id AND quarantine.scope = 'recovery-quarantine')
     `).bind(new Date().toISOString(), row.id, actor.tenantId, row.attempt_count, now).run();
     if (Number(claimed.meta.changes ?? 0) !== 1) continue;
 
     let accepted;
     try {
       const content = await materializeMailContent(DB, row);
-      const attachments = await resolveAttachments(actor, row);
+      const attachments = await resolveAttachments(row);
       accepted = await transport.send({
         subject: row.subject,
         body: { contentType: "HTML", content: content.html },
@@ -300,8 +297,8 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
               html_body = '<p>Mail annulleret.</p>',
               attachments_json = '[]',
               last_error = 'MAIL_CANCELLED', updated_at = ?
-          WHERE id = ? AND tenant_id = ? AND status = 'processing'
-        `).bind(cancelledAt, row.id, actor.tenantId).run();
+          WHERE id = ? AND tenant_id = ? AND status = 'processing' AND attempt_count = ?
+        `).bind(cancelledAt, row.id, actor.tenantId, row.attempt_count + 1).run();
         results.push({ id: row.id, status: "cancelled" });
         continue;
       }
@@ -322,8 +319,8 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
       await DB.prepare(`
         UPDATE portal_mail_outbox
         SET status = ?, next_attempt_at = ?, last_error = ?, updated_at = ?
-        WHERE id = ? AND tenant_id = ? AND status = 'processing'
-      `).bind(status, retryAt, safeError, new Date().toISOString(), row.id, actor.tenantId).run();
+        WHERE id = ? AND tenant_id = ? AND status = 'processing' AND attempt_count = ?
+      `).bind(status, retryAt, safeError, new Date().toISOString(), row.id, actor.tenantId, row.attempt_count + 1).run();
       results.push({ id: row.id, status });
       continue;
     }
@@ -339,13 +336,14 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
             html_body = CASE WHEN template_key = 'approval.requested'
               THEN '<p>Godkendelseslink fjernet efter afsendelse.</p>' ELSE html_body END,
             updated_at = ?, sent_at = ?
-        WHERE id = ? AND tenant_id = ? AND status = 'processing'
-      `).bind(accepted.requestId, sentAt, sentAt, row.id, actor.tenantId),
+        WHERE id = ? AND tenant_id = ? AND status = 'processing' AND attempt_count = ?
+      `).bind(accepted.requestId, sentAt, sentAt, row.id, actor.tenantId, row.attempt_count + 1),
       DB.prepare(`
         INSERT INTO portal_audit_events
           (id, tenant_id, application_id, actor_user_id, actor_subject, event_type,
            entity_type, entity_id, payload_json, ip_hash, occurred_at)
-        VALUES (?, ?, ?, ?, ?, 'mail.sent', 'mail_outbox', ?, ?, NULL, ?)
+        SELECT ?, ?, ?, ?, ?, 'mail.sent', 'mail_outbox', ?, ?, NULL, ?
+        WHERE EXISTS (SELECT 1 FROM portal_mail_outbox WHERE id = ? AND tenant_id = ? AND status = 'sent' AND attempt_count = ? AND provider_message_id = ?)
       `).bind(
         auditId,
         actor.tenantId,
@@ -355,72 +353,44 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
         row.id,
         JSON.stringify({ recipient: row.recipient_email, requestId: accepted.requestId }),
         sentAt,
+        row.id, actor.tenantId, row.attempt_count + 1, accepted.requestId,
       ),
     ]);
     results.push({ id: row.id, status: "sent" });
   }
-  return { processed: results.length, results };
+  return { processed: results.length, results, abandoned: Number(abandoned.meta.changes ?? 0) };
 }
 
-/**
- * Cloudflare Cron entry point. Each tenant with queued mail is processed with
- * a stable admin identity for authorization/audit, while the audit subject
- * clearly identifies the scheduler instead of a human interaction.
- */
+/** Both hosts use a machine principal; no human administrator is impersonated. */
 export async function processScheduledOutbox(limitPerTenant = 10) {
-  try {
-    readGraphMailConfig(await getGraphMailEnvironment());
-  } catch {
-    return { configured: false, tenants: 0, processed: 0 };
-  }
+  try { readGraphMailConfig(await getGraphMailEnvironment()); }
+  catch { return { configured: false, tenants: 0, processed: 0, failed: 0, queueAgeSeconds: 0 }; }
   const DB = await preparePortalData();
+  const now = new Date().toISOString();
   const tenants = await DB.prepare(`
-    SELECT DISTINCT outbox.tenant_id
+    SELECT outbox.tenant_id, MIN(outbox.created_at) AS oldest
     FROM portal_mail_outbox outbox
-    WHERE (outbox.status = 'queued'
+    INNER JOIN portal_tenants tenant ON tenant.id = outbox.tenant_id AND tenant.status = 'active'
+    WHERE NOT EXISTS (SELECT 1 FROM portal_bootstrap_state quarantine WHERE quarantine.tenant_id = outbox.tenant_id AND quarantine.scope = 'recovery-quarantine')
+      AND ((outbox.status = 'queued'
       AND (outbox.next_attempt_at IS NULL OR outbox.next_attempt_at <= ?)
       AND outbox.attempt_count < 5)
-      OR (outbox.status = 'processing' AND outbox.updated_at < ?)
-    ORDER BY outbox.tenant_id
-  `).bind(new Date().toISOString(), new Date(Date.now() - 15 * 60_000).toISOString()).all<{ tenant_id: string }>();
+      OR (outbox.status = 'processing' AND outbox.updated_at < ?))
+    GROUP BY outbox.tenant_id ORDER BY oldest, outbox.tenant_id LIMIT 50
+  `).bind(now, new Date(Date.now() - 15 * 60_000).toISOString()).all<{ tenant_id: string; oldest: string }>();
   let processed = 0;
-  let processedTenants = 0;
+  let failed = 0;
+  let queueAgeSeconds = 0;
   for (const tenant of tenants.results) {
-    const identity = await DB.prepare(`
-      SELECT user.id, user.external_subject, user.email, user.display_name,
-             tenant.name AS municipality, user.identity_provider
-      FROM portal_users user
-      INNER JOIN portal_tenants tenant ON tenant.id = user.tenant_id
-      INNER JOIN portal_user_roles role
-        ON role.tenant_id = user.tenant_id AND role.user_id = user.id
-      WHERE user.tenant_id = ? AND user.status = 'active' AND role.role = 'admin'
-        AND tenant.status = 'active'
-      ORDER BY user.created_at, user.id
-      LIMIT 1
-    `).bind(tenant.tenant_id).first<{
-      id: string;
-      external_subject: string;
-      email: string;
-      display_name: string;
-      municipality: string;
-      identity_provider: "dev" | "entra" | "fk";
-    }>();
-    if (!identity) continue;
-    const result = await processOutbox({
-      userId: identity.id,
-      subject: `mail-scheduler:${identity.external_subject}`,
-      tenantId: tenant.tenant_id,
-      role: "admin",
-      displayName: "D-GITA mailscheduler",
-      email: identity.email,
-      initials: "DS",
-      municipality: identity.municipality,
-      provider: identity.identity_provider,
-    }, limitPerTenant);
-    processed += result.processed;
-    processedTenants += 1;
+    const age = Math.floor((Date.now() - Date.parse(tenant.oldest.replace(" ", "T") + (tenant.oldest.includes("Z") ? "" : "Z"))) / 1000);
+    if (Number.isFinite(age)) queueAgeSeconds = Math.min(365 * 86400, Math.max(queueAgeSeconds, age, 0));
+    try {
+      const result = await processTenantOutbox({ tenantId: tenant.tenant_id, userId: null, subject: "service:mail-scheduler" }, limitPerTenant);
+      processed += result.processed;
+      failed += result.abandoned + result.results.filter((item) => item.status === "failed").length;
+    } catch { failed += 1; }
   }
-  return { configured: true, tenants: processedTenants, processed };
+  return { configured: true, tenants: tenants.results.length, processed, failed, queueAgeSeconds };
 }
 
 async function materializeMailContent(DB: D1Database, row: OutboxRow) {
@@ -443,42 +413,15 @@ async function materializeMailContent(DB: D1Database, row: OutboxRow) {
   };
 }
 
-async function assertMailStillAuthorized(DB: D1Database, row: OutboxRow) {
-  const current = await DB.prepare(`
-    SELECT mail.id FROM portal_mail_outbox mail
-    INNER JOIN portal_tenants tenant ON tenant.id = mail.tenant_id AND tenant.status = 'active'
-    WHERE mail.id = ? AND mail.tenant_id = ? AND mail.status = 'processing'
-      AND mail.recipient_email = ?
-    LIMIT 1
-  `).bind(row.id, row.tenant_id, row.recipient_email).first<{ id: string }>();
-  if (!current) throw new MailCancelledError();
-  if (row.template_key !== "approval.requested") return;
-  const match = /^approval\.requested:([0-9a-f-]{36}):/iu.exec(row.idempotency_key);
-  if (!match) throw new MailAttachmentReferenceError();
-  const authorized = await DB.prepare(`
-    SELECT request.id FROM portal_approval_requests request
-    INNER JOIN portal_applications application
-      ON application.id = request.application_id AND application.tenant_id = request.tenant_id
-    WHERE request.id = ? AND request.tenant_id = ? AND request.application_id = ?
-      AND request.status = 'pending' AND request.expires_at > ?
-      AND request.application_version_id = application.current_version_id
-      AND LOWER(TRIM(request.approver_email)) = LOWER(TRIM(?))
-      AND ${approvalMandateSql()}
-    LIMIT 1
-  `).bind(match[1], row.tenant_id, row.application_id, new Date().toISOString(), row.recipient_email)
-    .first<{ id: string }>();
-  if (!authorized) throw new MailCancelledError();
-}
 
-async function resolveAttachments(actor: ServerActor, row: OutboxRow) {
+async function resolveAttachments(row: OutboxRow) {
   const references = parseReceiptReferences(row.attachments_json);
   if (!references.length) return undefined;
   if (!row.case_number) throw new Error("Outbox-mail mangler sag.");
   const attachments: MailAttachment[] = [];
   for (const reference of references) {
-    const receipt = await getOrCreateReceipt(
-      actor,
-      row.case_number,
+    const receipt = await getOrCreateOutboxReceipt(
+      row,
       reference.receiptKind,
       reference.applicationVersionId,
     );
