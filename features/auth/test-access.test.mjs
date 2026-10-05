@@ -6,7 +6,7 @@ import { AuthHttpError } from "./http.ts";
 
 const publicUrl = "https://portal.example.dk/login";
 const validEnvironment = {
-  DGITA_ENABLE_DEV_LOGIN: "true",
+  DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
   DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
 };
 
@@ -14,7 +14,7 @@ test("offentligt testlogin fejler lukket uden en gyldig serverkode", async () =>
   await assert.rejects(
     assertTestLoginAccess(
       publicUrl,
-      { DGITA_ENABLE_DEV_LOGIN: "true" },
+      { DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk" },
       "uanset-kode",
       null,
     ),
@@ -27,7 +27,7 @@ test("offentligt testlogin fejler lukket uden en gyldig serverkode", async () =>
     assertTestLoginAccess(
       publicUrl,
       {
-        DGITA_ENABLE_DEV_LOGIN: "true",
+        DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
         DGITA_TEST_ACCESS_SECRET: "kort",
       },
       "kort",

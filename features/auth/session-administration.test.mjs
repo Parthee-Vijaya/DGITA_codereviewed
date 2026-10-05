@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 process.env.DGITA_ENVIRONMENT = "pilot";
 process.env.DGITA_ENABLE_DEV_LOGIN = "true";
+process.env.DGITA_APP_ORIGIN = "http://localhost";
 process.env.TURSO_DATABASE_URL = ":memory:";
 process.env.TURSO_AUTH_TOKEN = "synthetic-session-lifecycle";
 process.env.BLOB_READ_WRITE_TOKEN = "synthetic-session-lifecycle";
