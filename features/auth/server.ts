@@ -1,3 +1,5 @@
+import { resolveSessionActor, type SessionActivityOptions } from "./session-actor";
+import { readSessionPolicy } from "./session-lifecycle";
 import {
   ensurePortalSchema,
   getPersistenceBindings,
@@ -11,14 +13,11 @@ import {
   createSessionToken,
   devLoginPolicy,
   hashSessionToken,
-  initialsFor,
   readSessionToken,
   sessionCookie,
-  SESSION_TTL_SECONDS,
   type AuthEnvironment,
 } from "./primitives";
 import {
-  AUTH_PROVIDERS,
   type AuthProvider,
   type ServerActor,
 } from "./types";
@@ -27,18 +26,7 @@ import {
   clearTestLoginRateLimit,
   consumeTestLoginRateLimit,
 } from "./test-login-rate-limit";
-import { permitsTestSessions, readRuntimeEnvironment } from "../runtime/environment";
-
-type ActorRow = {
-  user_id: string;
-  external_subject: string;
-  tenant_id: string;
-  role: string;
-  display_name: string;
-  email: string;
-  municipality: string;
-  provider: string;
-};
+import { readRuntimeEnvironment } from "../runtime/environment";
 
 type UserIdRow = {
   id: string;
@@ -60,65 +48,20 @@ export async function getAuthEnvironment(): Promise<AuthEnvironment> {
   return readRuntimeEnvironment();
 }
 
-export async function getActor(request: Request) {
-  return getActorFromCookieHeader(request.headers.get("cookie"));
+export async function getActor(request: Request, options: SessionActivityOptions = {}) {
+  return resolveSessionActor(request.headers.get("cookie"), new Date(), options);
 }
 
 export async function getActorFromHeaders(headers: Pick<Headers, "get">) {
   return getActorFromCookieHeader(headers.get("cookie"));
 }
 
-export async function getActorFromCookieHeader(
-  cookieHeader: string | null,
-  now = new Date(),
-): Promise<ServerActor | null> {
-  const token = readSessionToken(cookieHeader);
-  if (!token) return null;
-
-  await ensurePortalSchema();
-  const tokenHash = await hashSessionToken(token);
-  const { DB } = await getPersistenceBindings();
-  const row = await DB.prepare(
-    `SELECT
-       u.id AS user_id,
-       u.external_subject,
-       u.tenant_id,
-       r.role,
-       u.display_name,
-       u.email,
-       t.name AS municipality,
-       s.provider
-     FROM portal_sessions s
-     JOIN portal_users u
-       ON u.id = s.user_id AND u.tenant_id = s.tenant_id
-     JOIN portal_tenants t
-       ON t.id = s.tenant_id
-     JOIN portal_user_roles r
-       ON r.user_id = u.id AND r.tenant_id = u.tenant_id
-     WHERE s.token_hash = ?
-       AND s.revoked_at IS NULL
-       AND s.expires_at > ?
-       AND u.status = 'active'
-       AND t.status = 'active'
-       AND r.role IN ('user', 'dgita_consultant', 'admin')
-     ORDER BY CASE r.role
-       WHEN 'admin' THEN 3
-       WHEN 'dgita_consultant' THEN 2
-       ELSE 1
-     END DESC
-     LIMIT 1`,
-  )
-    .bind(tokenHash, now.toISOString())
-    .first<ActorRow>();
-
-  if (row?.provider === "dev" && !permitsTestSessions(await getAuthEnvironment())) {
-    return null;
-  }
-  return row ? actorFromRow(row) : null;
+export async function getActorFromCookieHeader(cookieHeader: string | null, now = new Date()): Promise<ServerActor | null> {
+  return resolveSessionActor(cookieHeader, now);
 }
 
-export async function requireActor(request: Request): Promise<ServerActor> {
-  const actor = await getActor(request);
+export async function requireActor(request: Request, options: SessionActivityOptions = {}): Promise<ServerActor> {
+  const actor = await getActor(request, options);
   if (!actor) {
     throw new AuthHttpError(
       401,
@@ -167,10 +110,11 @@ export async function createDevSession(
   const { preparePortalData } = await import("../workspace/server-repository");
   const DB = await preparePortalData();
   const viewer = await resolvePilotViewer(DB, role);
+  const sessionPolicy = readSessionPolicy(runtimeEnvironment);
   const now = new Date();
   const nowIso = now.toISOString();
   const expiresAt = new Date(
-    now.getTime() + SESSION_TTL_SECONDS * 1_000,
+    now.getTime() + sessionPolicy.maximumSeconds * 1_000,
   ).toISOString();
   const proposedUserId = viewer.subject;
 
@@ -290,7 +234,7 @@ export async function createDevSession(
       userId: storedUser.id,
       provider: "dev",
     },
-    cookie: sessionCookie(token, request.url),
+    cookie: sessionCookie(token, request.url, sessionPolicy.maximumSeconds),
     expiresAt,
   };
 }
@@ -312,34 +256,4 @@ export async function revokeSession(
     .bind(now.toISOString(), await hashSessionToken(token))
     .run();
   return (result.meta.changes ?? 0) > 0;
-}
-
-function actorFromRow(row: ActorRow): ServerActor | null {
-  const role = actorRoleFromDatabase(row.role);
-  const provider = actorProvider(row.provider);
-  if (!role || !provider) return null;
-
-  return {
-    userId: row.user_id,
-    subject: row.external_subject,
-    tenantId: row.tenant_id,
-    role,
-    displayName: row.display_name,
-    email: row.email,
-    initials: initialsFor(row.display_name),
-    municipality: row.municipality,
-    provider,
-  };
-}
-
-function actorRoleFromDatabase(role: string): WorkspaceRole | null {
-  if (role === "dgita_consultant") return "consultant";
-  if (role === "user" || role === "admin") return role;
-  return null;
-}
-
-function actorProvider(value: string): AuthProvider | null {
-  return (AUTH_PROVIDERS as readonly string[]).includes(value)
-    ? (value as AuthProvider)
-    : null;
 }
