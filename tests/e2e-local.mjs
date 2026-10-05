@@ -6,6 +6,7 @@ import {
   demoApplicationState,
 } from "../features/application/engine.ts";
 import { approvalTokenForRequest } from "../features/approval/token-service.ts";
+import { exerciseDirectUpload } from "./runtime/direct-upload-flow.mjs";
 
 const baseUrl = (process.env.DGITA_E2E_BASE_URL || "http://localhost:3001").replace(/\/$/u, "");
 const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
@@ -139,8 +140,9 @@ async function main() {
     assert.equal(Number(stored.rows[0].total), 0);
     const clean = await upload(user, "fixture:clean");
     expectStatus(clean.response.status, 201, "sikkerhedskontrolleret upload", clean.payload);
-    uploadedAttachment = clean.payload.attachment;
-    state.attachments.contract = [uploadedAttachment];
+    uploadedAttachment = await exerciseDirectUpload({ user, consultant, anonymous, applicationId,
+      database: fixtureDatabase, fixtureOrigin: process.env.DGITA_FIXTURE_ORIGIN });
+    state.attachments.contract = [clean.payload.attachment, uploadedAttachment];
     state.hasContract = "ja";
     const scan = await fixtureDatabase.execute({ sql: "SELECT scan_status FROM portal_attachments WHERE id = ?", args: [uploadedAttachment.id] });
     assert.equal(scan.rows[0].scan_status, "clean");

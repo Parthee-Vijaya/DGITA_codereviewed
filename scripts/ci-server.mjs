@@ -143,7 +143,7 @@ try {
     if (providers) {
       const report = providers.evidence;
       assert.equal(report.unexpectedRequests, 0);
-      for (const field of ["blobWrites", "blobReads", "scanClean", "scanRejected", "scanUnavailable", "mailAccepted", "approvalLinks"]) assert.ok(report[field] > 0, `Provider contract was not exercised: ${field}`);
+      for (const field of ["blobWrites", "directBlobWrites", "blobReads", "scanClean", "scanRejected", "scanUnavailable", "mailAccepted", "approvalLinks"]) assert.ok(report[field] > 0, `Provider contract was not exercised: ${field}`);
       await writeFile(join(output, "providers.json"), JSON.stringify({ type: "local HTTP fixtures; no cloud acceptance", ...report }, null, 2));
     }
   } else {

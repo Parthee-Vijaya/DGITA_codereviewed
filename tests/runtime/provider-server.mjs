@@ -4,7 +4,8 @@ import { createHash } from "node:crypto";
 
 export async function startProviderFixtures(applicationOrigin) {
   const objects = new Map();
-  const evidence = { blobWrites: 0, blobReads: 0, scanClean: 0, scanRejected: 0, scanUnavailable: 0, mailAccepted: 0, approvalLinks: 0, unexpectedRequests: 0 };
+  const delegations = new Map();
+  const evidence = { blobWrites: 0, directBlobWrites: 0, blobReads: 0, scanClean: 0, scanRejected: 0, scanUnavailable: 0, mailAccepted: 0, approvalLinks: 0, unexpectedRequests: 0 };
   const server = createServer(async (request, response) => {
     try {
       const chunks = [];
@@ -38,12 +39,26 @@ export async function startProviderFixtures(applicationOrigin) {
       if (host === "vercel.com" && url.pathname === "/api/blob/signed-token") {
         const scope = JSON.parse(bytes.toString());
         assert.ok(scope.pathname && scope.validUntil > Date.now());
-        return json(200, { delegationToken: `${Buffer.from(JSON.stringify({ ...scope, storeId: "fixture" })).toString("base64url")}.synthetic`, clientSigningToken: "synthetic-signing-token" });
+        const delegationToken = `${Buffer.from(JSON.stringify({ ...scope, storeId: "fixture" })).toString("base64url")}.synthetic`;
+        delegations.set(delegationToken, scope);
+        return json(200, { delegationToken, clientSigningToken: "synthetic-signing-token" });
       }
       if (host === "vercel.com" && url.pathname === "/api/blob/" && request.method === "PUT") {
         const pathname = url.searchParams.get("pathname");
         assert.ok(pathname);
-        const contentType = request.headers["x-content-type"] || "application/octet-stream";
+        const direct = url.searchParams.has("vercel-blob-delegation");
+        const contentType = request.headers[direct ? "content-type" : "x-content-type"] || "application/octet-stream";
+        if (direct) {
+          // This checks the locally issued scope and wire contract, not Vercel's signature implementation.
+          const scope = delegations.get(url.searchParams.get("vercel-blob-delegation"));
+          assert.ok(scope && url.searchParams.get("vercel-blob-signature"));
+          assert.ok(scope.operations.includes("put") && scope.validUntil > Date.now());
+          assert.equal(scope.pathname, pathname);
+          assert.ok(scope.allowedContentTypes.includes(contentType));
+          assert.ok(bytes.length <= scope.maximumSizeInBytes);
+          assert.equal(objects.has(pathname), false, "Direct upload must not overwrite an object.");
+          evidence.directBlobWrites += 1;
+        }
         objects.set(pathname, { bytes, contentType }); evidence.blobWrites += 1;
         const blobUrl = `https://fixture.private.blob.vercel-storage.com/${pathname}`;
         return json(200, { url: blobUrl, downloadUrl: blobUrl, pathname, contentType, contentDisposition: "attachment", etag: createHash("sha256").update(bytes).digest("hex") });
