@@ -5,40 +5,6 @@
   "scope": "Development dependencies only. No exceptions apply to production dependencies. Exact advisory and dependency nodes only.",
   "exceptions": [
     {
-      "advisory": "GHSA-67mh-4wv8-2f99",
-      "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
-      "source": 1102341,
-      "vulnerablePackage": "esbuild",
-      "range": "<=0.24.2",
-      "severity": "moderate",
-      "expiresAt": "2026-11-04T00:00:00Z",
-      "owner": "Repository maintainer / municipal technical owner before production",
-      "reason": "The old esbuild is confined to drizzle-kit through @esbuild-kit. CI does not start this esbuild development server; migrations remain a separately reviewed operator task.",
-      "remediation": "Upgrade or replace drizzle-kit when it supports a patched esbuild without breaking migrations. Do not expose an esbuild development server.",
-      "allowedAffectedNodes": [
-        {
-          "package": "@esbuild-kit/core-utils",
-          "path": "node_modules/@esbuild-kit/core-utils",
-          "version": "3.3.2"
-        },
-        {
-          "package": "@esbuild-kit/esm-loader",
-          "path": "node_modules/@esbuild-kit/esm-loader",
-          "version": "2.6.5"
-        },
-        {
-          "package": "drizzle-kit",
-          "path": "node_modules/drizzle-kit",
-          "version": "0.31.10"
-        },
-        {
-          "package": "esbuild",
-          "path": "node_modules/@esbuild-kit/core-utils/node_modules/esbuild",
-          "version": "0.18.20"
-        }
-      ]
-    },
-    {
       "advisory": "GHSA-vfj7-8cjw-p6xm",
       "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
       "source": 1240992,
