@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { randomBytes } from "node:crypto";
 Object.assign(process.env, { DGITA_ENVIRONMENT: "pilot", DGITA_ENABLE_DEV_LOGIN: "true",
   TURSO_DATABASE_URL: ":memory:", TURSO_AUTH_TOKEN: "synthetic-revocation", BLOB_READ_WRITE_TOKEN: "synthetic-revocation",
-  DGITA_APPROVAL_TOKEN_SECRET: "synthetic-isolated-revocation-secret-123456789" });
+  DGITA_APPROVAL_TOKEN_SECRET: randomBytes(32).toString("hex") });
 const { preparePortalData, resolveActorUserId } = await import("../workspace/server-repository.ts");
 const { submitApplication } = await import("../application/server-repository.ts");
 const { demoApplicationState } = await import("../application/engine.ts");
