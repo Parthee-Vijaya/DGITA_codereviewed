@@ -124,7 +124,7 @@ Ved releasefejl: stop promotion, bevar kandidatens evidens, og vurder hændelsen
 | Overvågning/beredskab | Drift/sikkerhed | Alarmer og modtager for 5xx/readiness, scannerfejl, uploadophobning, køalder, backupfejl og secretudløb; gennemført alarm-/incidentøvelse |
 | Kommunal anvendelse | Systemejer/fagansvarlige | Risikovurdering, databehandling/retention/arkivering, DPIA-screening og manuel tilgængelighedsaccept efter faktisk scope |
 
-Der er ingen dokumenteret ekstern go-live-accept. Appens tidsbegrænsede dev-dependency-undtagelser og den aktuelt blokerende deployment-CLI-audit fremgår af [CI/CD-dokumentet](ci-cd.md); de er ikke en kommunal risikoaccept. `DGITA_PRODUCTION_APPROVED=true` registrerer frigivelsesbeslutningen, men erstatter ikke evidensen.
+Der er ingen dokumenteret ekstern go-live-accept. Appens og deploymentværktøjets separate, præcise og tidsbegrænsede dependency-undtagelser fremgår af [CI/CD-dokumentet](ci-cd.md). CLI-overrides er kompatibilitetstestet, men efterlader en kendt braces-rest-risiko; der er ingen critical-undtagelse. De tekniske undtagelser er ikke en kommunal risikoaccept. `DGITA_PRODUCTION_APPROVED=true` registrerer frigivelsesbeslutningen, men erstatter ikke evidensen.
 
 Driftslogs skal undlade rå tokens, login-callbackquery, godkendelses-URL'er, dokumentindhold og fritekst. Fastlæg adgang/retention for audit- og platformlogs og test redigering i ingress, APM og fejlopsamling; applikationens sikre fejltekster garanterer ikke, at en proxy undlader at logge URL'er. Der er ikke implementeret en samlet SIEM-/alarmintegration eller automatiseret arkiverings-/sletteprocedure.
 

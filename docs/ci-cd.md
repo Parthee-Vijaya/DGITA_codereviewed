@@ -129,3 +129,7 @@ Vercel-token, projekter, adskilte dataressourcer, miljøgodkendelser, migrations
 
 - [Vercel: deploy, prebuilt og skip-domain](https://vercel.com/docs/cli/deploy)
 - [Vercel: staged production og promotion uden rebuild](https://vercel.com/docs/deployments/promoting-a-deployment)
+
+## CodeQL-triage af klargøringen
+
+PR #3 blev genanalyseret på `d556194` i [run 37289411823](https://github.com/Parthee-Vijaya/DGITA_codereviewed/actions/runs/37289411823). Tre mediumfund i testharnessets dynamiske kodekonstruktion blev lukket ved at bruge en statisk child-process med JSON på stdin. To `js/http-to-file-access`-fund blev individuelt gennemgået og markeret falsk positive med begrundelse i GitHub: #4 er en tilsigtet download, hvis committed SHA-256 verificeres før skrivning/udpakning; #5 er valideret metadata til runnerens outputfil med faste navne, snævre formater og CR/LF-afvisning. Der er ingen generel query-suppression. Nul åbne fund på denne PR-ref er verificeret; fremtidige commits skal analyseres igen.
