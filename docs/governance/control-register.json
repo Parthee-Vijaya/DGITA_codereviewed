@@ -397,12 +397,17 @@
       "id": "DGITA-C13",
       "dimension": "Journal og arkiv",
       "risk": "For tidlig sletning eller ukontrolleret bevaring bryder journalbehov.",
-      "control": "Bevaringsbeslutning og legal hold før destruktive handlinger; ingen automatisk kassation.",
+      "control": "Deterministisk dry-run: active/unknown legal hold eller ukendt politik blokerer; godkendt versioneret politik og lukket version giver kun reviewforslag. Ingen fysisk sletning.",
       "implementation_refs": [
         "docs/privacy/data-inventory.json",
-        "docs/production-operations.md"
+        "docs/production-operations.md",
+        "features/privacy/retention-preview.ts",
+        "scripts/retention-exercise.mjs",
+        "docs/privacy/retention-preview.md"
       ],
-      "test_refs": [],
+      "test_refs": [
+        "tests/retention-preview.test.mjs"
+      ],
       "test_result": "reference_only_until_executed",
       "owner": {
         "proposal": "Journal-/arkivansvarlig + dataansvarlig",
@@ -414,7 +419,7 @@
         "human_review_date": null,
         "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
       },
-      "remaining_gap": "Autoritativ journal, klassifikation, retention, hold og fysisk sletning afventer politik.",
+      "remaining_gap": "Kommunal bevaringspolitik og autoritative kilder for hold, klassifikation og lukkeevidens er U; inputstruktur er ikke kommunal godkendelse. Ingen produktionsadapter eller slettejob.",
       "framework_contribution": {
         "ISO_ISMS": "records",
         "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",

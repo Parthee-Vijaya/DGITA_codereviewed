@@ -4,6 +4,7 @@ export const EVIDENCE_SUITES = Object.freeze({
     "tests/privacy-fixtures.test.mjs",
     "tests/privacy-inventory.test.mjs",
     "tests/privacy-logging.test.mjs",
+    "tests/retention-preview.test.mjs",
   ]),
   governance: Object.freeze(["tests/governance-evidence.test.mjs"]),
 });
