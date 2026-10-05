@@ -9,6 +9,8 @@ import { approvalTokenForRequest } from "../features/approval/token-service.ts";
 
 const baseUrl = (process.env.DGITA_E2E_BASE_URL || "http://localhost:3001").replace(/\/$/u, "");
 const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+const providerFixtures = process.env.DGITA_E2E_PROVIDER_FIXTURES === "true";
+let fixtureDatabase;
 
 class ApiClient {
   cookie = "";
@@ -27,6 +29,7 @@ class ApiClient {
       headers,
       body,
       redirect: options.redirect || "follow",
+      signal: AbortSignal.timeout(30_000),
     });
     const setCookie = response.headers.get("set-cookie");
     if (setCookie) this.cookie = setCookie.split(";", 1)[0];
@@ -84,7 +87,22 @@ async function main() {
   const user = await login("user");
   const consultant = await login("consultant");
   const admin = await login("admin");
+  if (providerFixtures) {
+    assert.match(process.env.TURSO_DATABASE_URL || "", /^file:\/.*\/dgita-ci-next-e2e-[^/]+\/synthetic\.sqlite$/u);
+    const { createClient } = await import("@libsql/client");
+    fixtureDatabase = createClient({ url: process.env.TURSO_DATABASE_URL });
+    const users = await fixtureDatabase.execute("SELECT id FROM portal_users ORDER BY id");
+    assert.ok(users.rows.length < 100);
+    for (const [index, row] of users.rows.entries()) await fixtureDatabase.execute({
+      sql: "UPDATE portal_users SET email = ?, display_name = ? WHERE id = ?",
+      args: [`user-${index}@example.invalid`, `Synthetic user ${index}`, row.id],
+    });
+  }
 
+  const approvers = await user.json("/api/approvers");
+  expectStatus(approvers.response.status, 200, "hent syntetisk godkender", approvers.payload);
+  const leader = approvers.payload.approvers[0];
+  assert.ok(leader, "En anden testperson skal kunne godkende ansøgningen");
   const state = structuredClone(demoApplicationState);
   Object.assign(state, {
     knownSystem: "nej",
@@ -92,20 +110,67 @@ async function main() {
     manualSystemName: `E2E testsystem ${runId}`,
     catalogQuery: "",
     selectedSystem: null,
-    approvingLeaderId: "kalundborg-consultant-peter-bjerre",
-    approvingLeader: "Peter Bjerre Ahlgren",
+    approvingLeaderId: leader.id,
+    approvingLeader: leader.name,
     consent: true,
   });
   assert.deepEqual(getAllErrors(state), [], "E2E-ansøgningen skal være gyldig");
 
+  console.log("Authentication and synthetic input prepared.");
   const applicationId = randomUUID();
+  let uploadedAttachment;
+  let draftRowVersion;
+  if (providerFixtures) {
+    const draft = await user.json("/api/drafts", { method: "POST", body: { id: applicationId, draft: state, status: "draft" } });
+    expectStatus(draft.response.status, 200, "opret kladde før upload", draft.payload);
+    draftRowVersion = draft.payload.rowVersion;
+    const upload = (client, content) => {
+      const body = new FormData(); body.set("draftId", applicationId); body.set("kind", "contract");
+      body.set("file", new File([`%PDF-1.4\n${content}\n%%EOF`], "synthetic.pdf", { type: "application/pdf" }));
+      return client.json("/api/uploads", { method: "POST", body });
+    };
+    const forbidden = await upload(consultant, "fixture:clean");
+    expectStatus(forbidden.response.status, 403, "anden bruger uploader til kladden", forbidden.payload);
+    const infected = await upload(user, "fixture:infected");
+    expectStatus(infected.response.status, 422, "scanner afviser inficeret fixture", infected.payload);
+    const unavailable = await upload(user, "fixture:unavailable");
+    expectStatus(unavailable.response.status, 503, "scannerfejl frigiver intet bilag", unavailable.payload);
+    const stored = await fixtureDatabase.execute({ sql: "SELECT COUNT(*) AS total FROM portal_attachments WHERE application_id = ?", args: [applicationId] });
+    assert.equal(Number(stored.rows[0].total), 0);
+    const clean = await upload(user, "fixture:clean");
+    expectStatus(clean.response.status, 201, "sikkerhedskontrolleret upload", clean.payload);
+    uploadedAttachment = clean.payload.attachment;
+    state.attachments.contract = [uploadedAttachment];
+    state.hasContract = "ja";
+    const scan = await fixtureDatabase.execute({ sql: "SELECT scan_status FROM portal_attachments WHERE id = ?", args: [uploadedAttachment.id] });
+    assert.equal(scan.rows[0].scan_status, "clean");
+    const anonymousFile = await anonymous.request(`/api/files/${uploadedAttachment.id}`);
+    expectStatus(anonymousFile.status, 401, "anonym bilagsadgang", null);
+    const delegated = await user.request(`/api/files/${uploadedAttachment.id}`, { redirect: "manual" });
+    expectStatus(delegated.status, 307, "privat fil kræver autentificeret delegation", null);
+    const delegatedUrl = new URL(delegated.headers.get("location"));
+    assert.equal(delegatedUrl.hostname, "fixture.private.blob.vercel-storage.com");
+    assert.ok(delegatedUrl.searchParams.has("vercel-blob-signature"));
+    const downloaded = await fetch(`${process.env.DGITA_FIXTURE_ORIGIN}${delegatedUrl.pathname}${delegatedUrl.search}`, {
+      headers: { "x-dgita-fixture-host": delegatedUrl.hostname }, signal: AbortSignal.timeout(5000),
+    });
+    expectStatus(downloaded.status, 200, "lokal fixture for delegeret download", null);
+    assert.match(await downloaded.text(), /fixture:clean/u);
+  }
+  console.log("Upload security cases completed.");
   const submitted = await user.json("/api/drafts", {
     method: "POST",
-    body: { id: applicationId, draft: state, status: "submitted" },
+    body: { id: applicationId, draft: state, status: "submitted", ...(draftRowVersion ? { expectedRowVersion: draftRowVersion } : {}) },
   });
   expectStatus(submitted.response.status, 200, "indsend ansøgning", submitted.payload);
   assert.equal(submitted.payload.status, "submitted");
   assert.equal(submitted.payload.versionNumber, 1);
+  if (uploadedAttachment) {
+    const attachment = await fixtureDatabase.execute({ sql: "SELECT application_version_id, immutable_at FROM portal_attachments WHERE id = ?", args: [uploadedAttachment.id] });
+    assert.ok(attachment.rows[0].application_version_id && attachment.rows[0].immutable_at);
+    const deletion = await user.json("/api/uploads", { method: "DELETE", body: { id: uploadedAttachment.id, draftId: applicationId } });
+    expectStatus(deletion.response.status, 409, "indsendt bilag er uforanderligt", deletion.payload);
+  }
   const caseNumber = submitted.payload.caseNumber;
   assert.match(caseNumber, /^ITA-\d{6,8}$/u);
 
@@ -190,6 +255,10 @@ async function main() {
   });
   expectStatus(approvalRequest.response.status, 202, "opret ledergodkendelse", approvalRequest.payload);
   assert.equal(approvalRequest.payload.status, "pending");
+  if (providerFixtures) {
+    const delivered = await admin.json("/api/mail/process", { method: "POST", body: { limit: 10 } });
+    expectStatus(delivered.response.status, 200, "send godkendelseslink før beslutning", delivered.payload);
+  }
   const approvalToken = await approvalTokenForRequest(approvalRequest.payload.id, baseUrl);
 
   const publicApproval = await anonymous.json(`/api/approvals/${approvalToken}`);
@@ -262,6 +331,7 @@ async function main() {
   expectStatus(fieldComment.response.status, 201, "versionsbundet feltkommentar", fieldComment.payload);
   assert.equal(fieldComment.payload.comment.fieldLabel, "Formål og ønsket effekt");
 
+  const reviewer = await consultant.json("/api/auth/session");
   const reviewWorkspace = await consultant.json("/api/workspace");
   const loadedReview = reviewWorkspace.payload.workspace.approvals[caseNumber];
   const finalized = await consultant.json("/api/workspace", {
@@ -275,7 +345,7 @@ async function main() {
         approved: "Ja",
         date: new Date().toISOString().slice(0, 10),
         legalBasis: "GDPR",
-        responsible: "Casper Kjeldsen Ravn",
+        responsible: reviewer.payload.viewer.displayName,
         hasAdditionalResponsible: "Nej",
         additionalResponsible: "",
         itConsultant: "D-GITA E2E",
@@ -343,7 +413,7 @@ async function main() {
 
   const mailDashboard = await admin.json("/api/mail/status");
   expectStatus(mailDashboard.response.status, 200, "maildashboard", mailDashboard.payload);
-  assert.equal(mailDashboard.payload.configured, false);
+  assert.equal(mailDashboard.payload.configured, providerFixtures);
   assert.equal(
     mailDashboard.payload.messages.filter((item) => item.id === statusMail.payload.id).length,
     1,
@@ -359,11 +429,26 @@ async function main() {
     method: "POST",
     body: { limit: 5 },
   });
-  expectStatus(processMail.response.status, 503, "mail uden Graph-konfiguration", processMail.payload);
-  assert.equal(processMail.payload.code, "MAIL_NOT_CONFIGURED");
+  if (providerFixtures) {
+    expectStatus(processMail.response.status, 200, "mail til lokal Graph-fixture", processMail.payload);
+    for (let batch = 0; batch < 10; batch += 1) {
+      const result = await admin.json("/api/mail/process", { method: "POST", body: { limit: 10 } });
+      expectStatus(result.response.status, 200, "tøm syntetisk mailkø", result.payload);
+      if (!result.payload.processed) break;
+    }
+    const dashboard = await admin.json("/api/mail/status");
+    assert.equal(dashboard.payload.messages.find((item) => item.id === statusMail.payload.id)?.status, "sent");
+    const forbiddenProcess = await user.json("/api/mail/process", { method: "POST", body: { limit: 1 } });
+    expectStatus(forbiddenProcess.response.status, 403, "mailjob kræver autorisation", forbiddenProcess.payload);
+  } else {
+    expectStatus(processMail.response.status, 503, "mail uden Graph-konfiguration", processMail.payload);
+    assert.equal(processMail.payload.code, "MAIL_NOT_CONFIGURED");
+  }
 
   const correctionApplicationId = randomUUID();
   const correctionV1State = structuredClone(state);
+  correctionV1State.hasContract = "nej";
+  correctionV1State.attachments = Object.fromEntries(Object.keys(state.attachments).map((kind) => [kind, []]));
   correctionV1State.manualSystemName = `E2E rettelsessag ${runId}`;
   correctionV1State.remarks = "Første indsendte version";
   const correctionV1 = await user.json("/api/drafts", {
@@ -529,7 +614,7 @@ async function main() {
   console.log(JSON.stringify({
     ok: true,
     caseNumber,
-    checks: 75,
+    suite: providerFixtures ? "Next full lifecycle and provider contracts" : "Cloudflare full lifecycle",
     receiptSha256: firstHash,
   }, null, 2));
 }
@@ -537,4 +622,4 @@ async function main() {
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
-});
+}).finally(() => fixtureDatabase?.close());

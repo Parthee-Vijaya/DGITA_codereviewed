@@ -40,7 +40,7 @@ jobs:
         run: npm test
 
   production:
-    name: Next production build and smoke
+    name: Next production build and complete workflow
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -54,12 +54,16 @@ jobs:
       - run: npm ci
       - run: npm run build:next
       - run: node scripts/ci-server.mjs production
+      - name: Complete case lifecycle on the Next production build with local provider fixtures
+        run: npm run test:ci:next-e2e
       - name: Retain synthetic smoke evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: production-smoke-${{ github.run_attempt }}
-          path: work/ci/production/
+          path: |
+            work/ci/production/
+            work/ci/next-e2e/
           if-no-files-found: ignore
           retention-days: 7
 

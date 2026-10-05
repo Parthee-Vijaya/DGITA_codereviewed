@@ -1,4 +1,4 @@
-import { assertSameOrigin, authErrorResponse, noStoreJson, readJsonObject } from "../../../../../features/auth/http";
+import { applicationOrigin, assertSameOrigin, authErrorResponse, noStoreJson, readJsonObject } from "../../../../../features/auth/http";
 import { requireActor } from "../../../../../features/auth/server";
 import {
   ApprovalWorkflowError,
@@ -15,7 +15,7 @@ export async function POST(
     const actor = await requireActor(request);
     const { caseNumber } = await context.params;
     return noStoreJson(
-      await createLeaderApprovalRequest(actor, caseNumber, new URL(request.url).origin),
+      await createLeaderApprovalRequest(actor, caseNumber, applicationOrigin(request)),
       { status: 202 },
     );
   } catch (error) {
