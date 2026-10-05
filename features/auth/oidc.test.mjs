@@ -5,7 +5,7 @@ import { exportJWK, generateKeyPair, SignJWT, base64url } from "jose";
 import { createLibsqlD1Adapter, enableLibsqlForeignKeys } from "../../db/vercel-persistence.ts";
 import { portalSchemaStatements } from "../../db/persistence.ts";
 import {
-  OIDC_FLOW_TTL_SECONDS, readEntraConfig, readEntraFlow, startEntraFlow,
+  OIDC_FLOW_TTL_SECONDS, isEntraOrigin, readEntraConfig, readEntraFlow, startEntraFlow,
   verifyEntraIdToken, consumeEntraState,
 } from "./oidc.ts";
 import { createEntraSession, handleEntraCallback, handleEntraStart } from "./oidc-server.ts";
@@ -113,6 +113,7 @@ test("status route activates the Entra button only on its configured origin and 
     const request = new Request(`${config.origin}/api/auth/entra/status`);
     const enabled = await providerStatus(request);
     assert.deepEqual(await enabled.json(), { enabled: true });
+    assert.deepEqual(await (await providerStatus(new Request("http://localhost:3000/api/auth/entra/status", { headers: { host: "portal.example.invalid" } }))).json(), { enabled: true });
     assert.match(enabled.headers.get("cache-control"), /no-store/);
     assert.deepEqual(await (await providerStatus(new Request("https://other.example.invalid/api/auth/entra/status"))).json(), { enabled: false });
     delete process.env.DGITA_ENTRA_CLIENT_SECRET;
@@ -290,5 +291,43 @@ test("valid identity without provisioning receives only a constant access-denied
     const response = await handleEntraCallback(request, environment, { now, database: DB, ...networkFor(await sign(nonce)).network });
     assert.equal(response.headers.get("location"), `${config.origin}/login?entra=access-not-assigned`);
     assert.equal((await DB.prepare("SELECT COUNT(*) AS count FROM portal_users").first()).count, 0);
+  } finally { close(); }
+});
+
+
+test("Next internal Entra origin requires the exact canonical Host and ignores forwarded spoofing", async () => {
+  const internal = "http://localhost:3000/api/auth/entra/start";
+  assert.equal(isEntraOrigin(new Request(internal, { headers: { host: "portal.example.invalid" } }), config), true);
+  for (const headers of [{}, { host: "evil.example.invalid" },
+    { host: "localhost:3000", "x-forwarded-host": "portal.example.invalid", "x-forwarded-proto": "https" },
+    { host: "portal.example.invalid.evil.invalid" }]) {
+    const request = new Request(internal, { headers });
+    assert.equal(isEntraOrigin(request, config), false);
+    await assert.rejects(handleEntraStart(request, environment, now), { code: "ENTRA_ORIGIN_MISMATCH" });
+  }
+  assert.equal(isEntraOrigin(new Request("https://evil.example.invalid/api/auth/entra/start", {
+    headers: { host: "portal.example.invalid" },
+  }), config), false);
+  const started = await handleEntraStart(new Request(internal, { headers: { host: "portal.example.invalid", "sec-fetch-site": "same-origin" } }), environment, now);
+  assert.equal(started.status, 303);
+  assert.equal(new URL(started.headers.get("location")).searchParams.get("redirect_uri"), config.redirectUri);
+});
+
+test("signed Entra callback through a canonical Host and internal Next URL preserves session verification", async () => {
+  const { DB, close } = await database();
+  try {
+    await provision(DB);
+    const { request, nonce, authorize } = await flowRequest();
+    const internal = new URL(request.url); internal.protocol = "http:"; internal.host = "localhost:3000";
+    const callback = new Request(internal, { headers: { cookie: request.headers.get("cookie"), host: "portal.example.invalid" } });
+    const { network, exchanges } = networkFor(await sign(nonce), authorize);
+    const response = await handleEntraCallback(callback, environment, { now, database: DB, ...network });
+    assert.equal(response.headers.get("location"), `${config.origin}/`);
+    assert.equal(exchanges.length, 1);
+    assert.match(response.headers.get("set-cookie"), /Secure/u);
+    assert.equal(await DB.prepare("SELECT count(*) AS n FROM portal_sessions").first("n"), 1);
+    const replay = await handleEntraCallback(callback, environment, { now, database: DB, ...network });
+    assert.equal(replay.headers.get("location"), `${config.origin}/login?entra=login-failed`);
+    assert.equal(exchanges.length, 1);
   } finally { close(); }
 });

@@ -89,8 +89,19 @@ export function oidcFlowCookie(config: EntraConfig, value: string, ttl = OIDC_FL
   ].join("; ");
 }
 
+export function isEntraOrigin(request: Request, config: EntraConfig) {
+  const actual = new URL(request.url);
+  const expected = new URL(config.origin);
+  if (actual.origin === expected.origin) return true;
+  // Next can expose its internal loopback URL. Host must still match the fixed
+  // canonical origin exactly; forwarded headers never choose a login origin.
+  return actual.protocol === "http:" && expected.protocol === "https:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(actual.hostname) &&
+    request.headers.get("host")?.toLowerCase() === expected.host.toLowerCase();
+}
+
 export function assertEntraOrigin(request: Request, config: EntraConfig) {
-  if (new URL(request.url).origin !== config.origin) {
+  if (!isEntraOrigin(request, config)) {
     throw new AuthHttpError(400, "ENTRA_ORIGIN_MISMATCH", "Brug portalens faste adresse for at logge ind.");
   }
 }
