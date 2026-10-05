@@ -694,6 +694,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
         }}
       />
       <SpotlightTour
+        returnFocusSelector='[data-tour="profile"]'
         open={tourOpen}
         steps={onboardingSteps}
         activeStep={tourStep}

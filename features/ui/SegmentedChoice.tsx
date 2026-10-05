@@ -2,7 +2,7 @@
 
 import { Check } from "lucide-react";
 import { useContext, type KeyboardEvent } from "react";
-import { QuestionLabelContext } from "../application/QuestionContent";
+import { QuestionLabelContext, QuestionHintContext } from "../application/QuestionContent";
 
 /** One tab stop per choice group; arrows select without leaving the group. */
 export function SegmentedChoice<Value extends string>({
@@ -17,6 +17,7 @@ export function SegmentedChoice<Value extends string>({
   label?: string;
 }) {
   const questionLabel = useContext(QuestionLabelContext);
+  const hintId = useContext(QuestionHintContext);
   const selectedIndex = options.findIndex((option) => option.value === value);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -32,7 +33,7 @@ export function SegmentedChoice<Value extends string>({
   }
 
   return (
-    <div className="choice-row" role="radiogroup" aria-label={label ?? questionLabel} onKeyDown={onKeyDown}>
+    <div className="choice-row" role="radiogroup" aria-label={label ?? questionLabel} aria-describedby={hintId} onKeyDown={onKeyDown}>
       {options.map((option, index) => (
         <button
           className={value === option.value ? "selected" : ""}
