@@ -363,17 +363,23 @@
       "id": "DGITA-C11",
       "dimension": "Overvågning og drift",
       "risk": "Jobfejl/køalder eller scannerfejl fører til ubemærket driftssvigt.",
-      "control": "Struktureret logkontrakt og health/readiness med eksplicitte begrænsninger.",
+      "control": "Fælles scheduler, vedvarende redigeret heartbeat, tenantafgrænset adminstatus, scannertelemetri og afgrænset HTTP-alarmadapter.",
       "implementation_refs": [
         "features/privacy/operational-log.ts",
         "app/api/readyz/route.ts",
         "docs/production-operations.md",
-        "features/runtime/scheduled-maintenance.ts"
+        "features/runtime/scheduled-maintenance.ts",
+        "features/operations/status.ts",
+        "features/operations/store.ts",
+        "features/operations/alarms.ts",
+        "app/api/operations/status/route.ts",
+        "docs/operations-observability.md"
       ],
       "test_refs": [
         "tests/privacy-logging.test.mjs",
         "tests/production-config.test.mjs",
-        "tests/scheduled-maintenance.test.mjs"
+        "tests/scheduled-maintenance.test.mjs",
+        "tests/operations.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -386,7 +392,7 @@
         "human_review_date": null,
         "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
       },
-      "remaining_gap": "Rigtig scheduler, alarmmodtager, vagt og servicemål er ikke afprøvet accepteret.",
+      "remaining_gap": "Lokale fejl-/belastningsprøver leverer til en lokal HTTP-modtager. Rigtig scheduler, uafhængig manglende-job-overvågning, alarmmodtager, vagt og servicemål er U; backupstatus opfindes ikke.",
       "framework_contribution": {
         "ISO_ISMS": "operations",
         "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
@@ -478,7 +484,8 @@
       ],
       "test_refs": [
         "features/application/malware-scan.test.mjs",
-        "features/application/malware-persistence.test.mjs"
+        "features/application/malware-persistence.test.mjs",
+        "tests/operations.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {

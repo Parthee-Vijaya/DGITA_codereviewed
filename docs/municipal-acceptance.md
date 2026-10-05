@@ -36,7 +36,7 @@ Rollerne er forslag, ikke personudpegninger eller juridiske ansvarsplaceringer. 
 
 ## Lokale bevisers grænser
 
-Det lokale Next-forløb afprøver et production-build i eksplicit pilottilstand med syntetiske providerfixtures. Det viser upload/scan, indsendelse, beslutning, kvittering, korrektion og mailbehandling lokalt. Den nuværende fulde API-test uploader via multipart `/api/uploads`; browserens direkte `presign → Blob PUT → complete` skal også afprøves som samlet gren i den valgte previewkonfiguration. Lokal Blob-signering er ikke cloudlagerets faktiske signaturvalidering.
+Det lokale Next-forløb afprøver et production-build i eksplicit pilottilstand med syntetiske providerfixtures. Det viser upload/scan, indsendelse, beslutning, kvittering, korrektion og mailbehandling lokalt. Den fulde API-test dækker både multipart `/api/uploads` og direkte `presign → Blob PUT → complete` med lokale HTTP-fixtures, inklusive ejer-/Origin-afvisning, checksumfejl og scannerfejl. Browserens CORS og den rigtige direkte providergren skal afprøves samlet i den valgte previewkonfiguration. Lokal Blob-signering er ikke cloudlagerets faktiske signaturvalidering.
 
 Schedulerens fælles job har claim-/versionsbinding, tilbagekaldelseskontrol, recoverykarantæne, backoff og afvisning af blind genlevering. Dets 45 sekunder er et budget for nye claims efter oprydningen, ikke en garanteret samlet runtime. Vercels eksisterende daglige cadence er bevaret; den er ikke accepteret som responsiv mailservice. Faktisk køalder, interval, kapacitet, modtagelse af alarmer og manglende ticks skal måles i det valgte miljø. Preview-READY er ikke et cron- eller driftsbevis.
 

@@ -27,6 +27,7 @@ export const EVIDENCE_SUITES = Object.freeze({
     "features/mail/delivery-policy.test.mjs", "features/mail/receipt-claim.test.mjs",
     "features/mail/outbox-policy.test.mjs", "tests/scheduled-maintenance.test.mjs",
   ]),
+  operations: Object.freeze(["tests/operations.test.mjs"]),
   receipt: Object.freeze([
     "tests/interface-controls.test.mjs", "tests/application-fields.test.mjs",
     "tests/receipt-access.test.mjs", "tests/receipt-view.test.mjs",

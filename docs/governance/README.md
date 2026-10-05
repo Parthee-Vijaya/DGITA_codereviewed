@@ -14,7 +14,7 @@ Kør med repositoryets Node 24 og installerede dependencies fra en ren, committe
 node scripts/release-evidence.mjs
 ```
 
-Generatoren kører de registrerede lokale suites for privatliv, governance, identitet, integritet, recovery, arkitektur, mail, kvittering og releaseguards via Node-testevents. Den skriver `work/release-evidence/release-evidence.json` og `control-evidence.csv`. Filerne er ignorerede af git og egner sig til en særskilt CI-artifact eller reviewpakke. Generatoren aktiverer ingen deployment og kontakter ingen kommunal service. Der videresendes ikke app-/providercredentials eller `NODE_OPTIONS` til de afgrænsede testprocesser.
+Generatoren kører de registrerede lokale suites for privatliv, governance, identitet, integritet, recovery, arkitektur, mail, drift, kvittering og releaseguards via Node-testevents. Den skriver `work/release-evidence/release-evidence.json` og `control-evidence.csv`. Filerne er ignorerede af git og egner sig til en særskilt CI-artifact eller reviewpakke. Generatoren aktiverer ingen deployment og kontakter ingen kommunal service. Der videresendes ikke app-/providercredentials eller `NODE_OPTIONS` til de afgrænsede testprocesser.
 
 `--suite <id>` måler kun den valgte suite; de tilladte id'er og filer står i `scripts/evidence-contract.mjs`. `--references-only` giver et registerudtræk uden at køre tests; det kan også bruges på en ændret worktree og markerer denne som uren. Målte resultater kræver ren kilde og gemmer eksakt commit samt SHA-256 af registeret. Kildeidentiteten kontrolleres igen efter testene. En mislykket/ufuldstændig suite giver en ikke-bestået måling og procesexit 1.
 
