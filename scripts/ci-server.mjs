@@ -5,8 +5,9 @@ import { createWriteStream } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { includeInTestWorkspace } from "./ci-workspace-policy.mjs";
 import { startProviderFixtures } from "../tests/runtime/provider-server.mjs";
 
 const mode = process.argv[2];
@@ -52,18 +53,9 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 try {
   await mkdir(output, { recursive: true });
   await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "running", runtime: process.version }, null, 2));
-  const excluded = new Set([".git", "node_modules", "work", "outputs", ".wrangler", ".vinext", "dist", ".vercel", ".codex", ".claude"]);
-  if (workerRuntime) excluded.add(".next");
   await cp(project, workspace, {
     recursive: true,
-    filter(path) {
-      const segments = relative(project, path).split(sep);
-      // Turbopack's .next/node_modules contains required external-package links.
-      if (segments.some((part, index) => excluded.has(part) && !(part === "node_modules" && index === 1 && segments[0] === ".next"))) return false;
-      if (segments[0] === ".next" && segments[1] === "cache") return false;
-      // Do not copy local credentials, database state, or developer env files.
-      return !/^\.env(?:\.|$)|^\.dev\.vars(?:\.|$)/u.test(basename(path));
-    },
+    filter: (path) => includeInTestWorkspace(relative(project, path), workerRuntime),
   });
   await symlink(join(project, "node_modules"), join(workspace, "node_modules"), "dir");
   const port = await new Promise((done, fail) => {

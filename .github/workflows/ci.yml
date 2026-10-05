@@ -36,6 +36,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - name: Enforce measured architecture and complexity guard
+        run: node scripts/code-health.mjs --check
       - name: Build worker and run unit and database integration tests
         run: npm test
 
@@ -87,6 +89,32 @@ jobs:
         with:
           name: application-workflow-${{ github.run_attempt }}
           path: work/ci/e2e/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  accessibility:
+    name: Browser accessibility and keyboard flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/node_modules/.cache/ms-playwright
+      - run: npm run test:ci:a11y
+      - name: Retain synthetic accessibility evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: accessibility-${{ github.run_attempt }}
+          path: work/ci/a11y/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -179,7 +207,7 @@ jobs:
       - run: node scripts/ci-download-tool.mjs actionlint
       - run: work/ci-tools/actionlint
       - name: Verify release guards reject untrusted source and candidates
-        run: node --test scripts/ci-release.test.mjs
+        run: node --test scripts/ci-workspace-policy.test.mjs scripts/ci-release.test.mjs
 
   dependency-review:
     name: Dependency change review
@@ -222,7 +250,7 @@ jobs:
   quality-gate:
     name: Required quality gate
     if: always()
-    needs: [verify, production, e2e, dependencies, deployment-tools, secrets, workflow, dependency-review, codeql]
+    needs: [verify, production, e2e, accessibility, dependencies, deployment-tools, secrets, workflow, dependency-review, codeql]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}
