@@ -1,0 +1,516 @@
+{
+  "schema_version": 1,
+  "record_date": "2026-10-05",
+  "scope": "Udvalgte tekniske bidrag; ikke fuld ISO-kontrolkatalog, NIS2-vurdering eller certificering.",
+  "score_policy": {
+    "historical_baseline": 40,
+    "technical_target": 52,
+    "ISO_overall_until_owned_process": 1,
+    "NIS2_overall_until_owned_process": 1,
+    "automatic_score_increase": false,
+    "production_approval": false
+  },
+  "controls": [
+    {
+      "id": "DGITA-C01",
+      "dimension": "Identitet og adgang",
+      "risk": "Uautoriseret eller tilbagekaldt identitet får adgang.",
+      "control": "Tenantafgrænset OIDC og provisionerede roller; ingen rolle fra maildomæne.",
+      "implementation_refs": [
+        "features/auth/oidc-server.ts",
+        "features/auth/server.ts"
+      ],
+      "test_refs": [
+        "features/auth/oidc.test.mjs",
+        "features/auth/session-policy.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "IAM + systemejer",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Rigtig Entra/MFA, afgang og kommunal rollebestilling er ikke accepteret.",
+      "framework_contribution": {
+        "ISO_ISMS": "identity",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C02",
+      "dimension": "Applikationssikkerhed",
+      "risk": "En anden kommune, ejer eller tidligere godkender får data/adgang.",
+      "control": "Live DB-mandat, tenant/ejerfilter og beslutnings-CAS på følsomme handlinger.",
+      "implementation_refs": [
+        "features/approval/mandate.ts",
+        "features/approval/server.ts"
+      ],
+      "test_refs": [
+        "features/approval/authorization.test.mjs",
+        "features/approval/revocation-races.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Sikkerhedsansvarlig + udvikler",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "AI-assisteret regression er ikke en uafhængig formel pentest eller kommunal risikogodkendelse.",
+      "framework_contribution": {
+        "ISO_ISMS": "security",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C03",
+      "dimension": "Databeskyttelse",
+      "risk": "Unødvendige identiteter, payloads eller fejlobjekter lækker.",
+      "control": "Neutrale nye fixtures, bevaret pilotprofil, feltfortegnelse, projektion og typed logallowlist.",
+      "implementation_refs": [
+        "features/workspace/pilot-profile.ts",
+        "features/privacy/operational-log.ts",
+        "docs/privacy/data-inventory.json"
+      ],
+      "test_refs": [
+        "tests/privacy-fixtures.test.mjs",
+        "tests/privacy-inventory.test.mjs",
+        "tests/privacy-logging.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Systemejer + dataansvarlig; DPO rådgiver",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Hjemmel, nødvendige felter, information, DPIA og platformlogs afventer kommunal beslutning/afprøvning.",
+      "framework_contribution": {
+        "ISO_ISMS": "privacy",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C04",
+      "dimension": "ISO 27001/27002",
+      "risk": "Kontroller bliver fejlagtigt behandlet som et ejet og fungerende ISMS.",
+      "control": "Versioneret risikokæde og krav om ejer/review/accept; ingen automatisk scoreforøgelse.",
+      "implementation_refs": [
+        "docs/governance/control-register.json",
+        "docs/governance/README.md"
+      ],
+      "test_refs": [
+        "tests/governance-evidence.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Kommunal CISO + ledelse",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "ISMS-scope, risikoejere, anvendt risikobehandling, ledelsesreview og eventuel certificering er U.",
+      "framework_contribution": {
+        "ISO_ISMS": "governance",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C05",
+      "dimension": "NIS2 og beredskab",
+      "risk": "Leverandørsvigt eller sikkerhedshændelse opdages/håndteres ikke korrekt.",
+      "control": "Øvelsesmanuskript, ekstern ansvarskæde og sporbar opfølgning.",
+      "implementation_refs": [
+        "docs/governance/incident-exercise.md",
+        "docs/production-operations.md"
+      ],
+      "test_refs": [],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Beredskabsansvarlig + CISO + ledelse",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Kommunalt NIS2-scope, væsentlighed, underretning, vagt og gennemført øvelse er U.",
+      "framework_contribution": {
+        "ISO_ISMS": "governance",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C06",
+      "dimension": "Arkitektur og kvalitet",
+      "risk": "Runtime- eller schemadrift bryder integritet og adgang.",
+      "control": "Versionsbundet migrationsmanifest og eksplicit produktionsmiljøkontrol.",
+      "implementation_refs": [
+        "db/persistence.ts",
+        "scripts/migration-runner.mjs",
+        "db/migration-manifest.json"
+      ],
+      "test_refs": [
+        "tests/migrations.test.mjs",
+        "tests/migration-guard.test.mjs",
+        "tests/environment-boundary.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Teknisk ansvarlig + databaseansvarlig",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Begge runtimeadaptere og den reelle kommunale binding skal verificeres; referencer er ikke aktuelle testresultater.",
+      "framework_contribution": {
+        "ISO_ISMS": "architecture",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C07",
+      "dimension": "Kodehelbred",
+      "risk": "Store moduler og skjulte afhængigheder gør rettelser risikable.",
+      "control": "Pilotseed har separat ansvar og stabil facade med bevarede regressionsinvarianter.",
+      "implementation_refs": [
+        "features/workspace/pilot-seed.ts",
+        "features/workspace/server-repository.ts"
+      ],
+      "test_refs": [
+        "tests/demo-seed-consistency.test.mjs",
+        "tests/privacy-fixtures.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Udvikler + anden reviewer",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Kompleksitet/cykler/branchecoverage måles særskilt; mindre filer alene er ikke kvalitetsaccept.",
+      "framework_contribution": {
+        "ISO_ISMS": "code-health",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C08",
+      "dimension": "Data- og versionsintegritet",
+      "risk": "Gamle links eller samtidige skriverier ændrer et andet versionsgrundlag.",
+      "control": "Låste snapshots, hashes, leases og atomiske betingede transitions.",
+      "implementation_refs": [
+        "features/application/server-repository.ts",
+        "features/approval/server.ts",
+        "features/receipt/server.ts"
+      ],
+      "test_refs": [
+        "features/application/correction-persistence.test.mjs",
+        "features/application/direct-upload-persistence.test.mjs",
+        "features/approval/revocation-races.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Teknisk ansvarlig + systemejer",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Rigtig cloudlagring, fejltilstande og dokumentforløb afventer miljøaccept.",
+      "framework_contribution": {
+        "ISO_ISMS": "integrity",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C09",
+      "dimension": "CI/CD og ændringer",
+      "risk": "Forkert SHA eller uafklaret sikkerhedsanalyse frigives.",
+      "control": "Releaseguard binder quality/SARIF og artefakt til SHA; dependency-policy har eksplicitte undtagelser.",
+      "implementation_refs": [
+        ".github/workflows/release-vercel.yml",
+        "scripts/ci-release-codeql.mjs"
+      ],
+      "test_refs": [
+        "scripts/ci-release.test.mjs",
+        "scripts/ci-audit.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Repoansvarlig + uafhængig menneskelig frigiver",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Live regler/CI/SARIF må genverificeres for release-SHA; anden menneskelig reviewer/frigiver er ikke dokumenteret udpeget.",
+      "framework_contribution": {
+        "ISO_ISMS": "delivery",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C10",
+      "dimension": "Gendannelse",
+      "risk": "DB og filer kan ikke genskabes konsistent.",
+      "control": "Dokumenteret isoleret restore/rollback-kontrakt med manifest og målt prøve.",
+      "implementation_refs": [
+        "docs/production-operations.md"
+      ],
+      "test_refs": [],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Drift + database-/backupansvarlig",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Aktuel test-evidens for komplet restore og kommunalt godkendt RPO/RTO skal vedlægges; ingen liveaccept i registeret.",
+      "framework_contribution": {
+        "ISO_ISMS": "recovery",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C11",
+      "dimension": "Overvågning og drift",
+      "risk": "Jobfejl/køalder eller scannerfejl fører til ubemærket driftssvigt.",
+      "control": "Struktureret logkontrakt og health/readiness med eksplicitte begrænsninger.",
+      "implementation_refs": [
+        "features/privacy/operational-log.ts",
+        "app/api/readyz/route.ts",
+        "docs/production-operations.md"
+      ],
+      "test_refs": [
+        "tests/privacy-logging.test.mjs",
+        "tests/production-config.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Drift/SOC + systemejer",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Rigtig scheduler, alarmmodtager, vagt og servicemål er ikke afprøvet accepteret.",
+      "framework_contribution": {
+        "ISO_ISMS": "operations",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C12",
+      "dimension": "Tilgængelighed",
+      "risk": "Brugeren kan ikke fuldføre web-/dokumentflow med hjælpemidler.",
+      "control": "Reproducerbare UI-kontroller suppleret med manuel krav-/forløbsaccept.",
+      "implementation_refs": [
+        "features/application/ApplicationFormView.tsx",
+        "features/receipt/server.ts"
+      ],
+      "test_refs": [
+        "tests/interface-controls.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Tilgængelighedsansvarlig + frontend/QA",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Fuld EN-scopevurdering, skærmlæser- og dokumentaccept skal registreres; automatiske tests kan ikke erstatte dem.",
+      "framework_contribution": {
+        "ISO_ISMS": "accessibility",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C13",
+      "dimension": "Journal og arkiv",
+      "risk": "For tidlig sletning eller ukontrolleret bevaring bryder journalbehov.",
+      "control": "Bevaringsbeslutning og legal hold før destruktive handlinger; ingen automatisk kassation.",
+      "implementation_refs": [
+        "docs/privacy/data-inventory.json",
+        "docs/production-operations.md"
+      ],
+      "test_refs": [],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Journal-/arkivansvarlig + dataansvarlig",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Autoritativ journal, klassifikation, retention, hold og fysisk sletning afventer politik.",
+      "framework_contribution": {
+        "ISO_ISMS": "records",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C14",
+      "dimension": "Applikationssikkerhed",
+      "risk": "Uverificeret eller infektiøst dokument frigives.",
+      "control": "Hashbundet scannersvar og fail-closed produktion for upload/version/download.",
+      "implementation_refs": [
+        "features/application/malware-scan.ts",
+        "features/application/file-repository.ts"
+      ],
+      "test_refs": [
+        "features/application/malware-scan.test.mjs",
+        "features/application/malware-persistence.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Sikkerhed + drift",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Rigtig scanner, detektions-/formatkontrakt, region, databehandling og overvågning er U.",
+      "framework_contribution": {
+        "ISO_ISMS": "security",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    },
+    {
+      "id": "DGITA-C15",
+      "dimension": "Databeskyttelse",
+      "risk": "Mail eller PDF sendes efter mandatbortfald eller til forkert modtager.",
+      "control": "Live mandat før PDF/token/transport og modtagerpolitik for pilot.",
+      "implementation_refs": [
+        "features/mail/outbox.ts",
+        "features/mail/graph-transport.ts"
+      ],
+      "test_refs": [
+        "features/mail/delivery-policy.test.mjs",
+        "features/approval/revocation-races.test.mjs"
+      ],
+      "test_result": "reference_only_until_executed",
+      "owner": {
+        "proposal": "Exchange/IAM + systemejer",
+        "appointed": false,
+        "acceptance": "U"
+      },
+      "review": {
+        "technical_record_date": "2026-10-05",
+        "human_review_date": null,
+        "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
+      },
+      "remaining_gap": "Postkassescope og accept af bearer/PDF-kopier skal verificeres i rigtigt miljø.",
+      "framework_contribution": {
+        "ISO_ISMS": "privacy",
+        "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
+        "data_protection": "Teknisk/organisatorisk bidrag; konkret behandlingsaccept U"
+      },
+      "organisational_acceptance": "U"
+    }
+  ],
+  "sources": [
+    {
+      "id": "ISO",
+      "url": "https://www.iso.org/standard/27001",
+      "accessed": "2026-10-05",
+      "scope": "Offentlig beskrivelse af organisatorisk ISMS; fuld standard ikke gennemgået."
+    },
+    {
+      "id": "NIS2",
+      "url": "https://samsik.dk/wp-content/uploads/2025/07/Vejledning-til-kommuner-om-NIS-2-loven.pdf",
+      "accessed": "2026-10-05",
+      "scope": "Sektorspecifik kommunal vejledning juli 2025; kommunen fastlægger konkret anvendelsesscope."
+    },
+    {
+      "id": "DESIGN",
+      "url": "https://www.datatilsynet.dk/regler-og-vejledning/behandlingssikkerhed/databeskyttelse-gennem-design-og-standardindstillinger",
+      "accessed": "2026-10-05",
+      "scope": "Dataminimering og databeskyttelse gennem design og standardindstillinger."
+    },
+    {
+      "id": "A11Y",
+      "url": "https://digst.dk/tilsyn/webtilgaengelighed/lovgivning/",
+      "accessed": "2026-10-05",
+      "scope": "Relevante offentlige web-/dokumentkrav; kommunal scope/accept skal afklares."
+    }
+  ]
+}
