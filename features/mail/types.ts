@@ -45,6 +45,12 @@ export type GraphMailConfig = {
   graphBaseUrl: string;
   graphScope: string;
   timeoutMs: number;
+  deliveryPolicy: MailDeliveryPolicy;
+};
+
+export type MailDeliveryPolicy = {
+  /** null is unrestricted production delivery; an empty list blocks every recipient. */
+  allowedRecipients: readonly string[] | null;
 };
 
 export type GraphMailEnvironment = Record<string, string | undefined>;
@@ -60,6 +66,5 @@ export type GraphMailDependencies = {
 };
 
 export interface MailTransport {
-  send(mail: OutgoingMail): Promise<AcceptedMail>;
+  send(mail: OutgoingMail, options?: { beforeSend?: () => Promise<void> }): Promise<AcceptedMail>;
 }
-

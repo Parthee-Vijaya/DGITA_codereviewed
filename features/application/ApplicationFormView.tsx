@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useContext,
   useId,
   useRef,
   useState,
@@ -26,7 +27,7 @@ import {
 
 import type { CatalogSystem } from "../catalog/search";
 import { useUnsavedChanges } from "./use-unsaved-changes";
-import { labelQuestionControls, QuestionLabelContext } from "./QuestionContent";
+import { labelQuestionControls, QuestionLabelContext, QuestionErrorContext } from "./QuestionContent";
 import { SegmentedChoice } from "../ui/SegmentedChoice";
 import {
   isAllowedPrivateBlobUrl,
@@ -34,7 +35,6 @@ import {
   sha256File,
 } from "./direct-upload-client";
 import {
-  APPROVING_LEADERS,
   canOpenStep,
   createAttachmentDraft,
   firstInvalidStep,
@@ -137,6 +137,8 @@ export function ApplicationFormView({
   const [results, setResults] = useState<CatalogSystem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [approvers, setApprovers] = useState<Array<{ id: string; name: string }>>([]);
+  const [approversError, setApproversError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "loading" | "idle" | "saving" | "saved" | "error"
   >("loading");
@@ -155,6 +157,24 @@ export function ApplicationFormView({
   const currentErrors = getStepErrors(form, step);
   const currentWarnings = getStepWarnings(form, step);
   const showErrors = attemptedSteps.includes(step);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/approvers", { cache: "no-store", signal: controller.signal });
+        const payload = await response.json() as { approvers?: Array<{ id: string; name: string }>; error?: string };
+        if (!response.ok || !Array.isArray(payload.approvers)) throw new Error(payload.error || "Godkenderne kunne ikke hentes.");
+        if (!controller.signal.aborted) {
+          setApprovers(payload.approvers);
+          setApproversError(payload.approvers.length === 0 ? "Der er endnu ikke tildelt en godkender til din kommune. Kontakt administratoren." : null);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) setApproversError(error instanceof Error ? error.message : "Godkenderne kunne ikke hentes.");
+      }
+    })();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -396,6 +416,9 @@ export function ApplicationFormView({
     markAttempted(step);
     if (currentErrors.length > 0) {
       onToast("Udfyld de markerede felter, før du går videre.");
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(".form-message.error")?.focus();
+      });
       return;
     }
     goToStep(Math.min(step + 1, steps.length - 1));
@@ -1020,7 +1043,7 @@ export function ApplicationFormView({
 
             {step === 8 ? (
               <>
-                <Question title="52. Angiv chef" hint="Lederen modtager en godkendelsesmail i Outlook."><select className={cx("clean-input", errorFor("approvingLeader") && "invalid")} value={form.approvingLeaderId} onChange={(event) => { const leader = APPROVING_LEADERS.find((candidate) => candidate.id === event.target.value); if (!leader) return; changeForm((current) => ({ ...current, approvingLeaderId: leader.id, approvingLeader: leader.name })); setSaveStatus("idle"); }}>{APPROVING_LEADERS.map((leader) => <option key={leader.id} value={leader.id}>{leader.name}</option>)}</select><FieldErrorText message={errorFor("approvingLeader")} /></Question>
+                <Question title="52. Angiv chef" hint="Lederen modtager en godkendelsesmail i Outlook."><select className={cx("clean-input", errorFor("approvingLeader") && "invalid")} value={form.approvingLeaderId} onChange={(event) => { const leader = approvers.find((candidate) => candidate.id === event.target.value); if (!leader) return; changeForm((current) => ({ ...current, approvingLeaderId: leader.id, approvingLeader: leader.name })); setSaveStatus("idle"); }}><option value="">Vælg en godkender</option>{approvers.map((leader) => <option key={leader.id} value={leader.id}>{leader.name}</option>)}</select><FieldErrorText message={approversError || errorFor("approvingLeader")} /></Question>
                 <Question title="53. Har du andre relevante bemærkninger?"><textarea className="clean-input" rows={5} placeholder="Tilføj eventuelle bemærkninger..." value={form.remarks} onChange={(event) => update("remarks", event.target.value)} /></Question>
                 <div className="outlook-note"><Mail size={20} /><div><strong>Godkendelsen klargøres til Outlook</strong><p>Lederen får et versionslåst beslutningsgrundlag og et direkte link til sagen, når mailintegrationen forbindes.</p></div></div>
               </>
@@ -1083,7 +1106,8 @@ function splitList(value: string) {
 
 function Question({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   const titleId = useId();
-  return <QuestionLabelContext.Provider value={title}><div className="question" role="group" aria-labelledby={titleId}><div className="question-copy"><div className="question-title" id={titleId}>{title}</div>{hint ? <p>{hint}</p> : null}</div><div>{labelQuestionControls(children, title)}</div></div></QuestionLabelContext.Provider>;
+  const errorId = `${titleId}-error`;
+  return <QuestionLabelContext.Provider value={title}><QuestionErrorContext.Provider value={errorId}><div className="question" role="group" aria-labelledby={titleId}><div className="question-copy"><div className="question-title" id={titleId}>{title}</div>{hint ? <p>{hint}</p> : null}</div><div>{labelQuestionControls(children, title, errorId)}</div></div></QuestionErrorContext.Provider></QuestionLabelContext.Provider>;
 }
 
 function Choice({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
@@ -1138,11 +1162,12 @@ function formatBytes(bytes: number) {
 }
 
 function FormMessage({ tone, title, messages }: { tone: "error" | "warning"; title: string; messages: string[] }) {
-  return <div className={cx("form-message", tone)}><Info size={20} /><div><strong>{title}</strong>{messages.map((message) => <p key={message}>{message}</p>)}</div></div>;
+  return <div className={cx("form-message", tone)} tabIndex={tone === "error" ? -1 : undefined} role={tone === "error" ? "alert" : undefined}><Info size={20} /><div><strong>{title}</strong>{messages.map((message) => <p key={message}>{message}</p>)}</div></div>;
 }
 
 function FieldErrorText({ message }: { message?: string }) {
-  return message ? <p className="field-error" role="alert">{message}</p> : null;
+  const errorId = useContext(QuestionErrorContext);
+  return message ? <p id={errorId} className="field-error" role="alert">{message}</p> : null;
 }
 
 function ReviewApplication({ form, error, onEdit, onConsent }: { form: ApplicationFormState; error?: string; onEdit: (step: number) => void; onConsent: (checked: boolean) => void }) {

@@ -1,5 +1,6 @@
 import type { ServerActor } from "../auth/types";
 import type { AttachmentDraft } from "./engine";
+import { assertAttachmentScanAllowed, MalwareScanError, scanUploadBytes } from "./malware-scan";
 import {
   acknowledgeApplicationAttachmentBlobDeletion,
   acquireApplicationAttachmentVerification,
@@ -75,6 +76,7 @@ export async function completeDirectApplicationUpload(
   if (!isVercelBlobTransferEnabled()) throw new DirectUploadUnavailableError();
   const upload = await getApplicationAttachmentUpload(actor, applicationId, attachmentId);
   if (upload.status === "ready") {
+    await assertAttachmentScanAllowed(upload.scanStatus);
     return attachmentDraft(upload);
   }
 
@@ -104,23 +106,27 @@ export async function completeDirectApplicationUpload(
       );
     }
 
+    if (!observed.bytes) throw new ApplicationRepositoryError(422, "Bilagets indhold kunne ikke sikkerhedskontrolleres.");
+    const scanStatus = await scanUploadBytes(observed.bytes, observed.checksum);
+
     // From this point a database error is ambiguous: the ready transition may
     // have committed even if its response was lost. Never delete the Blob in
     // that branch; a retained verifying lease is handled by TTL cleanup.
     commitAttempted = true;
-    return await finalizeApplicationAttachmentUpload(actor, lease, observed);
+    return await finalizeApplicationAttachmentUpload(actor, lease, { ...observed, scanStatus });
   } catch (error) {
     if (commitAttempted) {
       try {
         const current = await getApplicationAttachmentUpload(actor, applicationId, attachmentId);
         if (current.status === "ready") {
+          await assertAttachmentScanAllowed(current.scanStatus);
           return attachmentDraft(current);
         }
       } catch {
         // An unavailable read cannot prove that the commit failed. Keep Blob.
       }
     } else if (lease) {
-      const target = await discardApplicationAttachmentVerification(actor, lease).catch(
+      const target = await discardApplicationAttachmentVerification(actor, lease, error instanceof MalwareScanError && error.code === "MALWARE_DETECTED" ? "infected" : "failed").catch(
         () => null,
       );
       if (target) await deleteClaimedApplicationBlob(target);

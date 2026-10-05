@@ -3,6 +3,7 @@ import {
   getPersistenceBindings,
 } from "../../db/persistence";
 import { AuthHttpError } from "./http";
+import { readRuntimeEnvironment, type RuntimeEnvironment } from "../runtime/environment";
 
 export const TEST_LOGIN_RATE_LIMIT_SCOPE = "test-login";
 export const TEST_LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1_000;
@@ -115,9 +116,9 @@ export async function clearTestLoginRateLimit(subjectHash: string) {
     .run();
 }
 
-export async function testLoginRateLimitSubject(request: Request) {
+export async function testLoginRateLimitSubject(request: Request, environment?: RuntimeEnvironment) {
   const origin = new URL(request.url).origin;
-  const platformAddress = trustedClientAddress(request);
+  const platformAddress = trustedClientAddress(request, environment ?? await readRuntimeEnvironment());
   const payload = new TextEncoder().encode(
     `${origin}\n${platformAddress}`,
   );
@@ -129,13 +130,15 @@ export async function testLoginRateLimitSubject(request: Request) {
   );
 }
 
-function trustedClientAddress(request: Request) {
-  if (request.headers.has("x-vercel-id")) {
+function trustedClientAddress(request: Request, environment: RuntimeEnvironment) {
+  // Platform-looking HTTP headers alone are attacker-controlled on a direct
+  // Node host. The trusted proxy must also be identified by server configuration.
+  if (environment.VERCEL === "1" || environment.DGITA_TRUSTED_PROXY === "vercel") {
     return normalizedAddress(
       request.headers.get("x-vercel-forwarded-for"),
     );
   }
-  if (request.headers.has("cf-ray")) {
+  if (environment.DGITA_TRUSTED_PROXY === "cloudflare") {
     return normalizedAddress(request.headers.get("cf-connecting-ip"));
   }
   return "unknown";

@@ -116,7 +116,7 @@ export async function inspectPrivateBlob(blobUrl: string, expectedPathname: stri
     if (!privateBlobPathMatchesLogical(actualPathname, expectedPathname)) {
       throw new VercelBlobTransferError("Filen blev ikke fundet i dokumentlageret.");
     }
-    return await readPrivateBlobIntegrity(exactUrl);
+    return await readPrivateBlobIntegrity(exactUrl, true);
   } catch (error) {
     throw safeBlobError(error, "Filen kunne ikke integritetskontrolleres.");
   }
@@ -192,7 +192,7 @@ async function resolvePrivateBlobUrl(location: string) {
   return toPrivateBlobUrl(result.blob.url);
 }
 
-async function readPrivateBlobIntegrity(exactUrl: string) {
+async function readPrivateBlobIntegrity(exactUrl: string, includeBytes = false) {
   const actualPathname = privateBlobActualPathname(exactUrl);
   const result = await get(exactUrl, {
     access: "private",
@@ -210,6 +210,7 @@ async function readPrivateBlobIntegrity(exactUrl: string) {
 
   const reader = result.stream.getReader();
   const hash = createHash("sha256");
+  const chunks: Uint8Array[] = [];
   let size = 0;
   try {
     while (true) {
@@ -221,6 +222,7 @@ async function readPrivateBlobIntegrity(exactUrl: string) {
         throw new VercelBlobTransferError("Filen er større end den tilladte grænse.");
       }
       hash.update(next.value);
+      if (includeBytes) chunks.push(next.value);
     }
   } finally {
     reader.releaseLock();
@@ -229,11 +231,17 @@ async function readPrivateBlobIntegrity(exactUrl: string) {
   if (size !== result.blob.size) {
     throw new VercelBlobTransferError("Filens størrelse kunne ikke integritetskontrolleres.");
   }
+  const bytes = includeBytes ? new Uint8Array(size) : undefined;
+  if (bytes) {
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.byteLength; }
+  }
   return {
     size,
     contentType: (result.blob.contentType || "application/octet-stream").toLowerCase(),
     checksum: hash.digest("hex"),
     storageLocator: exactUrl,
+    ...(bytes ? { bytes } : {}),
   };
 }
 

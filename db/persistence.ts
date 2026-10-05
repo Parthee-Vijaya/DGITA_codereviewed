@@ -57,6 +57,16 @@ const legacySchemaStatements = [
  * source of truth; this idempotent bootstrap supports fresh local/Sites DBs.
  */
 export const portalSchemaStatements = [
+  `CREATE TABLE IF NOT EXISTS portal_environment (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    purpose TEXT NOT NULL CHECK (purpose IN ('test', 'production'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS portal_oidc_used_states (
+    state_hash TEXT PRIMARY KEY NOT NULL,
+    expires_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS portal_oidc_used_states_expires_idx
+    ON portal_oidc_used_states(expires_at)`,
   `CREATE TABLE IF NOT EXISTS portal_tenants (
     id TEXT PRIMARY KEY NOT NULL,
     slug TEXT NOT NULL,
@@ -641,7 +651,19 @@ export async function ensurePortalSchema() {
   if (!portalSchemaPromise) {
     portalSchemaPromise = (async () => {
       const { DB } = await getPersistenceBindings();
-      await runSchemaBatch(DB, portalSchemaStatements);
+      const [{ assertDatabaseEnvironment }, { readRuntimeEnvironment, deploymentStage }] = await Promise.all([
+        import("./environment-guard"),
+        import("../features/runtime/environment"),
+      ]);
+      const environment = await readRuntimeEnvironment();
+      if (deploymentStage(environment) !== "production") {
+        await runSchemaBatch(DB, portalSchemaStatements);
+      } else {
+        const { assertMigrationState } = await import("./migration-guard");
+        await assertMigrationState(DB);
+      }
+      // Production schema is deployed explicitly by the migration job.
+      await assertDatabaseEnvironment(DB, environment);
     })().catch((error) => {
       portalSchemaPromise = null;
       throw error;

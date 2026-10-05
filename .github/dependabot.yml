@@ -1,0 +1,41 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+    groups:
+      next:
+        patterns: [next, eslint-config-next]
+      react:
+        patterns: [react, react-dom, react-server-dom-webpack]
+      types:
+        patterns: ["@types/*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:30"
+      timezone: Europe/Copenhagen
+    commit-message:
+      prefix: ci
+  - package-ecosystem: npm
+    directory: /.github/deployment-tools
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci-deps

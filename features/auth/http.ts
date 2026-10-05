@@ -143,7 +143,10 @@ export function authErrorResponse(error: unknown) {
     );
   }
 
-  console.error("Authentication request failed", error);
+  const eventId = crypto.randomUUID();
+  const name = error instanceof Error && /^[A-Za-z0-9_.-]{1,80}$/u.test(error.name) ? error.name : "UnknownError";
+  // Provider errors can embed connection strings, SQL parameters or tokens.
+  console.error("Authentication request failed", { eventId, errorName: name });
   return noStoreJson(
     {
       code: "AUTH_UNAVAILABLE",

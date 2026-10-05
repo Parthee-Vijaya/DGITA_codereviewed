@@ -26,6 +26,7 @@ import {
   normalizeImageInput,
 } from "./validation";
 import { ensureVersionedSeed, PORTAL_DEFAULT_SEED } from "./seed-guard";
+import { permitsDemoSeed, readRuntimeEnvironment } from "../runtime/environment";
 
 export type PortalActor = {
   userId?: string;
@@ -148,7 +149,9 @@ export class PortalAccessError extends Error {
 export async function preparePortalData() {
   await ensurePortalSchema();
   const { DB } = await getPersistenceBindings();
-  await ensureVersionedSeed(DB, PORTAL_DEFAULT_SEED, seedPortalDefaults);
+  if (permitsDemoSeed(await readRuntimeEnvironment())) {
+    await ensureVersionedSeed(DB, PORTAL_DEFAULT_SEED, seedPortalDefaults);
+  }
   return DB;
 }
 
@@ -917,6 +920,11 @@ export async function seedPortalDefaults(DB: D1Database) {
     statements.push(...demoUserStatements(DB, user.id, user.email, user.displayName, user.role, now));
   }
   await runBatches(DB, statements);
+  await runBatches(DB, APPROVING_LEADERS.map((leader) => DB.prepare(`
+    INSERT OR IGNORE INTO portal_user_roles
+      (id, tenant_id, user_id, role, created_at, created_by_user_id)
+    VALUES (?, 'kalundborg', ?, 'approver', ?, NULL)
+  `).bind(`role:${leader.id}:approver`, leader.id, now)));
   await seedContentDefaults(DB, "kalundborg");
   await seedImageDefaults(DB, "kalundborg");
   await seedDemoApplications(DB, now);

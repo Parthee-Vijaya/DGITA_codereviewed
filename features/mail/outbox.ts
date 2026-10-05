@@ -1,4 +1,5 @@
 import type { ServerActor } from "../auth/types";
+import { approvalMandateSql } from "../approval/mandate";
 import {
   APPROVAL_TOKEN_PLACEHOLDER,
   approvalTokenForRequest,
@@ -220,6 +221,12 @@ export async function queueStatusMail(
 
 export async function processOutbox(actor: ServerActor, limit = 5) {
   requireAdmin(actor);
+  const DB = await preparePortalData();
+  const activeTenant = await DB.prepare("SELECT id FROM portal_tenants WHERE id = ? AND status = 'active'")
+    .bind(actor.tenantId).first<{ id: string }>();
+  if (!activeTenant) {
+    throw new OutboxError(403, "TENANT_INACTIVE", "Kommunen er ikke aktiv. Ingen mails er sendt.");
+  }
   const normalizedLimit = Math.min(10, Math.max(1, Math.trunc(limit)));
   const environment = await getGraphMailEnvironment();
   let transport;
@@ -233,7 +240,6 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
     );
   }
 
-  const DB = await preparePortalData();
   const now = new Date().toISOString();
   const abandonedBefore = new Date(Date.now() - 15 * 60_000).toISOString();
   await DB.prepare(`
@@ -283,7 +289,7 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
         body: { contentType: "HTML", content: content.html },
         to: [{ address: row.recipient_email, ...(row.recipient_name ? { name: row.recipient_name } : {}) }],
         attachments,
-      });
+      }, { beforeSend: () => assertMailStillAuthorized(DB, row) });
     } catch (error) {
       if (error instanceof MailCancelledError) {
         const cancelledAt = new Date().toISOString();
@@ -292,6 +298,7 @@ export async function processOutbox(actor: ServerActor, limit = 5) {
           SET status = 'cancelled', next_attempt_at = NULL,
               text_body = '[Mail annulleret]',
               html_body = '<p>Mail annulleret.</p>',
+              attachments_json = '[]',
               last_error = 'MAIL_CANCELLED', updated_at = ?
           WHERE id = ? AND tenant_id = ? AND status = 'processing'
         `).bind(cancelledAt, row.id, actor.tenantId).run();
@@ -387,6 +394,7 @@ export async function processScheduledOutbox(limitPerTenant = 10) {
       INNER JOIN portal_user_roles role
         ON role.tenant_id = user.tenant_id AND role.user_id = user.id
       WHERE user.tenant_id = ? AND user.status = 'active' AND role.role = 'admin'
+        AND tenant.status = 'active'
       ORDER BY user.created_at, user.id
       LIMIT 1
     `).bind(tenant.tenant_id).first<{
@@ -416,20 +424,12 @@ export async function processScheduledOutbox(limitPerTenant = 10) {
 }
 
 async function materializeMailContent(DB: D1Database, row: OutboxRow) {
+  await assertMailStillAuthorized(DB, row);
   if (row.template_key !== "approval.requested") {
     return { text: row.text_body, html: row.html_body };
   }
   const match = /^approval\.requested:([0-9a-f-]{36}):/iu.exec(row.idempotency_key);
   if (!match) throw new MailAttachmentReferenceError();
-  const request = await DB.prepare(`
-    SELECT request.status FROM portal_approval_requests request
-    INNER JOIN portal_applications application
-      ON application.id = request.application_id AND application.tenant_id = request.tenant_id
-    WHERE request.id = ? AND request.tenant_id = ? AND request.application_id = ?
-      AND request.expires_at > ? AND request.application_version_id = application.current_version_id
-    LIMIT 1
-  `).bind(match[1], row.tenant_id, row.application_id, new Date().toISOString()).first<{ status: string }>();
-  if (request?.status !== "pending") throw new MailCancelledError();
   if (
     !row.text_body.includes(APPROVAL_TOKEN_PLACEHOLDER) ||
     !row.html_body.includes(APPROVAL_TOKEN_PLACEHOLDER)
@@ -441,6 +441,33 @@ async function materializeMailContent(DB: D1Database, row: OutboxRow) {
     text: row.text_body.replaceAll(APPROVAL_TOKEN_PLACEHOLDER, token),
     html: row.html_body.replaceAll(APPROVAL_TOKEN_PLACEHOLDER, token),
   };
+}
+
+async function assertMailStillAuthorized(DB: D1Database, row: OutboxRow) {
+  const current = await DB.prepare(`
+    SELECT mail.id FROM portal_mail_outbox mail
+    INNER JOIN portal_tenants tenant ON tenant.id = mail.tenant_id AND tenant.status = 'active'
+    WHERE mail.id = ? AND mail.tenant_id = ? AND mail.status = 'processing'
+      AND mail.recipient_email = ?
+    LIMIT 1
+  `).bind(row.id, row.tenant_id, row.recipient_email).first<{ id: string }>();
+  if (!current) throw new MailCancelledError();
+  if (row.template_key !== "approval.requested") return;
+  const match = /^approval\.requested:([0-9a-f-]{36}):/iu.exec(row.idempotency_key);
+  if (!match) throw new MailAttachmentReferenceError();
+  const authorized = await DB.prepare(`
+    SELECT request.id FROM portal_approval_requests request
+    INNER JOIN portal_applications application
+      ON application.id = request.application_id AND application.tenant_id = request.tenant_id
+    WHERE request.id = ? AND request.tenant_id = ? AND request.application_id = ?
+      AND request.status = 'pending' AND request.expires_at > ?
+      AND request.application_version_id = application.current_version_id
+      AND LOWER(TRIM(request.approver_email)) = LOWER(TRIM(?))
+      AND ${approvalMandateSql()}
+    LIMIT 1
+  `).bind(match[1], row.tenant_id, row.application_id, new Date().toISOString(), row.recipient_email)
+    .first<{ id: string }>();
+  if (!authorized) throw new MailCancelledError();
 }
 
 async function resolveAttachments(actor: ServerActor, row: OutboxRow) {

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -17,6 +18,19 @@ const updatedAt = () =>
   text("updated_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`);
+
+export const portalEnvironment = sqliteTable("portal_environment", {
+  id: integer("id").primaryKey(),
+  purpose: text("purpose", { enum: ["test", "production"] }).notNull(),
+}, (table) => [
+  check("portal_environment_singleton", sql`${table.id} = 1`),
+  check("portal_environment_purpose", sql`${table.purpose} IN ('test', 'production')`),
+]);
+
+export const portalOidcUsedStates = sqliteTable("portal_oidc_used_states", {
+  stateHash: text("state_hash").primaryKey(),
+  expiresAt: text("expires_at").notNull(),
+}, (table) => [index("portal_oidc_used_states_expires_idx").on(table.expiresAt)]);
 
 /**
  * Compatibility tables used by the original draft/upload API. New protected

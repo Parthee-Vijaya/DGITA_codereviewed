@@ -1,0 +1,30 @@
+[
+  {
+    "id": "0000_known_loki",
+    "checksum": "07823c87e066c8cad9a594b1cd18958e3b5beca6f38b7c0b02801a0937450ab4"
+  },
+  {
+    "id": "0001_quiet_morg",
+    "checksum": "e15b055c869dc8ebd6f5876004a5f6f84eb8ff81a715b5ed2e76b16156d647d5"
+  },
+  {
+    "id": "0002_medical_chat",
+    "checksum": "44219d96cab791c38556107bbfb6a7c66ca5e3ae3a5ae3430782ce6bca1a3f75"
+  },
+  {
+    "id": "0003_serious_apocalypse",
+    "checksum": "573ab23761143a0c1046db5091f4c8e8976a95c119024ca5c206e4c6504149cb"
+  },
+  {
+    "id": "0004_chubby_blonde_phantom",
+    "checksum": "e59195a91644bbf32a7813c8ef9d822436b1188cc05b794504952df6053e8613"
+  },
+  {
+    "id": "0005_hesitant_gunslinger",
+    "checksum": "18bef49c6a4f65c9960672d53d770bfc26f9a27de884e6c131fe4f2b9d58f101"
+  },
+  {
+    "id": "0006_production_boundaries",
+    "checksum": "adb24f1f75868569e6a994a65f239c176567c35690f2b9c27d9bb05264f58e6e"
+  }
+]

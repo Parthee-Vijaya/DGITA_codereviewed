@@ -3,9 +3,10 @@
 import { Children, cloneElement, createContext, isValidElement, type ReactElement, type ReactNode } from "react";
 
 export const QuestionLabelContext = createContext<string | undefined>(undefined);
+export const QuestionErrorContext = createContext<string | undefined>(undefined);
 
 /** Native controls retain explicit labels; otherwise inherit the question. */
-export function labelQuestionControls(children: ReactNode, title: string): ReactNode {
+export function labelQuestionControls(children: ReactNode, title: string, errorId?: string): ReactNode {
   return Children.map(children, (child) => {
     if (!isValidElement(child) || typeof child.type !== "string") return child;
     const element = child as ReactElement<Record<string, unknown>>;
@@ -15,7 +16,8 @@ export function labelQuestionControls(children: ReactNode, title: string): React
     return cloneElement(element, {
       ...(control && !props["aria-label"] && !props["aria-labelledby"] ? { "aria-label": title } : {}),
       ...(control && invalid ? { "aria-invalid": true } : {}),
-      ...(props.children ? { children: labelQuestionControls(props.children as ReactNode, title) } : {}),
+      ...(control && invalid && errorId ? { "aria-describedby": [props["aria-describedby"], errorId].filter(Boolean).join(" ") } : {}),
+      ...(props.children ? { children: labelQuestionControls(props.children as ReactNode, title, errorId) } : {}),
     });
   });
 }

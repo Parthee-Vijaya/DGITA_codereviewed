@@ -43,6 +43,13 @@
       "when": 1788130351051,
       "tag": "0005_hesitant_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791189803004,
+      "tag": "0006_production_boundaries",
+      "breakpoints": true
     }
   ]
 }

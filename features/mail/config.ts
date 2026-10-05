@@ -1,4 +1,5 @@
 import { GraphMailConfigurationError } from "./errors";
+import { readMailDeliveryPolicy } from "./delivery-policy";
 import type {
   GraphMailConfig,
   GraphMailEnvironment,
@@ -86,6 +87,7 @@ export function readGraphMailConfig(
     graphBaseUrl,
     graphScope,
     timeoutMs,
+    deliveryPolicy: readMailDeliveryPolicy(environment),
   };
 }
 

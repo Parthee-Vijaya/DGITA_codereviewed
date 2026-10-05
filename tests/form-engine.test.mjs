@@ -233,10 +233,10 @@ test("fremtidige trin låses af den første ugyldige sektion", () => {
   assert.equal(canOpenStep(completeFirstStep, 1), true);
 });
 
-test("godkendende chef bindes til et stabilt katalog-id", () => {
+test("godkendende chef kræver et strukturelt gyldigt id før serverens mandatkontrol", () => {
   assert.equal(getStepErrors(state(), 8).length, 0);
   const manipulated = state({
-    approvingLeaderId: "ukendt-bruger-id",
+    approvingLeaderId: "ugyldigt/id",
     approvingLeader: "Peter Bjerre Ahlgren",
   });
   assert.equal(

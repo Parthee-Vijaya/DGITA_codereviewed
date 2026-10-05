@@ -25,6 +25,9 @@ import {
 } from "./direct-upload-policy";
 import { normalizePersistedApplicationFormState } from "./state-validation";
 import { canonicalCatalogSelection } from "../catalog/selection";
+import { canonicalizeApprovingLeader } from "./approver-repository";
+import { assertAttachmentScanAllowed, scanUploadBytes, type AttachmentScanStatus } from "./malware-scan";
+import { deploymentStage, readRuntimeEnvironment } from "../runtime/environment";
 
 type ApplicationRow = {
   id: string;
@@ -49,6 +52,7 @@ type AttachmentRow = {
   storage_key: string;
   checksum_sha256: string;
   status: string;
+  scan_status: string;
 };
 
 type VersionedAttachmentRow = AttachmentRow & {
@@ -403,7 +407,10 @@ export async function submitApplication(
 
   const attachments = await getApplicationAttachments(DB, id);
   let canonicalState: ApplicationFormState;
-  try { canonicalState = canonicalCatalogSelection(hydratePortalAttachments(state, attachments)); }
+  try {
+    canonicalState = canonicalCatalogSelection(hydratePortalAttachments(state, attachments));
+    canonicalState = await canonicalizeApprovingLeader(DB, actor, canonicalState);
+  }
   catch (error) { throw new ApplicationRepositoryError(422, (error as Error).message); }
   const errors = getAllErrors(canonicalState);
   if (errors.length > 0) {
@@ -430,6 +437,10 @@ export async function submitApplication(
         attachment.status === "ready" && includedAttachmentIds.has(attachment.id),
     )
     .sort((left, right) => left.id.localeCompare(right.id));
+  const scanEnvironment = await readRuntimeEnvironment();
+  for (const attachment of readyAttachments) {
+    await assertAttachmentScanAllowed(attachment.scan_status, scanEnvironment);
+  }
   const manifestJson = JSON.stringify(
     readyAttachments.map((attachment) => ({
       id: attachment.id,
@@ -461,6 +472,7 @@ export async function submitApplication(
         SELECT COUNT(*) FROM portal_attachments
         WHERE tenant_id = ? AND application_id = ?
           AND application_version_id IS NULL AND status = 'ready'
+          ${deploymentStage(scanEnvironment) === "production" ? "AND scan_status = 'clean'" : "AND scan_status IN ('clean', 'not_configured')"}
           AND id IN (${readyAttachments.map(() => "?").join(", ")})
       ) = ?`
     : "";
@@ -737,6 +749,7 @@ export async function storeApplicationAttachment(
   const { FILES } = await getPersistenceBindings();
   const bytes = await file.arrayBuffer();
   const checksum = await sha256Bytes(bytes);
+  const scanStatus = await scanUploadBytes(new Uint8Array(bytes), checksum);
   const id = crypto.randomUUID();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(-140) || "document";
   const pathname = `tenants/${actor.tenantId}/applications/${applicationId}/${id}/${safeName}`;
@@ -760,7 +773,7 @@ export async function storeApplicationAttachment(
          kind, original_name, size_bytes, content_type, storage_key,
          checksum_sha256, status, scan_status, uploaded_by_user_id,
          created_at, immutable_at, deleted_at)
-      SELECT ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'ready', 'not_configured', ?, ?, NULL, NULL
+      SELECT ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'ready', ?, ?, ?, NULL, NULL
       WHERE EXISTS (
         SELECT 1 FROM portal_applications
         WHERE id = ? AND tenant_id = ? AND owner_user_id = ?
@@ -777,6 +790,7 @@ export async function storeApplicationAttachment(
       contentType,
       storageKey,
       checksum,
+      scanStatus,
       actor.userId,
       now,
       applicationId,
@@ -815,6 +829,7 @@ export type PendingApplicationAttachment = DirectUploadMetadata & {
   storageKey: string;
   logicalStorageKey: string;
   status: "pending" | "verifying" | "ready";
+  scanStatus?: string;
 };
 
 export type ApplicationAttachmentVerificationLease =
@@ -850,7 +865,7 @@ export async function beginApplicationAttachmentUpload(
        kind, original_name, size_bytes, content_type, storage_key,
        checksum_sha256, status, scan_status, uploaded_by_user_id,
        created_at, immutable_at, deleted_at)
-    SELECT ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', 'not_configured', ?, ?, NULL, NULL
+    SELECT ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?, NULL, NULL
     WHERE EXISTS (
       SELECT 1 FROM portal_applications
       WHERE id = ? AND tenant_id = ? AND owner_user_id = ?
@@ -947,7 +962,7 @@ export async function getApplicationAttachmentUpload(
   const { DB } = await getOwnedDraftForUpload(actor, applicationId);
   const row = await DB.prepare(`
     SELECT id, application_id, kind, original_name, size_bytes, content_type,
-           storage_key, checksum_sha256, status
+           storage_key, checksum_sha256, status, scan_status
     FROM portal_attachments
     WHERE id = ? AND tenant_id = ? AND application_id = ? AND owner_user_id = ?
       AND application_version_id IS NULL AND status IN ('pending', 'verifying', 'ready')
@@ -967,6 +982,7 @@ export async function getApplicationAttachmentUpload(
     storage_key: string;
     checksum_sha256: string;
     status: "pending" | "verifying" | "ready";
+    scan_status: string;
   }>();
   if (!row) {
     throw new ApplicationRepositoryError(404, "Uploaden findes ikke, eller du har ikke adgang.");
@@ -987,6 +1003,7 @@ export async function getApplicationAttachmentUpload(
     ),
     checksum: row.checksum_sha256,
     status: row.status,
+    scanStatus: row.scan_status,
   };
 }
 
@@ -1094,6 +1111,7 @@ export async function finalizeApplicationAttachmentUpload(
   upload: ApplicationAttachmentVerificationLease,
   observed: Pick<DirectUploadMetadata, "size" | "contentType" | "checksum"> & {
     storageLocator: string;
+    scanStatus?: AttachmentScanStatus;
   },
 ) {
   if (
@@ -1107,10 +1125,12 @@ export async function finalizeApplicationAttachmentUpload(
   }
 
   const { DB } = await getOwnedDraftForUpload(actor, upload.applicationId);
+  const scanStatus = observed.scanStatus ?? "not_configured";
+  await assertAttachmentScanAllowed(scanStatus);
   const now = new Date().toISOString();
   const [updated] = await DB.batch([
     DB.prepare(`
-      UPDATE portal_attachments SET status = 'ready', storage_key = ?
+      UPDATE portal_attachments SET status = 'ready', storage_key = ?, scan_status = ?
       WHERE id = ? AND tenant_id = ? AND application_id = ? AND owner_user_id = ?
         AND application_version_id IS NULL AND status = 'verifying'
         AND EXISTS (
@@ -1126,6 +1146,7 @@ export async function finalizeApplicationAttachmentUpload(
         )
     `).bind(
       observed.storageLocator,
+      scanStatus,
       upload.id,
       actor.tenantId,
       upload.applicationId,
@@ -1158,6 +1179,7 @@ export async function finalizeApplicationAttachmentUpload(
         kind: upload.kind,
         size: upload.size,
         checksum: upload.checksum,
+        scanStatus,
       }),
       now,
       upload.id,
@@ -1233,13 +1255,14 @@ export async function discardPendingApplicationAttachment(
 export async function discardApplicationAttachmentVerification(
   actor: ServerActor,
   upload: ApplicationAttachmentVerificationLease,
+  scanStatus: "failed" | "infected" = "failed",
 ): Promise<ApplicationAttachmentBlobDeletion | null> {
   assertCanCreate(actor);
   const DB = await portalDb();
   const now = new Date().toISOString();
   const deleted = await DB.prepare(`
     UPDATE portal_attachments
-    SET status = 'deleted', deleted_at = ?
+    SET status = 'deleted', deleted_at = ?, scan_status = ?
     WHERE id = ? AND tenant_id = ? AND application_id = ? AND owner_user_id = ?
       AND application_version_id IS NULL AND status = 'verifying'
       AND storage_key = ?
@@ -1251,6 +1274,7 @@ export async function discardApplicationAttachmentVerification(
       )
   `).bind(
     now,
+    scanStatus,
     upload.id,
     actor.tenantId,
     upload.applicationId,
@@ -1437,7 +1461,7 @@ async function findApplicationById(DB: D1Database, id: string) {
 async function getApplicationAttachments(DB: D1Database, applicationId: string) {
   const result = await DB.prepare(`
     SELECT id, application_id, kind, original_name, size_bytes, content_type,
-           storage_key, checksum_sha256, status
+           storage_key, checksum_sha256, status, scan_status
     FROM portal_attachments
     WHERE application_id = ? AND application_version_id IS NULL
       AND status = 'ready'
@@ -1499,7 +1523,9 @@ async function initializeCorrectionAttachments(
       .replace(/[^a-zA-Z0-9._-]+/g, "_")
       .slice(-140) || "document";
     const pathname = `tenants/${actor.tenantId}/applications/${application.id}/corrections/${versionId}/${id}/${safeName}`;
-    const copied = await FILES.put(pathname, await stored.arrayBuffer(), {
+    const copiedBytes = await stored.arrayBuffer();
+    const scanStatus = await scanUploadBytes(new Uint8Array(copiedBytes), attachment.checksum_sha256);
+    const copied = await FILES.put(pathname, copiedBytes, {
       httpMetadata: { contentType: attachment.content_type },
       customMetadata: {
         tenantId: actor.tenantId,
@@ -1530,7 +1556,7 @@ async function initializeCorrectionAttachments(
       attachment.content_type,
       copied.key,
       attachment.checksum_sha256,
-      attachment.scan_status,
+      scanStatus,
       actor.userId,
       now,
       application.id,

@@ -16,6 +16,8 @@ Komponenterne er forfinet med inspiration fra [Fisher UI](https://jakobfisker.dk
 
 ## Status
 
+Fremtidigt arbejde og releases hører til [DGITA_codereviewed](https://github.com/Parthee-Vijaya/DGITA_codereviewed). Det tidligere DGITA-repo er bevaret som `upstream`. Produktionsforberedelserne omfatter sikkerhedsrettelser og CI/CD, men en kommunal produktionsaccept kræver stadig de eksterne kontroller i [driftsvejledningen](docs/production-operations.md).
+
 Seneste [robusthedsgennemgang og produktionscheckliste](docs/enterprise-review.md) beskriver rettelserne i kladder, samtidige redigeringer, statusskift, dokumenter, mail, PDF, admin og UX. Portalen er fortsat et test-/pilotmiljø — ikke en certificeret enterprise-produktionsløsning.
 
 | Område | Status |
@@ -27,7 +29,7 @@ Seneste [robusthedsgennemgang og produktionscheckliste](docs/enterprise-review.m
 | PDF-kvitteringer | Indsendelse, ledergodkendelse og afslutning |
 | Outlook-mail | Graph-adapter og idempotent outbox implementeret; kræver tenant-konfiguration |
 | Admin og visuel editor | Redaktionelt indhold, FAQ, links, hjælp og tre billedplaceringer |
-| SSO | Sessions- og providergrundlag findes; Entra/FK-loginflow mangler ekstern implementering |
+| SSO | Entra OIDC med PKCE, nonce, issuer/JWKS-validering og forhåndstildelte roller; live-accept i kommunens tenant udestår |
 | Driftsmodeller | Cloudflare Worker/Sites med D1/R2 eller Vercel med Turso/privat Blob |
 
 ## Brugeroplevelsen
@@ -198,7 +200,7 @@ DGITA_ENABLE_DEV_LOGIN=true
 DGITA_TEST_ACCESS_SECRET=<mindst-8-tegn>
 ```
 
-Testadgangskoden erstatter ikke rigtig identitetskontrol. En sådan deployment må derfor kun indeholde fiktive data og må ikke bruges som kommunal produktion. Sæt `DGITA_ENABLE_DEV_LOGIN=false` før brug med rigtige data og erstat flowet med Entra ID eller Fælleskommunal Adgangsstyring.
+Testadgangskoden giver adgang til fiktive identiteter i et særskilt pilotmiljø. Sæt `DGITA_ENVIRONMENT=pilot`, `DGITA_ENABLE_DEV_LOGIN=true` og `DGITA_ENABLE_DEMO_SEED=true`. Piloten skal have egen database, privat fil-storage, domæne og secrets. I produktion kræves `DGITA_ENVIRONMENT=production`, `DGITA_ENABLE_DEV_LOGIN=false` og `DGITA_ENABLE_DEMO_SEED=false`; eksisterende testsessioner afvises straks. En vedvarende databasemarkør forhindrer deling mellem pilot og produktion. Se [driftsvejledningen](docs/production-operations.md).
 
 ### Microsoft Graph / Outlook
 
@@ -217,7 +219,7 @@ I produktion kræves desuden en stabil `DGITA_APPROVAL_TOKEN_SECRET` på mindst 
 
 ### Entra ID og Fælleskommunal Adgangsstyring
 
-Providerkonfiguration, sessionsmodel og rollemodel er klar til integration. Det eksterne OIDC-login er endnu ikke færdigimplementeret: redirect/callback, JWKS- og tokenvalidering, claim-mapping og automatisk brugerprovisionering skal forbindes til kommunens valgte identity provider.
+Entra-login er implementeret som tenantbundet OIDC authorization code med PKCE, nonce, browserbundet krypteret flow-cookie og atomisk beskyttelse mod genbrug af state. Tokens valideres mod Microsofts JWKS, issuer, audience, tenant, objekt-ID og tidsgrænser. Kun aktive, på forhånd oprettede brugere og databaseroller giver adgang; e-mail eller claims tildeler aldrig automatisk en rolle. Kommunen skal konfigurere appregistrering, MFA/Conditional Access, identiteter og rettighedsproces og gennemføre live-accept. Fælleskommunal Adgangsstyring er ikke implementeret. Se [Entra og provisioning](docs/production-operations.md).
 
 ## Database og migrationer
 
@@ -228,7 +230,7 @@ Cloudflare-bindings er deklareret i `.openai/hosting.json`:
 
 På Vercel leveres den samme SQLite-kompatible databasekontrakt af Turso/libSQL, mens bilag, portalbilleder og PDF-kvitteringer lagres i privat Vercel Blob. `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` og `BLOB_STORE_ID` skal høre til det samme Vercel-projekt og det relevante deploymentmiljø. Blob SDK henter det kortlivede OIDC-token fra Vercels request-context, så der ikke kræves et langtidslevende read/write-token. `BLOB_READ_WRITE_TOKEN` understøttes fortsat som en kontrolleret fallback uden for OIDC-miljøet.
 
-Drizzle-migrationerne i `drizzle/` er deployment-kilden. Runtime-bootstrap er idempotent og gør en frisk database klar uden browserlagring. Cloudflare-buildet pakker desuden migrationsfilerne under `dist/.openai/drizzle`.
+Drizzle-migrationerne i `drizzle/` er deployment-kilden. Lokal/pilot kan bootstrappe schema idempotent. Produktion udfører ingen automatisk schemaændring: `npm run db:migrate` anvender migrationer transaktionelt med checksum-ledger og integritetskontrol. Runtime kontrollerer ledger mod det committed migrationsmanifest før trafik. Kør `npm run db:manifest` ved en ny migration; CI kontrollerer manifestets SQL-checksummer. En eksisterende pilot uden ledger kræver særskilt kontrolleret baseline/migrering og må ikke behandles som en tom database. Se [driftsvejledningen](docs/production-operations.md).
 
 En frisk testdatabase seedes deterministisk med de fiktive brugere, de ti testsager, redaktionelt testindhold og de tilhørende workflowdata. Systemkatalogets 4.656 poster ligger som committed runtime-data. Den lokale udviklingsdatabase og E2E-rester kopieres ikke til drift.
 
@@ -244,17 +246,9 @@ npm run test:e2e
 npm audit --omit=dev
 ```
 
-Den seneste komplette lokale gennemgang består af:
+CI-workflowet **Quality gates** kontrollerer lint, TypeScript, Worker-build, enheds- og databasetests, isoleret HTTP-E2E, native Next-produktionsbuild, production-smoke, dependency-audit/SBOM, hemmeligheder, workflow-syntaks og CodeQL. **Required quality gate** samler resultaterne. Aktuel evidens findes i [GitHub Actions](https://github.com/Parthee-Vijaya/DGITA_codereviewed/actions) og workflowets artefakter; en historisk testoptælling er ikke et bevis for en nyere commit.
 
-- produktionsbuild gennem Vinext/Vite
-- native Next.js/Vercel-produktionsbuild
-- 136 beståede enheds- og integrationstests
-- 75 E2E-kontroller af HTTP/API → D1/R2 → PDF/mail-outbox
-- SQLite `integrity_check` og `foreign_key_check`
-- manuel browsertest af login, roller, ejerskab, formularregler, fuzzy-søgning, D-GITA-felter, admin-editor og tutorial
-- 0 kendte sårbarheder i produktionsafhængigheder (`npm audit --omit=dev`)
-
-Et fuldt `npm audit` rapporterer fire moderate, udviklings-only fund i `drizzle-kit`'s transitive, ældre `esbuild`-loader. NPM's foreslåede `--force`-løsning er en breaking nedgradering af migrationsværktøjet; den er derfor ikke anvendt på runtimekoden.
+Produktionsafhængigheder skal have nul kendte auditfund. De resterende development-advisories er begrænset til præcise pakker, versioner og dependency-stier med en udløbsdato i `.github/dependency-audit-policy.json`. Nye, udvidede eller udløbne fund stopper CI. Undtagelserne er ikke en kommunal risikoaccept.
 
 ## Deployment
 
@@ -265,7 +259,7 @@ Projektet har to persistence-mål:
 
 `vercel.json` registrerer `GET /api/cron/mail` kl. 06:00 UTC én gang dagligt, som er kompatibelt med Hobby-planen. Vercel sender `CRON_SECRET` som et Bearer-token; endpointet afviser både manglende konfiguration og alle ikke-eksakte tokens. Cronjobbet behandler mailkøen og rydder sikkert op i udløbne upload-verifikationer. Cronjobs kører kun på production deployments. Ved hastesager kan en Admin fortsat vælge **Behandl kø** i mailadministrationen. Både cron og manuel mailbehandling kræver en færdig Microsoft Graph-konfiguration for at kunne sende.
 
-Til testmiljøet anvendes `DGITA_ENABLE_DEV_LOGIN=true` sammen med en separat `DGITA_TEST_ACCESS_SECRET` på mindst 8 tegn. Kontrollér før deployment, at alle data fortsat er fiktive, og at miljøvariablerne er oprettet i det korrekte Vercel-miljø. En senere kommunal produktion skal bruge rigtigt SSO og `DGITA_ENABLE_DEV_LOGIN=false`.
+Den manuelle GitHub-release kontrollerer beskyttet `main`, præcis commit og bestået quality gate. En kandidat bygges og kontrolleres, før et godkendt miljø kan promovere samme deployment. Cloududgivelse er som udgangspunkt slået fra, indtil de konkrete driftskrav er opfyldt. Se [CI/CD og release](docs/ci-cd.md).
 
 Det direkte Vercel-upload undgår Functions' requestgrænse, og signerede download-redirects undgår responsegrænsen. Hver completion tager en 15-minutters CAS-lease, og kun den worker, der ejer leasen, kan færdigmelde eller kassere Blob'en. En mistet databasekvittering efter ready-commit medfører aldrig automatisk Blob-sletning. Udløbne `verifying`-rækker lægges i en holdbar slettekø, hvor Blob-sletning kvitteres separat og derfor kan gentages sikkert.
 
@@ -275,16 +269,16 @@ Der kan højst være 10 ufærdige eller karantænesatte direkte uploads pr. sag 
 
 Dette er bevidst ikke fremstillet som færdig kommunal produktion:
 
-- Entra/FK-loginflow og claim-mapping mangler som beskrevet ovenfor.
+- Entra-koden er testet lokalt; reel appregistrering, MFA, rettigheder og tilbagekaldelse i kommunens tenant er endnu ikke live-accepteret. FK-login er ikke implementeret.
 - Det adgangskodebeskyttede testlogin må kun bruges med fiktive data; det er ikke en produktionsidentitet eller en erstatning for SSO.
 - Graph kræver kommunens appregistrering, tilladelser, afsenderpostkasse og secrets.
 - Vercel Hobby behandler automatisk mailkøen højst én gang dagligt; Admin kan behandle den manuelt imellem kørslerne.
 - Et afbrudt direkte Blob-upload uden completion-callback kan ende i en kvotebindende `quarantined`-række. En senere driftsudgave bør supplere med Blob-list-reconciliation eller en administrativ frigivelsesfunktion.
-- Uploadflowet har endnu ingen malware-scanner; `scan_status` sættes til `not_configured`.
+- Malware-adapteren afviser ved fejl og kræver et checksumbundet `clean`-svar før et produktionsbilag kan bruges. Den faktiske AV-tjeneste, placering, aftale, kapacitet og live EICAR-test skal etableres. Pilot uden scanner markeres `not_configured`.
 - Retention- og automatisk slettepolitik er ikke implementeret.
 - ESDH-links og journaliseringsflag findes, men automatisk ESDH-arkivering er ikke forbundet.
 - KITOS-kataloget er et versioneret snapshot og ikke en live-synkronisering.
-- Godkendende ledere er foreløbig tre testidentiteter; i drift skal de komme fra identitets-/organisationsdata.
+- Godkendere læses fra aktive, kommunebundne databaseroller. Der kræves særskilt `approver`-mandat; egen godkendelse er blokeret. Kommunen skal administrere tildeling og tilbagekaldelse.
 
 ## Projektstruktur
 

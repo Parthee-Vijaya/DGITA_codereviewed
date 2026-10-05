@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-05",
+  "reviewDeadline": "2026-11-04",
+  "scope": "Development dependencies only. No exceptions apply to production dependencies. Exact advisory and dependency nodes only.",
+  "exceptions": [
+    {
+      "advisory": "GHSA-67mh-4wv8-2f99",
+      "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+      "source": 1102341,
+      "vulnerablePackage": "esbuild",
+      "range": "<=0.24.2",
+      "severity": "moderate",
+      "expiresAt": "2026-11-04T00:00:00Z",
+      "owner": "Repository maintainer / municipal technical owner before production",
+      "reason": "The old esbuild is confined to drizzle-kit through @esbuild-kit. CI does not start this esbuild development server; migrations remain a separately reviewed operator task.",
+      "remediation": "Upgrade or replace drizzle-kit when it supports a patched esbuild without breaking migrations. Do not expose an esbuild development server.",
+      "allowedAffectedNodes": [
+        {
+          "package": "@esbuild-kit/core-utils",
+          "path": "node_modules/@esbuild-kit/core-utils",
+          "version": "3.3.2"
+        },
+        {
+          "package": "@esbuild-kit/esm-loader",
+          "path": "node_modules/@esbuild-kit/esm-loader",
+          "version": "2.6.5"
+        },
+        {
+          "package": "drizzle-kit",
+          "path": "node_modules/drizzle-kit",
+          "version": "0.31.10"
+        },
+        {
+          "package": "esbuild",
+          "path": "node_modules/@esbuild-kit/core-utils/node_modules/esbuild",
+          "version": "0.18.20"
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "source": 1240992,
+      "vulnerablePackage": "braces",
+      "range": "<=3.0.3",
+      "severity": "high",
+      "expiresAt": "2026-11-04T00:00:00Z",
+      "owner": "Repository maintainer / municipal technical owner before production",
+      "reason": "Build/lint glob-matching only; no runtime dependency. Repository patterns are reviewed, and CI uses isolated runners with time limits. No upstream fixed version exists in the advisory verified on 2026-10-05.",
+      "remediation": "Update braces and its parent packages when a supported fixed version is published. Untrusted deeply nested glob expressions must not be accepted.",
+      "allowedAffectedNodes": [
+        {
+          "package": "@next/eslint-plugin-next",
+          "path": "node_modules/@next/eslint-plugin-next",
+          "version": "16.3.8"
+        },
+        {
+          "package": "braces",
+          "path": "node_modules/braces",
+          "version": "3.0.3"
+        },
+        {
+          "package": "eslint-config-next",
+          "path": "node_modules/eslint-config-next",
+          "version": "16.3.8"
+        },
+        {
+          "package": "fast-glob",
+          "path": "node_modules/fast-glob",
+          "version": "3.3.1"
+        },
+        {
+          "package": "fast-glob",
+          "path": "node_modules/vite-plugin-dynamic-import/node_modules/fast-glob",
+          "version": "3.3.3"
+        },
+        {
+          "package": "micromatch",
+          "path": "node_modules/micromatch",
+          "version": "4.0.8"
+        },
+        {
+          "package": "vinext",
+          "path": "node_modules/vinext",
+          "version": "1.0.0-beta.8"
+        },
+        {
+          "package": "vite-plugin-commonjs",
+          "path": "node_modules/vite-plugin-commonjs",
+          "version": "0.10.4"
+        },
+        {
+          "package": "vite-plugin-dynamic-import",
+          "path": "node_modules/vite-plugin-dynamic-import",
+          "version": "1.6.0"
+        }
+      ]
+    }
+  ]
+}

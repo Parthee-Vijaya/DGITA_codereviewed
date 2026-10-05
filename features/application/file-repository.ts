@@ -1,5 +1,6 @@
 import { ensurePortalSchema, getPersistenceBindings } from "../../db/persistence";
 import type { ServerActor } from "../auth/types";
+import { assertAttachmentScanAllowed } from "./malware-scan";
 
 type FileRow = {
   id: string;
@@ -9,6 +10,7 @@ type FileRow = {
   storage_key: string;
   kind: string;
   created_at: string;
+  scan_status: string;
 };
 
 export class FileAccessError extends Error {
@@ -25,7 +27,7 @@ export async function listCaseAttachments(actor: ServerActor, caseNumber: string
   const statement = DB.prepare(`
     SELECT attachment.id, attachment.original_name, attachment.size_bytes,
            attachment.content_type, attachment.storage_key, attachment.kind,
-           attachment.created_at
+           attachment.created_at, attachment.scan_status
     FROM portal_attachments attachment
     INNER JOIN portal_applications application
       ON application.id = attachment.application_id
@@ -67,7 +69,7 @@ export async function authorizeAttachmentDownload(actor: ServerActor, attachment
   const statement = DB.prepare(`
     SELECT attachment.id, attachment.original_name, attachment.size_bytes,
            attachment.content_type, attachment.storage_key, attachment.kind,
-           attachment.created_at
+           attachment.created_at, attachment.scan_status
     FROM portal_attachments attachment
     INNER JOIN portal_applications application
       ON application.id = attachment.application_id
@@ -84,5 +86,6 @@ export async function authorizeAttachmentDownload(actor: ServerActor, attachment
     ? await statement.bind(attachmentId, actor.tenantId, actor.userId).first<FileRow>()
     : await statement.bind(attachmentId, actor.tenantId).first<FileRow>();
   if (!row) throw new FileAccessError(404, "Filen findes ikke, eller du har ikke adgang.");
+  await assertAttachmentScanAllowed(row.scan_status);
   return row;
 }
