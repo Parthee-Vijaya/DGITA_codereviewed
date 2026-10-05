@@ -31,3 +31,5 @@ Kølagt/fejlet linkmail annulleres, og ubekræftet mailindhold neutraliseres. En
 Dette erstatter ikke rigtig Entra/MFA- og brugerafgangstest. Autentificeret ledergodkendelse bør afklares som produktionsvalg; de nuværende tidsbegrænsede bearerlinks bevares i pilot, og en ny loginvariant er ikke stiltiende indført.
 
 En sagsversion med en allerede committet lederbeslutning kan ikke få en ny lederanmodning. Både forkontrol og den atomiske skrivebetingelse håndhæver dette; et samtidigt beslutningscommit kan ikke overskrives. En tilbagekaldt, ubesluttet anmodning kan erstattes. En ny beslutning kræver en ny sagsversion. Historiske beslutninger og PDF-filer omskrives ikke.
+
+Testloginens lokale undtagelse kræver både lokal requestadresse og lokal konfigureret offentlig adresse. Vercel-runtime får aldrig localhost-undtagelsen. Dermed kan en reverse proxys interne HTTP-adresse ikke fjerne pilotens kodekrav; sessionscookies får `Secure`, når den betroede offentlige adresse er HTTPS eller miljøet er Vercel. Også cookieudløb bruger den samme politik.

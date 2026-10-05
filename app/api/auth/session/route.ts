@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     return noStoreJson(response, {
       headers:
         !actor && hadCookie
-          ? { "Set-Cookie": expiredSessionCookie(request.url) }
+          ? { "Set-Cookie": expiredSessionCookie(request.url, environment) }
           : undefined,
     });
   } catch (error) {

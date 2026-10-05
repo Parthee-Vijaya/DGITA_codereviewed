@@ -65,8 +65,8 @@ export function sessionCookie(
   token: string,
   requestUrl: string | URL,
   ttlSeconds = SESSION_TTL_SECONDS,
+  environment: AuthEnvironment = {},
 ) {
-  const url = new URL(requestUrl);
   const expires = new Date(Date.now() + ttlSeconds * 1_000).toUTCString();
   return [
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
@@ -75,14 +75,13 @@ export function sessionCookie(
     "SameSite=Lax",
     `Max-Age=${ttlSeconds}`,
     `Expires=${expires}`,
-    url.protocol === "https:" ? "Secure" : null,
+    requiresSecureCookie(requestUrl, environment) ? "Secure" : null,
   ]
     .filter(Boolean)
     .join("; ");
 }
 
-export function expiredSessionCookie(requestUrl: string | URL) {
-  const url = new URL(requestUrl);
+export function expiredSessionCookie(requestUrl: string | URL, environment: AuthEnvironment = {}) {
   return [
     `${SESSION_COOKIE_NAME}=`,
     "Path=/",
@@ -90,7 +89,7 @@ export function expiredSessionCookie(requestUrl: string | URL) {
     "SameSite=Lax",
     "Max-Age=0",
     "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-    url.protocol === "https:" ? "Secure" : null,
+    requiresSecureCookie(requestUrl, environment) ? "Secure" : null,
   ]
     .filter(Boolean)
     .join("; ");
@@ -115,7 +114,7 @@ export function devLoginPolicy(
       configurationValid: true,
     } as const;
   }
-  if (isLocalRequestUrl(requestUrl)) {
+  if (isLocalTestRequest(requestUrl, environment)) {
     return {
       enabled: true,
       accessCodeRequired: false,
@@ -176,6 +175,25 @@ function testAccessSecret(environment: AuthEnvironment) {
     environment.DGITA_TEST_ACCESS_SECRET ??
     environment.DGITA_DEMO_ACCESS_SECRET
   );
+}
+
+function isHostedVercel(environment: AuthEnvironment) {
+  return Boolean(environment.VERCEL || environment.VERCEL_URL || environment.VERCEL_BRANCH_URL);
+}
+
+// A reverse proxy may expose an internal loopback URL even for a public pilot.
+// Only a genuinely local request and configured origin qualify for the shortcut.
+function isLocalTestRequest(requestUrl: string | URL, environment: AuthEnvironment) {
+  if (isHostedVercel(environment)) return false;
+  try {
+    return isLocalRequestUrl(requestUrl) &&
+      isLocalRequestUrl(environment.DGITA_APP_ORIGIN || requestUrl);
+  } catch { return false; }
+}
+
+function requiresSecureCookie(requestUrl: string | URL, environment: AuthEnvironment) {
+  return isHostedVercel(environment) || new URL(requestUrl).protocol === "https:" ||
+    new URL(environment.DGITA_APP_ORIGIN || requestUrl).protocol === "https:";
 }
 
 function isLocalRequestUrl(requestUrl: string | URL) {

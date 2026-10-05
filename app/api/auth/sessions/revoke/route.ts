@@ -5,7 +5,8 @@ import { revokeUserSessions } from "../../../../../features/auth/session-adminis
 
 export async function POST(request: Request) {
   try {
-    assertSameOrigin(request, await getAuthEnvironment());
+    const environment = await getAuthEnvironment();
+    assertSameOrigin(request, environment);
     const actor = await requireActor(request);
     const body = await readJsonObject(request);
     if (Object.keys(body).some((key) => key !== "userId") ||
@@ -13,6 +14,6 @@ export async function POST(request: Request) {
       return noStoreJson({ error: "Angiv kun brugerens id, eller send et tomt objekt for egne sessioner." }, { status: 400 });
     }
     const result = await revokeUserSessions(actor, "userId" in body ? body.userId as string : actor.userId);
-    return noStoreJson(result, result.ownSessions ? { headers: { "Set-Cookie": expiredSessionCookie(request.url) } } : {});
+    return noStoreJson(result, result.ownSessions ? { headers: { "Set-Cookie": expiredSessionCookie(request.url, environment) } } : {});
   } catch (error) { return authErrorResponse(error); }
 }

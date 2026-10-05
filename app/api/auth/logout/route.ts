@@ -8,20 +8,20 @@ import {
 import { expiredSessionCookie } from "../../../../features/auth/primitives";
 
 async function logout(request: Request) {
-  let originAccepted = false;
+  let expiredCookie: string | null = null;
   try {
     const environment = await getAuthEnvironment();
     assertSameOrigin(request, environment);
-    originAccepted = true;
+    expiredCookie = expiredSessionCookie(request.url, environment);
     await revokeSession(request.headers.get("cookie"));
     return noStoreJson(
       { authenticated: false },
-      { headers: { "Set-Cookie": expiredSessionCookie(request.url) } },
+      { headers: { "Set-Cookie": expiredCookie } },
     );
   } catch (error) {
     const response = authErrorResponse(error);
-    if (originAccepted) {
-      response.headers.set("Set-Cookie", expiredSessionCookie(request.url));
+    if (expiredCookie) {
+      response.headers.set("Set-Cookie", expiredCookie);
     }
     return response;
   }

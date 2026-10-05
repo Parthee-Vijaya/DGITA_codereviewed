@@ -234,7 +234,7 @@ export async function createDevSession(
       userId: storedUser.id,
       provider: "dev",
     },
-    cookie: sessionCookie(token, request.url, sessionPolicy.maximumSeconds),
+    cookie: sessionCookie(token, request.url, sessionPolicy.maximumSeconds, runtimeEnvironment),
     expiresAt,
   };
 }
