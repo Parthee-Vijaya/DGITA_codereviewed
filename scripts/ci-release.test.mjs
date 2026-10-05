@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const script = new URL("./ci-release.mjs", import.meta.url).href;
+const fixture = fileURLToPath(new URL("./ci-release-fixture.mjs", import.meta.url));
 const sourceSha = "a".repeat(40);
 const digest = "b".repeat(64);
 function environment() {
@@ -16,8 +20,9 @@ function deployment() {
   return { id: "dpl_fixture", projectId: "prj_fixture", readyState: "READY", target: "production", meta: { dgitaSourceSha: sourceSha, dgitaArtifactSha: digest, dgitaWorkflowRun: "1234", dgitaEnvironment: "production" } };
 }
 function execute(mode, env = environment(), data = deployment()) {
-  const code = `globalThis.fetch = async (url) => { if (!new URL(url).hostname.endsWith('vercel.com')) throw new Error('Unexpected network host'); return Response.json(${JSON.stringify(data)}); }; process.argv[2] = ${JSON.stringify(mode)}; await import(${JSON.stringify(script)});`;
-  return spawnSync(process.execPath, ["--input-type=module", "--eval", code], { env, encoding: "utf8" });
+  return spawnSync(process.execPath, [fixture, mode], {
+    env, encoding: "utf8", input: JSON.stringify(mode === "source" ? data : [data]),
+  });
 }
 
 test("deployment guard accepts the verified staged production artifact", () => {
@@ -45,16 +50,30 @@ test("release guard rejects missing approvals, partial hashes, untrusted URLs an
     (e) => { delete e.VERCEL_TOKEN; },
   ]) { const env = environment(); change(env); assert.notEqual(execute("deployment", env).status, 0); }
 });
+test("deployment outputs reject control characters, invalid identifiers and non-string values before writing", () => {
+  const directory = mkdtempSync(join(tmpdir(), "dgita-release-output-"));
+  const outputPath = join(directory, "output");
+  try {
+    for (const id of ["dpl_fixture\ninjected=true", "dpl_fixture\rinjected=true", "dpl_fixture\n", "dpl_fixture\r", "dpl_fixture=bad", "https://attacker.example", null, {}]) {
+      writeFileSync(outputPath, "");
+      const result = execute("deployment", { ...environment(), GITHUB_OUTPUT: outputPath }, { ...deployment(), id });
+      assert.notEqual(result.status, 0);
+      assert.equal(readFileSync(outputPath, "utf8"), "");
+    }
+    const result = execute("deployment", { ...environment(), GITHUB_OUTPUT: outputPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(outputPath, "utf8"), "deployment_id=dpl_fixture\n");
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 test("source guard rejects an unprotected branch and unsuccessful exact-commit CI", () => {
-  for (const scenario of ["unprotected", "wrong-ancestor", "failed-ci", "missing-gate", "valid"]) {
+  for (const scenario of ["unprotected", "wrong-ancestor", "failed-ci", "invalid-run-id", "missing-gate", "valid"]) {
     const responses = [
       { protected: scenario !== "unprotected", commit: { sha: sourceSha } },
       { merge_base_commit: { sha: scenario === "wrong-ancestor" ? "c".repeat(40) : sourceSha } },
-      { workflow_runs: [{ id: 10, head_sha: sourceSha, head_branch: "main", event: "push", status: "completed", conclusion: scenario === "failed-ci" ? "failure" : "success" }] },
+      { workflow_runs: [{ id: scenario === "invalid-run-id" ? "10\rspoof=true" : 10, head_sha: sourceSha, head_branch: "main", event: "push", status: "completed", conclusion: scenario === "failed-ci" ? "failure" : "success" }] },
       { jobs: scenario === "missing-gate" ? [] : [{ name: "Required quality gate", conclusion: "success" }] },
     ];
-    const code = `const results=${JSON.stringify(responses)}; globalThis.fetch=async()=>Response.json(results.shift()); process.argv[2]='source'; await import(${JSON.stringify(script)});`;
-    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", code], { env: environment(), encoding: "utf8" });
+    const result = execute("source", environment(), responses);
     if (scenario === "valid") assert.equal(result.status, 0, result.stderr); else assert.notEqual(result.status, 0);
   }
 });

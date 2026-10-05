@@ -12,7 +12,16 @@ const target = environment.RELEASE_ENVIRONMENT;
 assert.match(sourceSha, /^[a-f0-9]{40}$/u, "Release requires a complete lowercase commit SHA.");
 assert.ok(["pilot", "production"].includes(target), "Choose pilot or production.");
 async function output(name, value) {
-  assert.ok(!String(value).includes("\n"));
+  const formats = new Map([
+    ["sha", /^[a-f0-9]{40}$/u],
+    ["ci_run", /^[1-9][0-9]{0,19}$/u],
+    ["deployment_id", /^dpl_[A-Za-z0-9]+$/u],
+    ["artifact_sha", /^[a-f0-9]{64}$/u],
+  ]);
+  assert.ok(formats.has(name), "Unknown release output.");
+  assert.equal(typeof value, "string", "Release outputs must be strings.");
+  assert.ok(!/[\r\n]/u.test(value), "Release outputs must contain exactly one line.");
+  assert.match(value, formats.get(name), `Invalid release output: ${name}`);
   if (environment.GITHUB_OUTPUT) await appendFile(environment.GITHUB_OUTPUT, `${name}=${value}\n`);
 }
 async function github(path) {
@@ -33,6 +42,7 @@ async function requireVerifiedSource() {
   const history = await github(`actions/workflows/ci.yml/runs?head_sha=${sourceSha}&event=push&branch=main&per_page=100`);
   const run = history.workflow_runs.filter((item) => item.head_sha === sourceSha && item.head_branch === "main" && item.event === "push").sort((a, b) => b.id - a.id)[0];
   assert.ok(run && run.status === "completed" && run.conclusion === "success", "Latest main CI run for this exact commit must succeed.");
+  assert.ok(Number.isSafeInteger(run.id) && run.id > 0, "GitHub must return a valid workflow run identifier.");
   const jobs = await github(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`);
   assert.ok(jobs.jobs.some((job) => job.name === "Required quality gate" && job.conclusion === "success"), "Required quality gate is missing or unsuccessful.");
   await output("sha", sourceSha);

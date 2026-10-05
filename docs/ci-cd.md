@@ -54,21 +54,23 @@ Værktøjsdownload understøtter Linux x64 (GitHub runner) og macOS arm64. Gitle
 
 ## GitHub-indstillinger før beskyttet levering
 
-Følgende blev læst direkte fra GitHub den 5. oktober 2026, inden hardening af indstillinger. Kontrollér igen efter ændringer:
+Følgende er konfigureret og læst tilbage via GitHub API den 5. oktober 2026. Dette er et dateret øjebliksbillede; gentag kontrollen før frigivelse.
 
-| Indstilling | Verificeret udgangspunkt | Nødvendig handling |
+| Indstilling | Verificeret status | Resterende handling |
 | --- | --- | --- |
-| Repository | Offentligt, `Parthee-Vijaya/DGITA_codereviewed` | Bekræft, at åben kildekode er tilsigtet; aldrig rigtige persondata eller driftssecrets i repo |
-| `main` branch protection | Ikke oprettet (API 404) | Kræv pull request, relevant review, løste samtaler og `Required quality gate`; afvis force push/sletning og uautoriseret bypass |
-| CODEOWNERS | Fil tilføjet med nuværende ejer | Tilknyt kommunens navngivne vedligeholderteam og mindst én anden reviewer; ejer kan ikke godkende sin egen PR |
-| Actions standardtoken | Læseadgang, kan ikke godkende PR'er | Bevar indstillingen; begræns tilladte actions og kræv fulde SHA'er i GitHub-policy |
-| Actions SHA-policy | Ikke krævet på repositoryniveau | Aktivér SHA-krav; workflowet er allerede pinned |
-| Secret scanning / push protection | Begge aktiveret | Bevar og afprøv med ufarlig canary i et isoleret testrepo, hvis kommunen kræver evidens |
-| Dependabot security updates | Deaktiveret | Aktivér advisories, security updates og en ejer for triage |
-| Private vulnerability reporting | Deaktiveret | Aktivér og fastlæg sikkerhedskontakt, responstider og beredskab |
-| CodeQL default setup | Ikke konfigureret | Brug den nye advanced workflow-opsætning og gennemgå faktiske alerts efter første kørsel |
-| Code scanning merge protection | Ikke verificeret som aktiv | Kræv CodeQL og blokér efter kommunens tærskel, mindst high/critical sikkerhedsfund |
-| GitHub environments | Ingen oprettet | Opret `pilot` og `production`, ansvarlig reviewer, branch-begrænsning og særskilte credentials efter valg af platform |
+| Repository | Offentligt, `Parthee-Vijaya/DGITA_codereviewed` | Afklar kommunens vedligeholder-/ejermodel; ingen persondata eller driftssecrets i repo |
+| `main` branch protection | Pull request, opdateret branch, løste samtaler og `Required quality gate` fra GitHub Actions app 15368; gælder også admins | Bevar; force push og sletning er slået fra, lineær historik kræves |
+| Menneskeligt kodereview | CODEOWNERS peger på nuværende ejer; 0 obligatoriske approvals | Udpeg mindst én anden vedligeholder og aktivér uafhængigt review før kommunal drift |
+| Actions standardtoken | Læseadgang, kan ikke godkende PR'er | Bevar mindst mulige rettigheder |
+| Actions SHA-policy | Repositoryet kræver fulde commit-SHA'er; readback `sha_pinning_required=true` | Bevar ved opdatering af actions |
+| Secret scanning / push protection | Begge aktiveret | Bevar og fastlæg triageansvar |
+| Dependabot | Advisories og security updates aktiveret; ugentlige konfigurerede opdateringer | Følg nye PR'er og advisories; restundtagelser udløber 4. november |
+| Private vulnerability reporting | Aktiveret | Fastlæg sikkerhedskontakt, responstider og beredskab |
+| CodeQL | Advanced workflow for JS/TS og Actions; faktiske analyser er gennemført | Analysefund skal triageres særskilt; et grønt analysejob er ikke nul fund |
+| Code scanning merge protection | CodeQL-jobs er del af den obligatoriske gate | Et selvstændigt ruleset med alarmtærskel skal kontrolleres separat |
+| GitHub environments | `pilot` og `production`: kun beskyttede branches, Parthee som required reviewer, deployment slået fra | Særskilte cloudprojekter/credentials mangler. Selv-review er tilladt, indtil en anden ansvarlig er udpeget |
+
+Begge miljøer har `DGITA_DEPLOYMENT_ENABLED=false`; produktion har også `DGITA_PRODUCTION_APPROVED=false`. Disse spærrer må først ændres efter konkret teknisk og organisatorisk accept. Ingen live-deployment er udført af denne klargøring. Den eksisterende onlinepilot og dens testkode er bevaret.
 
 CI er hostinguafhængig. Det manuelle Vercel-flow er forberedt, men ekstern opsætning og en rigtig releasekørsel er stadig åbne driftsopgaver. Azure/Hetzner er mulige senere beslutninger og er ikke implementeret som deploymål.
 

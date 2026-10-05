@@ -18,6 +18,8 @@ Denne vejledning beskriver koden pr. 5. oktober 2026 og arbejdet før rigtig kom
 
 Angiv altid miljøet eksplicit. Kompatibilitetsreglen bevarer eksisterende testlogin, når det er eksplicit slået til uden miljøangivelse; brug den ikke til produktionsopsætning. Demo-seed skal være eksplicit aktiveret gennem seed-/testloginflag og må aldrig anvendes i produktion. Native Next bruger `.env.local`; lokal Cloudflare/Vinext kan bruge `.dev.vars`. Kopiér ikke disse filer, hentede Vercel-miljøfiler eller databaseeksporter til Git/Actions-artifacts.
 
+De arvede testfixtures indeholder navngivne personaer og kommunale mailadresser. Syntetiske sagsforløb er derfor ikke dokumentation for anonymiserede eller persondatafri testidentiteter. Gennemgå og neutralisér navne/adresser før offentlig pilot efter pilotejerens beslutning, og bevar den præcise mail-allowlist som særskilt afsendelseskontrol.
+
 ## Entra-login og provisionering
 
 IAM opretter en fortrolig **Web**-app i én konkret workforce-tenant. Registrér præcis `${DGITA_APP_ORIGIN}/api/auth/entra/callback`. Produktionens origin er HTTPS uden sti, query eller fragment. En anden deploymentadresse er ikke en gyldig callbackadresse. Appen bruger authorization code med PKCE S256, `openid profile email`, nonce og krypteret kortlivet state-cookie; der bruges ikke implicit flow, refresh token eller Graph-adgang til login. [Microsofts redirectvejledning](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-redirect-uri) og [authorization code-flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow).
