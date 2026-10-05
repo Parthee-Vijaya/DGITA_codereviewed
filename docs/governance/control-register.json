@@ -18,11 +18,16 @@
       "control": "Tenantafgrænset OIDC og provisionerede roller; ingen rolle fra maildomæne.",
       "implementation_refs": [
         "features/auth/oidc-server.ts",
-        "features/auth/server.ts"
+        "features/auth/server.ts",
+        "features/auth/session-actor.ts",
+        "features/auth/session-lifecycle.ts",
+        "features/auth/session-administration.ts"
       ],
       "test_refs": [
         "features/auth/oidc.test.mjs",
-        "features/auth/session-policy.test.mjs"
+        "features/auth/session-policy.test.mjs",
+        "features/auth/session-lifecycle.test.mjs",
+        "features/auth/session-administration.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -50,11 +55,14 @@
       "control": "Live DB-mandat, tenant/ejerfilter og beslutnings-CAS på følsomme handlinger.",
       "implementation_refs": [
         "features/approval/mandate.ts",
-        "features/approval/server.ts"
+        "features/approval/server.ts",
+        "features/approval/decision-integrity.ts",
+        "features/approval/revocation.ts"
       ],
       "test_refs": [
         "features/approval/authorization.test.mjs",
-        "features/approval/revocation-races.test.mjs"
+        "features/approval/revocation-races.test.mjs",
+        "features/approval/operator-revocation.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -177,12 +185,16 @@
       "implementation_refs": [
         "db/persistence.ts",
         "scripts/migration-runner.mjs",
-        "db/migration-manifest.json"
+        "db/migration-manifest.json",
+        "scripts/schema-contract.mjs",
+        "scripts/schema-check.mjs"
       ],
       "test_refs": [
         "tests/migrations.test.mjs",
         "tests/migration-guard.test.mjs",
-        "tests/environment-boundary.test.mjs"
+        "tests/environment-boundary.test.mjs",
+        "tests/schema-parity.test.mjs",
+        "tests/runtime-origin.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -195,7 +207,7 @@
         "human_review_date": null,
         "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
       },
-      "remaining_gap": "Begge runtimeadaptere og den reelle kommunale binding skal verificeres; referencer er ikke aktuelle testresultater.",
+      "remaining_gap": "Next- og Worker-forløb kan afprøves lokalt med syntetiske providers; rigtig kommunal identitet, storage og transport afventer miljøaccept.",
       "framework_contribution": {
         "ISO_ISMS": "architecture",
         "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
@@ -207,14 +219,19 @@
       "id": "DGITA-C07",
       "dimension": "Kodehelbred",
       "risk": "Store moduler og skjulte afhængigheder gør rettelser risikable.",
-      "control": "Pilotseed har separat ansvar og stabil facade med bevarede regressionsinvarianter.",
+      "control": "Separat uploadrepository og pilotseed, målt importgraf uden cykler og CI-lofter for kritiske funktioners kompleksitet.",
       "implementation_refs": [
         "features/workspace/pilot-seed.ts",
-        "features/workspace/server-repository.ts"
+        "features/workspace/server-repository.ts",
+        "features/application/upload-repository.ts",
+        "features/application/repository-support.ts",
+        "scripts/code-health.mjs",
+        ".github/code-health-policy.json"
       ],
       "test_refs": [
         "tests/demo-seed-consistency.test.mjs",
-        "tests/privacy-fixtures.test.mjs"
+        "tests/privacy-fixtures.test.mjs",
+        "features/application/direct-upload-persistence.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -227,7 +244,7 @@
         "human_review_date": null,
         "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
       },
-      "remaining_gap": "Kompleksitet/cykler/branchecoverage måles særskilt; mindre filer alene er ikke kvalitetsaccept.",
+      "remaining_gap": "Lokal subset-coverage er dokumenteret med sit omfang; samlet vedligeholdbarhed og ejeraccept kræver fortsat review. Mindre filer er ikke alene kvalitetsaccept.",
       "framework_contribution": {
         "ISO_ISMS": "code-health",
         "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
@@ -243,12 +260,16 @@
       "implementation_refs": [
         "features/application/server-repository.ts",
         "features/approval/server.ts",
-        "features/receipt/server.ts"
+        "features/receipt/server.ts",
+        "features/approval/decision-integrity.ts",
+        "features/receipt/view-server.ts"
       ],
       "test_refs": [
         "features/application/correction-persistence.test.mjs",
         "features/application/direct-upload-persistence.test.mjs",
-        "features/approval/revocation-races.test.mjs"
+        "features/approval/revocation-races.test.mjs",
+        "features/approval/operator-revocation.test.mjs",
+        "tests/receipt-access.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -276,11 +297,13 @@
       "control": "Releaseguard binder quality/SARIF og artefakt til SHA; dependency-policy har eksplicitte undtagelser.",
       "implementation_refs": [
         ".github/workflows/release-vercel.yml",
-        "scripts/ci-release-codeql.mjs"
+        "scripts/ci-release-codeql.mjs",
+        "docs/tooling-debt.md"
       ],
       "test_refs": [
         "scripts/ci-release.test.mjs",
-        "scripts/ci-audit.test.mjs"
+        "scripts/ci-audit.test.mjs",
+        "tests/tooling-compatibility.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -305,11 +328,18 @@
       "id": "DGITA-C10",
       "dimension": "Gendannelse",
       "risk": "DB og filer kan ikke genskabes konsistent.",
-      "control": "Dokumenteret isoleret restore/rollback-kontrakt med manifest og målt prøve.",
+      "control": "SQLite online-backup, hashbundet filmanifest og konsistent lokal restore med sessions-/linktilbagekaldelse, blokeret mail og obligatorisk karantæne.",
       "implementation_refs": [
-        "docs/production-operations.md"
+        "docs/production-operations.md",
+        "scripts/recovery-bundle.mjs",
+        "scripts/recovery.mjs",
+        "db/environment-guard.ts",
+        "docs/recovery-exercise.md"
       ],
-      "test_refs": [],
+      "test_refs": [
+        "tests/recovery-bundle.test.mjs",
+        "tests/schema-parity.test.mjs"
+      ],
       "test_result": "reference_only_until_executed",
       "owner": {
         "proposal": "Drift + database-/backupansvarlig",
@@ -321,7 +351,7 @@
         "human_review_date": null,
         "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
       },
-      "remaining_gap": "Aktuel test-evidens for komplet restore og kommunalt godkendt RPO/RTO skal vedlægges; ingen liveaccept i registeret.",
+      "remaining_gap": "Lokal syntetisk restore er reproducerbar; cloudbackup, ekstern backupkryptering, opbevaring, artifact-rollback og kommunalt godkendt RPO/RTO afventer valgt miljø.",
       "framework_contribution": {
         "ISO_ISMS": "recovery",
         "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
@@ -337,11 +367,13 @@
       "implementation_refs": [
         "features/privacy/operational-log.ts",
         "app/api/readyz/route.ts",
-        "docs/production-operations.md"
+        "docs/production-operations.md",
+        "features/runtime/scheduled-maintenance.ts"
       ],
       "test_refs": [
         "tests/privacy-logging.test.mjs",
-        "tests/production-config.test.mjs"
+        "tests/production-config.test.mjs",
+        "tests/scheduled-maintenance.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -366,13 +398,21 @@
       "id": "DGITA-C12",
       "dimension": "Tilgængelighed",
       "risk": "Brugeren kan ikke fuldføre web-/dokumentflow med hjælpemidler.",
-      "control": "Reproducerbare UI-kontroller suppleret med manuel krav-/forløbsaccept.",
+      "control": "Automatiske Chromium/axe- og tastaturforløb, fokus-/fejlfeedback og versionsbundet HTML-kvittering; separat tagged-PDF-prototype.",
       "implementation_refs": [
         "features/application/ApplicationFormView.tsx",
-        "features/receipt/server.ts"
+        "features/receipt/server.ts",
+        "features/application/ApplicationFields.tsx",
+        "features/receipt/ReceiptDocument.tsx",
+        "features/receipt/tagged-pdf-prototype.ts",
+        "docs/receipt-accessibility-prototype.md",
+        "tests/a11y/application.spec.ts"
       ],
       "test_refs": [
-        "tests/interface-controls.test.mjs"
+        "tests/interface-controls.test.mjs",
+        "tests/application-fields.test.mjs",
+        "tests/receipt-view.test.mjs",
+        "tests/receipt-access.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {
@@ -385,7 +425,7 @@
         "human_review_date": null,
         "next_review_trigger": "Før release og ved ændret kode, leverandør, scope eller hændelse."
       },
-      "remaining_gap": "Fuld EN-scopevurdering, skærmlæser- og dokumentaccept skal registreres; automatiske tests kan ikke erstatte dem.",
+      "remaining_gap": "Fuld EN-scopevurdering, repræsentativ skærmlæserafprøvning og dokumentaccept mangler. Tagged PDF er en prototype, ikke PDF/UA-accept. Eksisterende PDF-filer er bevaret.",
       "framework_contribution": {
         "ISO_ISMS": "accessibility",
         "NIS2": "Risikobaseret teknisk/operationelt bidrag; konkret kommunalt scope U",
@@ -466,11 +506,14 @@
       "control": "Live mandat før PDF/token/transport og modtagerpolitik for pilot.",
       "implementation_refs": [
         "features/mail/outbox.ts",
-        "features/mail/graph-transport.ts"
+        "features/mail/graph-transport.ts",
+        "features/mail/claim-authorization.ts"
       ],
       "test_refs": [
         "features/mail/delivery-policy.test.mjs",
-        "features/approval/revocation-races.test.mjs"
+        "features/approval/revocation-races.test.mjs",
+        "features/mail/receipt-claim.test.mjs",
+        "features/mail/outbox-policy.test.mjs"
       ],
       "test_result": "reference_only_until_executed",
       "owner": {

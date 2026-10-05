@@ -18,7 +18,7 @@ export function generateReleaseEvidence(args = []) {
   const referenceOnly = args.length === 1 && args[0] === "--references-only";
   const suiteArg = args.length === 0 ? "all" : args.length === 2 && args[0] === "--suite" ? args[1] : null;
   if (!referenceOnly && (!suiteArg || (suiteArg !== "all" && !Object.hasOwn(EVIDENCE_SUITES, suiteArg)))) {
-    throw new Error("Use no arguments, --suite privacy|governance|all or --references-only.");
+    throw new Error("Use no arguments, --suite <registered-suite>|all or --references-only.");
   }
   const initialSource = sourceState();
   if (!referenceOnly && !initialSource.clean) throw new Error("Commit or isolate source changes before measuring release evidence.");

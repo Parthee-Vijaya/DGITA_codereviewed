@@ -7,6 +7,31 @@ export const EVIDENCE_SUITES = Object.freeze({
     "tests/retention-preview.test.mjs",
   ]),
   governance: Object.freeze(["tests/governance-evidence.test.mjs"]),
+  identity: Object.freeze([
+    "features/auth/oidc.test.mjs", "features/auth/session-policy.test.mjs",
+    "features/auth/session-lifecycle.test.mjs", "features/auth/session-administration.test.mjs",
+    "features/approval/authorization.test.mjs", "features/approval/operator-revocation.test.mjs",
+    "features/approval/revocation-races.test.mjs",
+  ]),
+  integrity: Object.freeze([
+    "features/application/correction-persistence.test.mjs", "features/application/direct-upload-persistence.test.mjs",
+    "features/application/malware-scan.test.mjs", "features/application/malware-persistence.test.mjs",
+    "tests/demo-seed-consistency.test.mjs",
+  ]),
+  recovery: Object.freeze(["tests/recovery-bundle.test.mjs", "tests/schema-parity.test.mjs"]),
+  architecture: Object.freeze([
+    "tests/migrations.test.mjs", "tests/migration-guard.test.mjs", "tests/environment-boundary.test.mjs",
+    "tests/runtime-origin.test.mjs", "tests/production-config.test.mjs", "tests/tooling-compatibility.test.mjs",
+  ]),
+  delivery: Object.freeze([
+    "features/mail/delivery-policy.test.mjs", "features/mail/receipt-claim.test.mjs",
+    "features/mail/outbox-policy.test.mjs", "tests/scheduled-maintenance.test.mjs",
+  ]),
+  receipt: Object.freeze([
+    "tests/interface-controls.test.mjs", "tests/application-fields.test.mjs",
+    "tests/receipt-access.test.mjs", "tests/receipt-view.test.mjs",
+  ]),
+  release: Object.freeze(["scripts/ci-release.test.mjs", "scripts/ci-audit.test.mjs"]),
 });
 
 const COUNT_KEYS = ["tests", "passed", "failed", "cancelled", "skipped", "todo", "suites"];
