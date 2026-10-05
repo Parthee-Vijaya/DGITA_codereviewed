@@ -1,0 +1,3 @@
+# Exact historical false positive: isolated in-memory test fixture, never a credential.
+# The current test generates an ephemeral random secret. No rule/path-wide exclusion.
+bbb83f25c1301c3e041c4e906e7ce60d10684207:features/approval/operator-revocation.test.mjs:generic-api-key:5

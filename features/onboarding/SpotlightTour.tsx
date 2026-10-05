@@ -41,6 +41,8 @@ export type SpotlightTourProps = {
   onComplete: (step: SpotlightTourStep, index: number) => void;
   labels?: Partial<SpotlightTourLabels>;
   className?: string;
+  /** Stable trigger to return to when the launching menu item unmounts. */
+  returnFocusSelector?: string;
 };
 
 type TargetGeometry = {
@@ -82,6 +84,7 @@ export function SpotlightTour({
   onComplete,
   labels,
   className,
+  returnFocusSelector,
 }: SpotlightTourProps) {
   const [internalActiveStep, setInternalActiveStep] = useState(() =>
     clampStep(defaultActiveStep, steps.length),
@@ -224,10 +227,13 @@ export function SpotlightTour({
 
     return () => {
       const previous = previouslyFocusedRef.current;
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      const target = previous?.isConnected && previous !== document.body
+        ? previous
+        : returnFocusSelector ? document.querySelector<HTMLElement>(returnFocusSelector) : null;
+      target?.focus({ preventScroll: true });
       previouslyFocusedRef.current = null;
     };
-  }, [open]);
+  }, [open, returnFocusSelector]);
 
   useEffect(() => {
     if (!open) return;
@@ -258,7 +264,7 @@ export function SpotlightTour({
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+      if (event.shiftKey && (active === dialogRef.current || active === first || !dialogRef.current.contains(active))) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && (active === last || !dialogRef.current.contains(active))) {

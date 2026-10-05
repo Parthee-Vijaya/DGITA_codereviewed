@@ -1,0 +1,1071 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-05",
+  "status": "Teknisk feltfortegnelse; kommunal nødvendighed/hjemmel/retention/accept U",
+  "scope": "Applikationsformularens topniveau og deklarerede DB-kolonner; JSON-understruktur beskrevet særskilt. Ingen inspektion af live persondata.",
+  "decision_legend": {
+    "U": "Ukendt eller ikke dokumenteret accepteret; betyder ikke at en proces ikke findes."
+  },
+  "form_groups": {
+    "form-version": {
+      "fields": [
+        "schemaVersion"
+      ],
+      "purpose": "Versionsfortolkning af formular og låst snapshot.",
+      "category": "technical-context",
+      "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
+    "contact-and-mandate": {
+      "fields": [
+        "contactPerson",
+        "dataOwner",
+        "systemOwner",
+        "contractOwner",
+        "systemAdministrators",
+        "superUsers",
+        "approvingLeaderId",
+        "approvingLeader"
+      ],
+      "purpose": "Kontakt, ansvar og godkendelsesmandat. Godkender-id kan ikke autorisere uden DB-kontrol.",
+      "category": "direct-or-linked-personal",
+      "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
+    "documents": {
+      "fields": [
+        "attachments",
+        "esdhContractUrl",
+        "esdhDpaUrl",
+        "descriptionUrl"
+      ],
+      "purpose": "Dokumentation og referencer. Filnavne, URL-er og dokumentindhold kan indeholde persondata.",
+      "category": "unstructured-potential-personal",
+      "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
+    "financial": {
+      "fields": [
+        "hasBudget",
+        "budgetAmount",
+        "oneTimeCost",
+        "yearlyCost",
+        "otherCost"
+      ],
+      "purpose": "Anskaffelsens budget og omkostninger; kontekst knyttet til sag/ejer.",
+      "category": "case-linked",
+      "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
+    "free-description": {
+      "fields": [
+        "replacementSystem",
+        "catalogQuery",
+        "manualSystemName",
+        "businessType",
+        "systemDescription",
+        "supplier",
+        "supplierCvr",
+        "rightsHolder",
+        "rightsHolderCvr",
+        "department",
+        "responsibleOrganization",
+        "acquisitionMethod",
+        "marketResearchSystems",
+        "relatedSystem",
+        "purpose",
+        "functionDescription",
+        "existingProcessSystems",
+        "crossFunctionality",
+        "benefits",
+        "implementationResources",
+        "remarks"
+      ],
+      "purpose": "Beslutningsgrundlag. Fritekst og virksomhedsidentifikatorer kan rumme persondata; undgå borger-/personcases.",
+      "category": "unstructured-potential-personal",
+      "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
+    "structured-assessment": {
+      "fields": [
+        "knownSystem",
+        "replacesExisting",
+        "selectedSystem",
+        "manualCatalogEntry",
+        "existsInKitos",
+        "municipalityAlreadyUsesSystem",
+        "marketResearch",
+        "acquisitionType",
+        "kleTopics",
+        "existingProcessSystem",
+        "crossCutting",
+        "crossDepartments",
+        "hasRiskAssessment",
+        "needsRiskHelp",
+        "personalData",
+        "hasDpa",
+        "hasContract",
+        "hasSupplierChecklist",
+        "dataClassification",
+        "employeeAccess",
+        "milestones",
+        "startDate",
+        "endDate",
+        "implementationUsers",
+        "hasArchitecture",
+        "checklistJournalized",
+        "consent"
+      ],
+      "purpose": "Katalogreference, risikospørgsmål, tidsplan og formularbekræftelse; consent er ikke i sig selv et GDPR-samtykke.",
+      "category": "case-linked",
+      "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    }
+  },
+  "nested_structures": {
+    "selectedSystem": "Katalog: id, name, supplier, rightsHolder, source, usedInKalundborg, optional localSystemId/localStatus/kitosStatus. Identifikatorer og fritekst kan være personhenførbare i kontekst.",
+    "attachments": "Fem dokumenttyper; id, kind, name, size, type, status, valgfri error. Server accepterer ikke browsermetadata som bevis for storage, ejer eller scan.",
+    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel.",
+    "payload_json": "Eventbestemt revisionspayload; individuelt flow og autoriseret projektion, ikke generel log.",
+    "attachments_json": "Mailbilagsreferencer/metadata; privat dokumentkopi kan indgå i transporten.",
+    "roles_snapshot_json": "Historisk sessionkontekst; aktuelle roller kontrolleres fra DB."
+  },
+  "tables": [
+    {
+      "table": "application_attachments",
+      "purpose": "Kompatibilitetsschema for historiske bilag; ingen ny brugersti bør skrive til dette.",
+      "flow": "legacy-document",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "draft_id",
+          "kind",
+          "size",
+          "content_type",
+          "created_at"
+        ],
+        "unstructured-potential-personal": [
+          "name"
+        ],
+        "private-locator": [
+          "storage_key"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "application_drafts",
+      "purpose": "Kompatibilitetsschema for historiske kladder; afklares ved journal/retentionbeslutning.",
+      "flow": "legacy-application",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "schema_version",
+          "status",
+          "created_at",
+          "updated_at",
+          "submitted_at"
+        ],
+        "unstructured-potential-personal": [
+          "state_json"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_application_versions",
+      "purpose": "Uforanderligt indsendt beslutningsgrundlag og hash.",
+      "flow": "application",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "version_number",
+          "schema_version",
+          "snapshot_sha256",
+          "attachment_manifest_sha256",
+          "created_at",
+          "submitted_at"
+        ],
+        "unstructured-potential-personal": [
+          "snapshot_json"
+        ],
+        "direct-or-linked-personal": [
+          "submitted_by_user_id"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_applications",
+      "purpose": "Ejer- og tenantafgrænset sag, kladde, fase og versionspegepind.",
+      "flow": "application",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "case_number",
+          "status",
+          "phase",
+          "draft_schema_version",
+          "row_version",
+          "current_version_number",
+          "current_version_id",
+          "created_at",
+          "updated_at",
+          "submitted_at",
+          "closed_at"
+        ],
+        "direct-or-linked-personal": [
+          "owner_user_id",
+          "assigned_consultant_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "title",
+          "system_name",
+          "draft_state_json"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_approval_requests",
+      "purpose": "Versionsbundet godkendelseslink, modtager, tokenhash og beslutning.",
+      "flow": "approval",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "status",
+          "created_at",
+          "expires_at",
+          "decided_at"
+        ],
+        "direct-or-linked-personal": [
+          "approver_email",
+          "approver_name",
+          "created_by_user_id"
+        ],
+        "credential-derived": [
+          "token_hash"
+        ],
+        "unstructured-potential-personal": [
+          "decision_comment"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_attachment_upload_locks",
+      "purpose": "Tidsbegrænset intern skrivelease; identitet til løsning af concurrency.",
+      "flow": "documents",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "attachment_id",
+          "acquired_at",
+          "expires_at"
+        ],
+        "private-locator": [
+          "authoritative_storage_key"
+        ],
+        "internal-capability": [
+          "lease_token"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_attachments",
+      "purpose": "Bilagsmetadata, ejer, privat locator, integritet og scannerstatus.",
+      "flow": "documents",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "kind",
+          "size_bytes",
+          "content_type",
+          "checksum_sha256",
+          "status",
+          "scan_status",
+          "created_at",
+          "immutable_at",
+          "deleted_at"
+        ],
+        "direct-or-linked-personal": [
+          "owner_user_id",
+          "uploaded_by_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "original_name"
+        ],
+        "private-locator": [
+          "storage_key"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_audit_events",
+      "purpose": "Beskyttet revisionsspor for aktør, handling, entitet og afgrænset payload.",
+      "flow": "audit",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "event_type",
+          "entity_type",
+          "entity_id",
+          "occurred_at"
+        ],
+        "direct-or-linked-personal": [
+          "actor_user_id",
+          "actor_subject"
+        ],
+        "unstructured-potential-personal": [
+          "payload_json"
+        ],
+        "credential-derived": [
+          "ip_hash"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_auth_rate_limits",
+      "purpose": "Misbrugsbegrænsning med afledt subjecthash og tidsvindue.",
+      "flow": "identity",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "scope",
+          "window_started_at",
+          "attempt_count",
+          "updated_at"
+        ],
+        "credential-derived": [
+          "subject_hash"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_bootstrap_state",
+      "purpose": "Holdbar versionsmarkør for seed/testprofil samt redigeret scheduler-heartbeat. Scope adskiller profiler fra observation; ingen rå driftslog.",
+      "flow": "operations",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "tenant_id",
+          "scope",
+          "version",
+          "completed_at"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_case_comments",
+      "purpose": "Sagssamtale med visibility, forfatter og revisionsmetadata.",
+      "flow": "dialog",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "visibility",
+          "category",
+          "status",
+          "parent_comment_id",
+          "created_at",
+          "edited_at",
+          "resolved_at"
+        ],
+        "direct-or-linked-personal": [
+          "author_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "body"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_content_entries",
+      "purpose": "Administreret tekst, links og billedmetadata; kan være offentliggjort og indeholde kontaktdata.",
+      "flow": "content",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "key",
+          "locale",
+          "page_path",
+          "content_type",
+          "status",
+          "version",
+          "created_at",
+          "updated_at",
+          "published_at"
+        ],
+        "unstructured-potential-personal": [
+          "value_json"
+        ],
+        "direct-or-linked-personal": [
+          "updated_by_user_id"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_dgita_approvals",
+      "purpose": "Internt sagsbehandlingsgrundlag og beslutning. legalBasis betyder ramme, ikke konkret GDPR-hjemmel.",
+      "flow": "internal-review",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "status",
+          "created_at",
+          "updated_at",
+          "decided_at"
+        ],
+        "direct-or-linked-personal": [
+          "reviewer_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "internal_fields_json",
+          "decision_comment"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_environment",
+      "purpose": "Miljømarkør mod sammenblanding af test og produktion.",
+      "flow": "operations",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "purpose"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_field_comments",
+      "purpose": "Feltkommentarer med visibility og forfatter.",
+      "flow": "dialog",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "field_id",
+          "visibility",
+          "status",
+          "parent_comment_id",
+          "created_at",
+          "edited_at",
+          "resolved_at"
+        ],
+        "direct-or-linked-personal": [
+          "author_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "body"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_images",
+      "purpose": "Billedmetadata/alttekst og privat filreference i schema; kontrollér faktisk produktsti før brug.",
+      "flow": "content",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "content_entry_id",
+          "content_type",
+          "size_bytes",
+          "checksum_sha256",
+          "status",
+          "created_at",
+          "deleted_at"
+        ],
+        "private-locator": [
+          "storage_key"
+        ],
+        "unstructured-potential-personal": [
+          "original_name",
+          "alt_text"
+        ],
+        "direct-or-linked-personal": [
+          "uploaded_by_user_id"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_mail_outbox",
+      "purpose": "Modtager, indhold, bilagsreferencer, kø/leveringsstatus; kan rumme bearerlinks og PDF-referencer.",
+      "flow": "mail",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "template_key",
+          "idempotency_key",
+          "status",
+          "attempt_count",
+          "next_attempt_at",
+          "provider",
+          "provider_message_id",
+          "created_at",
+          "updated_at",
+          "sent_at"
+        ],
+        "direct-or-linked-personal": [
+          "recipient_user_id",
+          "recipient_email",
+          "recipient_name",
+          "created_by_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "subject",
+          "text_body",
+          "html_body",
+          "attachments_json",
+          "last_error"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_notifications",
+      "purpose": "Brugerspecifik besked, læsestatus og link til autoriseret sag.",
+      "flow": "notifications",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "source_event_id",
+          "event_type",
+          "link_path",
+          "status",
+          "created_at",
+          "read_at"
+        ],
+        "direct-or-linked-personal": [
+          "recipient_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "title",
+          "body"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_oidc_used_states",
+      "purpose": "Kortlivet replayregister med hash af OIDC-state.",
+      "flow": "identity",
+      "columns_by_category": {
+        "credential-derived": [
+          "state_hash"
+        ],
+        "linked-operational-metadata": [
+          "expires_at"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_receipts",
+      "purpose": "Versionsbundet kvitteringsmetadata og privat PDF-locator.",
+      "flow": "receipts",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "kind",
+          "status",
+          "checksum_sha256",
+          "size_bytes",
+          "content_type",
+          "created_at",
+          "generated_at"
+        ],
+        "private-locator": [
+          "storage_key"
+        ],
+        "direct-or-linked-personal": [
+          "created_by_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "failure_reason"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_sessions",
+      "purpose": "Portalsession, hash af bearer, bruger-/rollekobling og udløb/tilbagekaldelse.",
+      "flow": "identity",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "provider",
+          "roles_snapshot_json",
+          "created_at",
+          "expires_at",
+          "last_seen_at",
+          "revoked_at"
+        ],
+        "direct-or-linked-personal": [
+          "user_id",
+          "provider_session_id"
+        ],
+        "credential-derived": [
+          "token_hash",
+          "ip_hash",
+          "user_agent_hash"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_tenants",
+      "purpose": "Kommune-/organisationsscope og aktivstatus.",
+      "flow": "identity",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "slug",
+          "name",
+          "authority_code",
+          "status",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_user_roles",
+      "purpose": "Administratorprovisioneret adgangs- og mandatrolle.",
+      "flow": "identity",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "role",
+          "created_at"
+        ],
+        "direct-or-linked-personal": [
+          "user_id",
+          "created_by_user_id"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_users",
+      "purpose": "Stabil IdP-identitet, kontakt og kontostatus.",
+      "flow": "identity",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "identity_provider",
+          "status",
+          "created_at",
+          "updated_at",
+          "last_login_at"
+        ],
+        "direct-or-linked-personal": [
+          "external_subject",
+          "email",
+          "display_name"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U",
+      "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    }
+  ],
+  "flows": {
+    "application": {
+      "path": [
+        "Formular",
+        "Servervalidering og tenant/ejerkontrol",
+        "Privat DB-kladde",
+        "Låst DB-version",
+        "Autoriseret UI og kvittering/PDF"
+      ],
+      "external": [
+        "PDF kan indgå i aftalt godkendelsesmail; kommunal accept af modtager/kopiering mangler."
+      ],
+      "code": [
+        "features/application/state-validation.ts",
+        "features/application/server-repository.ts",
+        "features/receipt/server.ts"
+      ]
+    },
+    "identity": {
+      "path": [
+        "Dev-testlogin eller Entra kode/ID-token",
+        "Validering og provisioneret DB-rolle",
+        "HttpOnly sessionscookie + DB-tokenhash",
+        "Aktørprojektion"
+      ],
+      "external": [
+        "Entra, proxy og platform kan have egne logs; callbackquery/headers skal redigeres der."
+      ],
+      "code": [
+        "features/auth/oidc-server.ts",
+        "features/auth/server.ts",
+        "features/auth/primitives.ts"
+      ]
+    },
+    "documents": {
+      "path": [
+        "Browser filbytes",
+        "Autorisering og størrelses/type/integritetskontrol",
+        "Privat R2/Blob og DB-metadata",
+        "Scanner modtager hele dokumentet",
+        "Autoriseret download og versionsbinding"
+      ],
+      "external": [
+        "Scanner, Blob/R2, region, aftaler og ekstern retention er ikke kommunalt accepteret."
+      ],
+      "code": [
+        "features/application/direct-upload-policy.ts",
+        "features/application/file-repository.ts",
+        "features/application/malware-scan.ts"
+      ]
+    },
+    "approval": {
+      "path": [
+        "Versionsbundet anmodning",
+        "Tokenhash i DB og bearer i autoriseret mailflow",
+        "Lederlink",
+        "Beslutning og audit"
+      ],
+      "external": [
+        "En allerede afsendt mail/PDF kan ikke tilbagekaldes af portalen."
+      ],
+      "code": [
+        "features/approval/server.ts",
+        "features/approval/mandate.ts"
+      ]
+    },
+    "audit": {
+      "path": [
+        "Serverhandling",
+        "Beskyttet tenantafgrænset audit i DB",
+        "Autoriseret sagsvisning/procesbevis"
+      ],
+      "external": [
+        "Ingen generel eksport til driftslogger; SIEM/retention/adgang kræver særskilt accept."
+      ],
+      "code": [
+        "features/application/server-repository.ts",
+        "features/approval/server.ts",
+        "features/workspace/server-repository.ts"
+      ]
+    },
+    "internal-review": {
+      "path": [
+        "Konsulent/admin",
+        "Valideret intern DB-projektion",
+        "Konsulent/admin og relevant beslutningsspor"
+      ],
+      "external": [
+        "Konkrete nødvendige ansvarsfelter og behandlingshjemmel afventer systemejer."
+      ],
+      "code": [
+        "features/workspace/model.ts",
+        "features/workspace/server-repository.ts"
+      ]
+    },
+    "dialog": {
+      "path": [
+        "Autoriseret bruger/konsulent",
+        "Valideret kommentar",
+        "DB visibility",
+        "Autoriseret dialog og notifikation"
+      ],
+      "external": [
+        "Fritekst må ikke bruges som generel borgerjournal uden afklaring."
+      ],
+      "code": [
+        "features/cases/dialog-repository.ts",
+        "features/workspace/server-repository.ts"
+      ]
+    },
+    "mail": {
+      "path": [
+        "Servergenereret køelement",
+        "Live mandatkontrol og modtagerpolitik",
+        "Graph transport",
+        "Modtagers postkasse"
+      ],
+      "external": [
+        "Graph/Exchange log/retention og kopier af PDF/link ligger uden for portalens tilbagekaldelse."
+      ],
+      "code": [
+        "features/mail/outbox.ts",
+        "features/mail/graph-transport.ts"
+      ]
+    },
+    "notifications": {
+      "path": [
+        "Serverhandling",
+        "DB med recipient_user_id",
+        "Kun aktørens notifikationsliste"
+      ],
+      "external": [
+        "Ingen særskilt kommunal bevaringsbeslutning registreret."
+      ],
+      "code": [
+        "features/workspace/server-repository.ts"
+      ]
+    },
+    "content": {
+      "path": [
+        "Administrator eller testseed",
+        "Valideret DB-indhold",
+        "Publiceret portalindhold"
+      ],
+      "external": [
+        "Eksterne link-/billedtjenester kan modtage requestmetadata; indholdsansvarlig skal godkende offentliggørelse."
+      ],
+      "code": [
+        "features/workspace/model.ts",
+        "features/workspace/server-repository.ts"
+      ]
+    },
+    "receipts": {
+      "path": [
+        "Låst version + beslutning",
+        "Genereret PDF",
+        "Privat storage + checksum",
+        "Autoriseret download eller aftalt mailflow"
+      ],
+      "external": [
+        "Nye HTML-/eksportveje skal tilføjes her når de integreres; ingen arkivaccept endnu."
+      ],
+      "code": [
+        "features/receipt/server.ts"
+      ]
+    },
+    "operations": {
+      "path": [
+        "Serverkonfiguration",
+        "DB-miljø/seedmarkør",
+        "Kontrol af miljø og version",
+        "Redigeret scheduler-heartbeat i bootstrap-state",
+        "Adminbeskyttet tenantaggregat",
+        "Konfigureret alarm-HTTP-sink med kun flags/varighed"
+      ],
+      "external": [
+        "Ingen rå konfiguration/secrets i almindelige logs.",
+        "Jobinterval/queuegrænse skal konfigureres; backup og historisk scannerfejltotal er unknown. Ekstern vagt/monitor/retention afventer accept."
+      ],
+      "code": [
+        "db/persistence.ts",
+        "features/workspace/pilot-profile.ts",
+        "features/operations/store.ts",
+        "features/operations/status.ts",
+        "features/operations/alarms.ts"
+      ]
+    },
+    "legacy-document": {
+      "path": [
+        "Historisk kompatibilitetsdata",
+        "DB/filreference",
+        "Operatørafklaring før migrering eller sletning"
+      ],
+      "external": [
+        "Ingen ny retentionbeslutning eller automatisk oprydning."
+      ],
+      "code": [
+        "db/schema.ts"
+      ]
+    },
+    "legacy-application": {
+      "path": [
+        "Historisk kompatibilitetsdata",
+        "DB",
+        "Operatørafklaring før migrering eller sletning"
+      ],
+      "external": [
+        "Ingen ny retentionbeslutning eller automatisk oprydning."
+      ],
+      "code": [
+        "db/schema.ts"
+      ]
+    }
+  },
+  "operational_logging": {
+    "code": "features/privacy/operational-log.ts",
+    "events": [
+      "auth.unexpected_error",
+      "scheduler.completed",
+      "scheduler.failed",
+      "scanner.completed",
+      "scanner.failed",
+      "operations.telemetry_failed",
+      "operations.alarm_delivery"
+    ],
+    "allowed": [
+      "Internt genereret eventId og timestamp",
+      "For scheduler: bounded tællere/varighed/køalder + configured/cleanupFailed",
+      "Scanner: fast udfaldskategori og bounded varighed; ingen checksum/bytes/filnavne",
+      "Alarmlevering: fast udfaldskategori; ingen modtager-URL/token/fejltekst"
+    ],
+    "forbidden": [
+      "Tokens/headers/query",
+      "Navne/mail/adresser",
+      "Bruger-/sags-/tenant-id",
+      "Fritekst/dokumentbytes/URL",
+      "Fejlobjekt/stack/cause"
+    ],
+    "audit": "portal_audit_events er separat beskyttet personhenførbart revisionsspor.",
+    "external_gap": "Ingress, Vercel/Cloudflare platformlogs, APM, browserconsole og netværkscapture kræver særskilt kontrol. Appens sink er ikke bevis for disse."
+  },
+  "open_decisions": [
+    "Dataansvarlig fastlægger konkret formål, art.6/9-hjemmel, informationspligt og nødvendige felter.",
+    "Systemejer/DPO gennemfører DPIA-screening; DPO rådgiver, dataansvarlig beslutter.",
+    "Journal-/arkivansvarlig beslutter bevaring/kassation, legal hold og eksterne kopier.",
+    "Drift afprøver platformlogredigering, logadgang/retention samt scanner-/mail-/storageaftaler.",
+    "Tekniske token/lease-udløb er ikke vedtagne generelle slettefrister. Ingen fysisk sletning aktiveres af dette register."
+  ]
+}

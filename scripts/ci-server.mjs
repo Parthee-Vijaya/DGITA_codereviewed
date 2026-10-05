@@ -1,15 +1,20 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { includeInTestWorkspace } from "./ci-workspace-policy.mjs";
+import { readSourceState, requireCleanSource, requireUnchangedSource, sourceEvidence } from "./ci-source-provenance.mjs";
+import { startProviderFixtures } from "../tests/runtime/provider-server.mjs";
 
 const mode = process.argv[2];
-if (!["e2e", "production"].includes(mode)) throw new Error("Usage: node scripts/ci-server.mjs e2e|production");
+if (!["e2e", "a11y", "next-e2e", "production"].includes(mode)) throw new Error("Usage: node scripts/ci-server.mjs e2e|a11y|next-e2e|production");
+const workflowTest = mode !== "production";
+const workerRuntime = mode === "e2e" || mode === "a11y";
 const project = resolve(import.meta.dirname, "..");
 const output = join(project, "work", "ci", mode);
 const temporary = await mkdtemp(join(tmpdir(), `dgita-ci-${mode}-`));
@@ -18,6 +23,22 @@ const children = new Set();
 let cleaned = false;
 let serverLog;
 let testLog;
+let providers;
+let sourceStart = null;
+let sourceEnd = null;
+const runId = randomUUID();
+const startedAt = new Date().toISOString();
+
+async function writeEvidence(status) {
+  const identity = { schemaVersion: 2, runId, mode, status, runtime: process.version, startedAt,
+    ...(status === "running" ? {} : { completedAt: new Date().toISOString() }),
+    source: sourceEvidence(sourceStart, sourceEnd) };
+  // Overwrite both files even before source validation, so failed starts cannot leave old proof.
+  await writeFile(join(output, "result.json"), JSON.stringify(identity, null, 2));
+  if (mode === "next-e2e") await writeFile(join(output, "providers.json"), JSON.stringify({
+    ...identity, type: "local HTTP fixtures; no cloud acceptance", ...(providers?.evidence ?? {}),
+  }, null, 2));
+}
 
 function stopProcess(child, signal = "SIGTERM") {
   if (!child.pid) return;
@@ -35,6 +56,7 @@ async function cleanup() {
   for (const child of children) stopProcess(child);
   await delay(500);
   for (const child of children) stopProcess(child, "SIGKILL");
+  if (providers) await providers.close();
   await Promise.all([serverLog, testLog].filter(Boolean).map((stream) => new Promise((done) => stream.end(done))));
   await rm(temporary, { recursive: true, force: true });
 }
@@ -46,20 +68,16 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 try {
   await mkdir(output, { recursive: true });
-  await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "running", runtime: process.version }, null, 2));
-  const excluded = new Set([".git", "node_modules", "work", "outputs", ".wrangler", ".vinext", "dist", ".vercel", ".codex", ".claude"]);
-  if (mode === "e2e") excluded.add(".next");
+  await writeEvidence("running");
+  sourceStart = await readSourceState(project);
+  requireCleanSource(sourceStart);
+  await writeEvidence("running");
   await cp(project, workspace, {
     recursive: true,
-    filter(path) {
-      const segments = relative(project, path).split(sep);
-      if (segments.some((part) => excluded.has(part))) return false;
-      if (segments[0] === ".next" && segments[1] === "cache") return false;
-      // Do not copy local credentials, database state, or developer env files.
-      return !/^\.env(?:\.|$)|^\.dev\.vars(?:\.|$)/u.test(basename(path));
-    },
+    filter: (path) => includeInTestWorkspace(relative(project, path), workerRuntime),
   });
   await symlink(join(project, "node_modules"), join(workspace, "node_modules"), "dir");
+  requireUnchangedSource(sourceStart, await readSourceState(project));
   const port = await new Promise((done, fail) => {
     const socket = createServer();
     socket.once("error", fail);
@@ -74,18 +92,35 @@ try {
     PATH: process.env.PATH,
     TMPDIR: tmpdir(),
     CI: "true",
-    NODE_ENV: mode === "production" ? "production" : "development",
+    PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || join(project, "node_modules", ".cache", "ms-playwright"),
+    NODE_ENV: workerRuntime ? "development" : "production",
     NEXT_TELEMETRY_DISABLED: "1",
     WRANGLER_SEND_METRICS: "false",
     WRANGLER_WRITE_LOGS: "false",
     DGITA_APP_ORIGIN: origin,
     NEXT_PUBLIC_SITE_URL: origin,
     DGITA_E2E_BASE_URL: origin,
-    DGITA_ENABLE_DEV_LOGIN: mode === "e2e" ? "true" : "false",
-    DGITA_ENVIRONMENT: mode === "e2e" ? "pilot" : "production",
+    DGITA_ENABLE_DEV_LOGIN: workflowTest ? "true" : "false",
+    DGITA_ENVIRONMENT: workflowTest ? "pilot" : "production",
     DGITA_APPROVAL_TOKEN_SECRET: randomBytes(32).toString("hex"),
   };
-  if (mode === "e2e") {
+  if (mode === "next-e2e") {
+    providers = await startProviderFixtures(origin);
+    Object.assign(environment, {
+      TURSO_DATABASE_URL: `file:${join(temporary, "synthetic.sqlite")}`,
+      TURSO_AUTH_TOKEN: "synthetic-database-token",
+      BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_fixture_synthetic",
+      DGITA_FIXTURE_ORIGIN: providers.origin,
+      DGITA_E2E_PROVIDER_FIXTURES: "true",
+      CRON_SECRET: randomBytes(32).toString("hex"),
+      DGITA_MALWARE_SCAN_URL: "https://scanner.example.invalid/scan",
+      DGITA_MALWARE_SCAN_TOKEN: randomBytes(32).toString("hex"),
+      DGITA_GRAPH_TENANT_ID: "fixture-tenant", DGITA_GRAPH_CLIENT_ID: "fixture-client",
+      DGITA_GRAPH_CLIENT_SECRET: "synthetic-client-secret", DGITA_GRAPH_SENDER: "portal@example.invalid",
+      DGITA_MAIL_ALLOWED_RECIPIENTS: Array.from({ length: 100 }, (_, index) => `user-${index}@example.invalid`).join(","),
+    });
+  }
+  if (workerRuntime) {
     const workerKeys = ["DGITA_ENVIRONMENT", "DGITA_ENABLE_DEV_LOGIN", "DGITA_APPROVAL_TOKEN_SECRET", "DGITA_APP_ORIGIN", "NEXT_PUBLIC_SITE_URL"];
     await writeFile(join(workspace, ".dev.vars"), workerKeys.map((key) => `${key}=${JSON.stringify(environment[key])}`).join("\n") + "\n", { mode: 0o600 });
   }
@@ -99,9 +134,9 @@ try {
     return child;
   }
   serverLog = createWriteStream(join(output, "server.log"));
-  const server = mode === "e2e"
+  const server = workerRuntime
     ? launch("npm", ["run", "dev", "--", "--port", String(port), "--hostname", "127.0.0.1"], serverLog)
-    : launch(process.execPath, [join(project, "node_modules", "next", "dist", "bin", "next"), "start", "--port", String(port), "--hostname", "127.0.0.1"], serverLog);
+    : launch(process.execPath, [...(mode === "next-e2e" ? ["--import", join(project, "tests/runtime/provider-dispatch.mjs")] : []), join(project, "node_modules", "next", "dist", "bin", "next"), "start", "--port", String(port), "--hostname", "127.0.0.1"], serverLog);
   const readyBy = Date.now() + 120_000;
   let ready = false;
   while (Date.now() < readyBy) {
@@ -115,15 +150,21 @@ try {
     await delay(500);
   }
   assert.ok(ready, `Server readiness timed out; inspect work/ci/${mode}/server.log`);
-  if (mode === "e2e") {
+  if (workflowTest) {
     testLog = createWriteStream(join(output, "tests.log"));
-    const tests = launch("npm", ["run", "test:e2e"], testLog);
+    const tests = launch("npm", mode === "a11y" ? ["exec", "--", "playwright", "test"] : ["run", "test:e2e"], testLog);
     const result = await new Promise((done) => {
       const timeout = setTimeout(() => { stopProcess(tests); done({ timeout: true }); }, 240_000);
       tests.once("error", (error) => { clearTimeout(timeout); done({ error }); });
       tests.once("exit", (code, signal) => { clearTimeout(timeout); done({ code, signal }); });
     });
-    assert.equal(result.code, 0, `E2E failed (${JSON.stringify(result)}); inspect work/ci/e2e/tests.log`);
+    if (mode === "a11y") await cp(join(workspace, "work", "ci", "a11y"), output, { recursive: true }).catch(() => undefined);
+    assert.equal(result.code, 0, `E2E failed (${JSON.stringify(result)}); inspect work/ci/${mode}/tests.log`);
+    if (providers) {
+      const report = providers.evidence;
+      assert.equal(report.unexpectedRequests, 0);
+      for (const field of ["blobWrites", "directBlobWrites", "blobReads", "scanClean", "scanRejected", "scanUnavailable", "mailAccepted", "approvalLinks"]) assert.ok(report[field] > 0, `Provider contract was not exercised: ${field}`);
+    }
   } else {
     const request = (path, options = {}) => fetch(`${origin}${path}`, { ...options, redirect: "manual", signal: AbortSignal.timeout(10_000) });
     const health = await request("/api/healthz");
@@ -151,10 +192,14 @@ try {
     assert.equal(devLogin.status, 403);
     assert.equal((await devLogin.json()).code, "TEST_LOGIN_DISABLED");
   }
-  await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "passed", runtime: process.version, completedAt: new Date().toISOString() }, null, 2));
+  await cleanup();
+  sourceEnd = await readSourceState(project);
+  requireUnchangedSource(sourceStart, sourceEnd);
+  await writeEvidence("passed");
   console.log(`${mode}: passed (isolated workspace, local server, synthetic data).`);
 } catch (error) {
-  await writeFile(join(output, "result.json"), JSON.stringify({ mode, status: "failed", runtime: process.version }, null, 2));
+  sourceEnd = await readSourceState(project).catch(() => null);
+  await writeEvidence("failed");
   throw error;
 } finally {
   await cleanup();

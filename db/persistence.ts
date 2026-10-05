@@ -58,7 +58,7 @@ const legacySchemaStatements = [
  */
 export const portalSchemaStatements = [
   `CREATE TABLE IF NOT EXISTS portal_environment (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+    id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
     purpose TEXT NOT NULL CHECK (purpose IN ('test', 'production'))
   )`,
   `CREATE TABLE IF NOT EXISTS portal_oidc_used_states (

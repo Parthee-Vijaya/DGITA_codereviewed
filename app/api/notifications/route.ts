@@ -8,7 +8,7 @@ import {
 
 export async function GET(request: Request) {
   try {
-    return noStoreJson(await listNotifications(await requireActor(request)));
+    return noStoreJson(await listNotifications(await requireActor(request, { recordActivity: false })));
   } catch (error) {
     return handleError(error);
   }

@@ -1,4 +1,5 @@
 import type { AuthEnvironment } from "./primitives";
+import { writeOperationalLog } from "../privacy/operational-log";
 
 export class AuthHttpError extends Error {
   readonly status: number;
@@ -21,7 +22,7 @@ export class AuthHttpError extends Error {
 
 export function assertSameOrigin(
   request: Request,
-  environment: AuthEnvironment = {},
+  environment: AuthEnvironment = typeof process === "undefined" ? {} : process.env,
 ) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) return;
 
@@ -70,11 +71,12 @@ export function assertSameOrigin(
   }
 }
 
+export function applicationOrigin(request: Request, environment: AuthEnvironment = typeof process === "undefined" ? {} : process.env) {
+  return new URL(environment.DGITA_APP_ORIGIN || request.url).origin;
+}
+
 function allowedOrigins(request: Request, environment: AuthEnvironment) {
-  const configuredOrigin = environment.DGITA_APP_ORIGIN;
-  const origins = new Set([
-    new URL(configuredOrigin || request.url).origin,
-  ]);
+  const origins = new Set([applicationOrigin(request, environment)]);
 
   // Vercel exposes the immutable deployment hostname at runtime. Trusting that
   // exact platform-provided hostname lets an unaliased release be tested before
@@ -143,10 +145,8 @@ export function authErrorResponse(error: unknown) {
     );
   }
 
-  const eventId = crypto.randomUUID();
-  const name = error instanceof Error && /^[A-Za-z0-9_.-]{1,80}$/u.test(error.name) ? error.name : "UnknownError";
-  // Provider errors can embed connection strings, SQL parameters or tokens.
-  console.error("Authentication request failed", { eventId, errorName: name });
+  // Even Error.name may contain provider or request-controlled content.
+  writeOperationalLog({ event: "auth.unexpected_error" });
   return noStoreJson(
     {
       code: "AUTH_UNAVAILABLE",

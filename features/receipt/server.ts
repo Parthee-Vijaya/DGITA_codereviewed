@@ -7,8 +7,10 @@ import {
 } from "pdf-lib";
 
 import { getPersistenceBindings } from "../../db/persistence";
+import { assertMailStillAuthorized, MailAttachmentReferenceError, type ClaimedMail } from "../mail/claim-authorization";
 import type { ServerActor } from "../auth/types";
 import type { ApplicationFormState } from "../application/engine";
+import { receiptSections, displaySystem } from "./content";
 import { preparePortalData, resolveActorUserId } from "../workspace/server-repository";
 
 export type ReceiptKind = "submission" | "approval" | "final";
@@ -60,13 +62,37 @@ export async function getOrCreateReceipt(
 ) {
   const DB = await preparePortalData();
   const actorUserId = await resolveActorUserId(DB, actor);
-  const application = await findAccessibleApplication(
-    DB,
-    actor,
-    actorUserId,
-    caseNumber,
-    expectedApplicationVersionId,
-  );
+  const application = await findReceiptApplication(DB, actor.tenantId, caseNumber, expectedApplicationVersionId, actor.role === "user" ? actorUserId : undefined);
+  return materializeReceipt(DB, actor, actorUserId, application, kind);
+}
+
+/** Shared read authority for version-bound HTML and stored PDF receipts. */
+export async function getAccessibleReceiptSource(actor: ServerActor, caseNumber: string, expectedVersionId?: string) {
+  const DB = await preparePortalData();
+  const actorUserId = await resolveActorUserId(DB, actor);
+  return findReceiptApplication(DB, actor.tenantId, caseNumber, expectedVersionId, actor.role === "user" ? actorUserId : undefined);
+}
+
+/** Internal job capability: a current DB claim and its exact immutable reference are mandatory. */
+export async function getOrCreateOutboxReceipt(claim: ClaimedMail, kind: ReceiptKind, versionId: string) {
+  const DB = await preparePortalData();
+  await assertMailStillAuthorized(DB, claim);
+  let references: unknown;
+  try { references = JSON.parse(claim.attachments_json); } catch { throw new MailAttachmentReferenceError(); }
+  if (!Array.isArray(references) || !references.some((item) => item?.receiptKind === kind && item?.applicationVersionId === versionId)) {
+    throw new MailAttachmentReferenceError();
+  }
+  const target = await DB.prepare("SELECT case_number FROM portal_applications WHERE id = ? AND tenant_id = ?")
+    .bind(claim.application_id, claim.tenant_id).first<{ case_number: string }>();
+  if (!target) throw new MailAttachmentReferenceError();
+  const application = await findReceiptApplication(DB, claim.tenant_id, target.case_number, versionId);
+  return materializeReceipt(DB, { tenantId: claim.tenant_id, subject: "service:mail-scheduler" }, null, application, kind, () => assertMailStillAuthorized(DB, claim));
+}
+
+async function materializeReceipt(
+  DB: D1Database, actor: Pick<ServerActor, "tenantId" | "subject">, actorUserId: string | null,
+  application: ReceiptApplicationRow, kind: ReceiptKind, assertAuthorized: () => Promise<void> = async () => {},
+) {
   if (
     !application.receipt_version_id ||
     application.receipt_version_number === null ||
@@ -129,6 +155,7 @@ export async function getOrCreateReceipt(
     },
   });
 
+  await assertAuthorized();
   await DB.batch([
       DB.prepare(`
         INSERT INTO portal_receipts
@@ -176,14 +203,14 @@ export async function getOrCreateReceipt(
   return { bytes, filename: receiptFilename(application.case_number, kind), checksum };
 }
 
-async function findAccessibleApplication(
+async function findReceiptApplication(
   DB: D1Database,
-  actor: ServerActor,
-  actorUserId: string,
+  tenantId: string,
   caseNumber: string,
   expectedApplicationVersionId?: string,
+  ownerUserId?: string,
 ) {
-  const ownerClause = actor.role === "user" ? "AND a.owner_user_id = ?" : "";
+  const ownerClause = ownerUserId ? "AND a.owner_user_id = ?" : "";
   const statement = DB.prepare(`
     SELECT a.id, a.case_number, a.system_name, a.status, a.owner_user_id,
            owner.display_name AS owner_name, owner.email AS owner_email,
@@ -214,9 +241,9 @@ async function findAccessibleApplication(
     WHERE a.tenant_id = ? AND a.case_number = ? ${ownerClause}
     LIMIT 1
   `);
-  const row = actor.role === "user"
-    ? await statement.bind(expectedApplicationVersionId ?? null, actor.tenantId, caseNumber, actorUserId).first<ReceiptApplicationRow>()
-    : await statement.bind(expectedApplicationVersionId ?? null, actor.tenantId, caseNumber).first<ReceiptApplicationRow>();
+  const row = ownerUserId
+    ? await statement.bind(expectedApplicationVersionId ?? null, tenantId, caseNumber, ownerUserId).first<ReceiptApplicationRow>()
+    : await statement.bind(expectedApplicationVersionId ?? null, tenantId, caseNumber).first<ReceiptApplicationRow>();
   if (!row) throw new ReceiptError(404, "Sagen findes ikke, eller du har ikke adgang.");
   return row;
 }
@@ -429,92 +456,6 @@ class ReceiptLayout {
       this.y -= 30;
     }
   }
-}
-
-function receiptSections(state: ApplicationFormState) {
-  return [
-    {
-      title: "System og ansvar",
-      rows: [
-        ["System", displaySystem(state)],
-        ["Forretningsområde", state.businessType],
-        ["Beskrivelse", state.systemDescription],
-        ["Leverandør", state.supplier],
-        ["Rettighedshaver", state.rightsHolder],
-        ["Kontaktperson", state.contactPerson],
-        ["Afdeling", state.department],
-        ["Dataejer", state.dataOwner],
-        ["Systemejer", state.systemOwner],
-      ],
-    },
-    {
-      title: "Anskaffelse og formål",
-      rows: [
-        ["Anskaffelsesmetode", state.acquisitionMethod],
-        ["Anskaffelsestype", state.acquisitionType === "tilkøb" ? "Tilkøb" : "Nyanskaffelse"],
-        ["Formål", state.purpose],
-        ["Funktionalitet", state.functionDescription],
-        ["Tværgående", yesNo(state.crossCutting)],
-        ["Berørte enheder", state.crossDepartments.join(", ")],
-        ["Gevinster", state.benefits],
-      ],
-    },
-    {
-      title: "Økonomi og implementering",
-      rows: [
-        ["Budget til rådighed", yesNo(state.hasBudget)],
-        ["Budgetbeløb", money(state.budgetAmount)],
-        ["Engangsomkostning", money(state.oneTimeCost)],
-        ["Årlig omkostning", money(state.yearlyCost)],
-        ["Øvrige omkostninger", money(state.otherCost)],
-        ["Startdato", state.startDate],
-        ["Slutdato", state.endDate],
-        ["Antal brugere", state.implementationUsers],
-        ["Ressourcer", state.implementationResources],
-      ],
-    },
-    {
-      title: "Data, risiko og dokumentation",
-      rows: [
-        ["Personoplysninger", yesNo(state.personalData)],
-        ["Dataklassifikation", state.dataClassification],
-        ["Risikovurdering", yesNo(state.hasRiskAssessment)],
-        ["Databehandleraftale", yesNo(state.hasDpa)],
-        ["Kontrakt", yesNo(state.hasContract)],
-        ["Leverandørtjekliste", yesNo(state.hasSupplierChecklist)],
-        ["Arkitekturbeskrivelse", yesNo(state.hasArchitecture)],
-        ["Bilag", attachmentSummary(state)],
-      ],
-    },
-    {
-      title: "Godkendelse",
-      rows: [
-        ["Godkendende chef", state.approvingLeader],
-        ["Bemærkninger", state.remarks],
-        ["Samtykke registreret", state.consent ? "Ja" : "Nej"],
-      ],
-    },
-  ] satisfies Array<{ title: string; rows: Array<[string, string]> }>;
-}
-
-function displaySystem(state: ApplicationFormState) {
-  return state.selectedSystem?.name || state.manualSystemName || state.catalogQuery || "Ikke navngivet";
-}
-
-function attachmentSummary(state: ApplicationFormState) {
-  const names = Object.values(state.attachments)
-    .flat()
-    .filter((attachment) => attachment.status === "uploaded")
-    .map((attachment) => attachment.name);
-  return names.length ? names.join(", ") : "Ingen bilag";
-}
-
-function yesNo(value: "ja" | "nej") {
-  return value === "ja" ? "Ja" : "Nej";
-}
-
-function money(value: string) {
-  return value.trim() ? `${value.trim()} kr.` : "Ikke oplyst";
 }
 
 function formatDate(value: string | null) {

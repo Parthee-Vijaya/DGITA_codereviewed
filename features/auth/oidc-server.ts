@@ -1,3 +1,5 @@
+import { readSessionPolicy } from "./session-lifecycle";
+import { readRuntimeEnvironment } from "../runtime/environment";
 import { ensurePortalSchema, getPersistenceBindings } from "../../db/persistence";
 import { AuthHttpError } from "./http";
 import {
@@ -7,14 +9,14 @@ import {
 } from "./oidc";
 import {
   createSessionToken, hashSessionToken, readSessionToken, sessionCookie,
-  SESSION_TTL_SECONDS, type AuthEnvironment,
+  type AuthEnvironment,
 } from "./primitives";
 
 type ProvisionedUser = { id: string; role: string };
 
 /** Roles and profile data are administrator-provisioned; token roles/email never grant access. */
 export async function createEntraSession(DB: D1Database, identity: EntraIdentity,
-  config: EntraConfig, request: Request, now = new Date()) {
+  config: EntraConfig, request: Request, now = new Date(), environment?: AuthEnvironment) {
   if (identity.tenantId !== config.tenantId ||
       identity.subject !== `${config.tenantId}:${identity.objectId}`) throw accessDenied();
   const user = await DB.prepare(
@@ -30,7 +32,8 @@ export async function createEntraSession(DB: D1Database, identity: EntraIdentity
   const token = createSessionToken();
   const tokenHash = await hashSessionToken(token);
   const nowIso = now.toISOString();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000).toISOString();
+  const policy = readSessionPolicy(environment ?? await readRuntimeEnvironment());
+  const expiresAt = new Date(now.getTime() + policy.maximumSeconds * 1000).toISOString();
   const oldToken = readSessionToken(request.headers.get("cookie"));
   const oldHash = oldToken ? await hashSessionToken(oldToken) : null;
   // Recheck active status and assigned role at insert time; a prior lookup grants no rights by itself.
@@ -52,7 +55,7 @@ export async function createEntraSession(DB: D1Database, identity: EntraIdentity
   if (oldHash) writes.push(DB.prepare("UPDATE portal_sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL")
     .bind(nowIso, oldHash));
   await DB.batch(writes);
-  return { cookie: sessionCookie(token, config.origin), expiresAt };
+  return { cookie: sessionCookie(token, config.origin, policy.maximumSeconds), expiresAt };
 }
 
 function accessDenied() {
@@ -96,7 +99,7 @@ export async function handleEntraCallback(request: Request, environment: AuthEnv
       throw new AuthHttpError(400, "ENTRA_AUTHORIZATION_FAILED", "Login blev ikke gennemført.");
     }
     const identity = await exchangeEntraCode(codes[0], flow, config, now, options);
-    const session = await createEntraSession(DB, identity, config, request, now);
+    const session = await createEntraSession(DB, identity, config, request, now, environment);
     return redirect(`${config.origin}/`, [oidcFlowCookie(config, "", 0), session.cookie]);
   } catch (error) {
     const code = error instanceof AuthHttpError && error.code === "ENTRA_ACCESS_NOT_ASSIGNED"

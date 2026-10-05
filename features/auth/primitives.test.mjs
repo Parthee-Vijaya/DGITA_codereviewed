@@ -53,13 +53,13 @@ test("testlogin er kun aktivt lokalt eller med eksplicit flag", () => {
   assert.equal(isDevLoginEnabled("https://portal.example.dk"), false);
   assert.equal(
     isDevLoginEnabled("https://portal.example.dk", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
     }),
     false,
   );
   assert.equal(
     isDevLoginEnabled("https://portal.example.dk", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
       DGITA_TEST_ACCESS_SECRET: "x".repeat(8),
     }),
     true,
@@ -80,7 +80,7 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
   });
   assert.deepEqual(
     devLoginPolicy("https://portal.example.dk", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
       DGITA_TEST_ACCESS_SECRET: "kort",
     }),
     {
@@ -91,14 +91,14 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
   );
   assert.equal(
     devLoginPolicy("https://portal.example.dk", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
       DGITA_TEST_ACCESS_SECRET: " ".repeat(8),
     }).configurationValid,
     false,
   );
 
   const environment = {
-    DGITA_ENABLE_DEV_LOGIN: "true",
+    DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
     DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
   };
   assert.equal(
@@ -113,14 +113,14 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
 
   assert.equal(
     await verifyTestAccessCode("legacykode", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
       DGITA_DEMO_ACCESS_SECRET: "legacykode",
     }),
     true,
   );
   assert.equal(
     await verifyTestAccessCode("synthetic-test-access", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
       DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
       DGITA_DEMO_ACCESS_SECRET: "legacykode",
     }),
@@ -128,7 +128,7 @@ test("offentligt testmiljø kræver en konfigureret adgangskode", async () => {
   );
   assert.equal(
     await verifyTestAccessCode("legacykode", {
-      DGITA_ENABLE_DEV_LOGIN: "true",
+      DGITA_ENABLE_DEV_LOGIN: "true", DGITA_APP_ORIGIN: "https://portal.example.dk",
       DGITA_TEST_ACCESS_SECRET: "synthetic-test-access",
       DGITA_DEMO_ACCESS_SECRET: "legacykode",
     }),

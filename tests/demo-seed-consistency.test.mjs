@@ -59,6 +59,9 @@ function createDatabase() {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const statement of portalSchemaStatements) database.exec(statement);
+  database.exec(`INSERT INTO portal_tenants (id, slug, name) VALUES ('kalundborg', 'kalundborg', 'Historical test tenant');
+    INSERT INTO portal_bootstrap_state (tenant_id, scope, version, completed_at)
+    VALUES ('kalundborg', 'test-fixture-profile', 'legacy-v1', '2026-10-05T00:00:00Z')`);
   return { database, D1: new TestD1Database(database) };
 }
 

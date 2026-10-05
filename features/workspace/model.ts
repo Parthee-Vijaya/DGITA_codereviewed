@@ -21,7 +21,8 @@ export type WorkspaceViewer = {
   municipality: string;
 };
 
-export const DEMO_VIEWERS: Record<WorkspaceRole, WorkspaceViewer> = {
+/** Historical fixture references only. New databases use SYNTHETIC_VIEWERS. */
+export const LEGACY_DEMO_VIEWERS: Record<WorkspaceRole, WorkspaceViewer> = {
   user: {
     subject: "demo-user-partheepan",
     tenantId: "kalundborg",
@@ -74,9 +75,9 @@ export type CaseRecord = {
 
 const partheepanOwner = {
   tenantId: "kalundborg",
-  ownerSubject: DEMO_VIEWERS.user.subject,
-  ownerEmail: DEMO_VIEWERS.user.email,
-  applicant: DEMO_VIEWERS.user.displayName,
+  ownerSubject: LEGACY_DEMO_VIEWERS.user.subject,
+  ownerEmail: LEGACY_DEMO_VIEWERS.user.email,
+  applicant: LEGACY_DEMO_VIEWERS.user.displayName,
   municipality: "Kalundborg",
 };
 
@@ -88,7 +89,7 @@ const anitaOwner = {
   municipality: "Kalundborg",
 };
 
-export const DEMO_CASES: CaseRecord[] = [
+export const LEGACY_DEMO_CASES: CaseRecord[] = [
   {
     ...partheepanOwner,
     id: "ITA-001290",
@@ -201,6 +202,40 @@ export const DEMO_CASES: CaseRecord[] = [
   },
 ];
 
+/** Neutral defaults for newly created test databases; historical ids are not migrated. */
+export const SYNTHETIC_VIEWERS: Record<WorkspaceRole, WorkspaceViewer> = {
+  user: { subject: "test-user-01", tenantId: "kalundborg", role: "user", displayName: "Testbruger 01", email: "user-01@example.invalid", initials: "T1", municipality: "Testkommune" },
+  consultant: { subject: "test-consultant-01", tenantId: "kalundborg", role: "consultant", displayName: "Testkonsulent 01", email: "consultant-01@example.invalid", initials: "K1", municipality: "Testkommune" },
+  admin: { subject: "test-admin-01", tenantId: "kalundborg", role: "admin", displayName: "Testadministrator 01", email: "admin-01@example.invalid", initials: "A1", municipality: "Testkommune" },
+};
+
+export const SYNTHETIC_EXTRA_USERS = [
+  { id: "test-user-02", email: "user-02@example.invalid", displayName: "Testbruger 02", role: "user" as const },
+  { id: "test-approver-01", email: "approver-01@example.invalid", displayName: "Testgodkender 01", role: "consultant" as const },
+];
+
+export const SYNTHETIC_APPROVERS = [
+  { id: "test-approver-01", name: "Testgodkender 01" },
+  { id: "test-user-01", name: "Testbruger 01" },
+  { id: "test-user-02", name: "Testbruger 02" },
+];
+
+export const SYNTHETIC_CASES: CaseRecord[] = LEGACY_DEMO_CASES.map((item, index) => {
+  const owner = item.ownerSubject === LEGACY_DEMO_VIEWERS.user.subject
+    ? { subject: SYNTHETIC_VIEWERS.user.subject, email: SYNTHETIC_VIEWERS.user.email, name: SYNTHETIC_VIEWERS.user.displayName }
+    : { subject: "test-user-02", email: "user-02@example.invalid", name: "Testbruger 02" };
+  return {
+    ...item, ownerSubject: owner.subject, ownerEmail: owner.email, applicant: owner.name,
+    system: `Testsystem ${String(index + 1).padStart(2, "0")}`, municipality: "Testkommune",
+    consultant: item.consultant === "Ikke tildelt" ? "Ikke tildelt" : "Testkonsulent 01",
+    leader: item.leader === "Ikke valgt" ? "Ikke valgt" : "Testgodkender 01",
+  };
+});
+
+/** Compatibility names now select neutral defaults for newly created test data. */
+export const DEMO_VIEWERS = SYNTHETIC_VIEWERS;
+export const DEMO_CASES = SYNTHETIC_CASES;
+
 export type WorkspaceCapabilities = {
   createApplications: boolean;
   processApplications: boolean;
@@ -260,14 +295,17 @@ export function projectCaseForViewer(
   return { ...item, dgitaApproval: normalizeDgitaApproval(approval) };
 }
 
-export const D_GITA_LEGAL_BASES = ["NSIS", "NIS2", "GDPR"] as const;
+export const D_GITA_FRAMEWORKS = ["NSIS", "NIS2", "GDPR"] as const;
+/** Compatibility alias: stored legalBasis values are framework labels, never proof of lawful processing. */
+export const D_GITA_LEGAL_BASES = D_GITA_FRAMEWORKS;
 export const D_GITA_PHASES = ["Kladde", "Indsendt", "Under behandling", "Afsluttet"] as const;
 
 export type DgitaApproval = {
   revision?: number;
   approved: "" | "Ja" | "Nej";
   date: string;
-  legalBasis: "" | (typeof D_GITA_LEGAL_BASES)[number];
+  /** Historical wire/storage key. A framework selection, not an Article 6/9 legal basis. */
+  legalBasis: "" | (typeof D_GITA_FRAMEWORKS)[number];
   responsible: string;
   hasAdditionalResponsible: "" | "Ja" | "Nej";
   additionalResponsible: string;
@@ -429,8 +467,8 @@ export const DEFAULT_CONTENT: ContentEntry[] = [
     published: true,
   },
   portalText("contact.local.role", "Kontakt · rolle", "Din lokale D-GITA-konsulent", "Forside · Kontakt"),
-  portalText("contact.local.name", "Kontakt · navn", "Casper Kjeldsen Ravn", "Forside · Kontakt"),
-  portalText("contact.local.email", "Kontakt · e-mail", "ckra@kalundborg.dk", "Forside · Kontakt"),
+  portalText("contact.local.name", "Kontakt · navn", "Testkonsulent 01", "Forside · Kontakt"),
+  portalText("contact.local.email", "Kontakt · e-mail", "consultant-01@example.invalid", "Forside · Kontakt"),
   portalText("home.resources.eyebrow", "Ressourcer · overlinje", "Viden og vejledning", "Forside · Ressourcer"),
   portalText("home.resources.title", "Ressourcer · overskrift", "Genveje til et bedre forløb", "Forside · Ressourcer"),
   portalText("home.resources.about.title", "Genvej · Om D-GITA", "Om D-GITA", "Forside · Ressourcer"),
@@ -776,8 +814,8 @@ export const DEFAULT_CONTENT: ContentEntry[] = [
     id: "link.contact",
     category: "link",
     title: "Kontakt D-GITA",
-    body: "Skriv til den lokale D-GITA-funktion i Kalundborg.",
-    url: "mailto:ckra@kalundborg.dk",
+    body: "Testkontakt til D-GITA. Adressen kan ikke modtage mail.",
+    url: "mailto:contact-01@example.invalid",
     location: "Links for Kalundborg Kommune",
     published: true,
   },

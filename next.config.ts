@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/cases/:caseNumber/receipt",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
         source: "/approve/:path*",
         headers: [
           { key: "Cache-Control", value: "private, no-store, max-age=0" },

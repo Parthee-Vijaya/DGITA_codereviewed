@@ -2320,6 +2320,10 @@ button.notice:hover,
   gap: 55px;
 }
 
+.application-layout > * {
+  min-width: 0;
+}
+
 .application-rail {
   position: sticky;
   top: 115px;
@@ -2429,6 +2433,7 @@ button.notice:hover,
 }
 
 .application-sheet {
+  overflow-wrap: anywhere;
   border: 1px solid var(--line);
   border-radius: var(--radius-surface);
   background: var(--paper);
@@ -2446,6 +2451,11 @@ button.notice:hover,
   font-weight: 720;
   letter-spacing: .11em;
   text-transform: uppercase;
+}
+
+.sheet-heading h2,
+.application-sheet .form-message.error {
+  scroll-margin-block-start: 100px;
 }
 
 .sheet-heading h2 {
@@ -5938,18 +5948,19 @@ textarea.clean-input {
     position: relative;
     top: auto;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    overflow-x: auto;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     border-top: 1px solid var(--line-dark);
     border-bottom: 1px solid var(--line-dark);
   }
 
   .application-rail > button {
-    min-width: 145px;
+    min-width: 0;
+    grid-template-columns: 28px minmax(0, 1fr);
     padding: 12px 8px;
   }
 
   .application-rail > button strong {
+    overflow-wrap: anywhere;
     font-size: 10px;
   }
 

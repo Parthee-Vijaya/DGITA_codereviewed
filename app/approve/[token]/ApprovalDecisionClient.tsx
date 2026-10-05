@@ -9,10 +9,13 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { PublicApprovalRequest } from "../../../features/approval/server";
 import { DgitaLogo } from "../../../features/brand/BrandLockup";
+
+// Server-rendered decision controls stay disabled until their handlers are ready.
+const subscribeHydration = () => () => {};
 
 export function ApprovalDecisionClient({
   token,
@@ -21,6 +24,13 @@ export function ApprovalDecisionClient({
   token: string;
   initialApproval: PublicApprovalRequest;
 }) {
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const [focusTarget, setFocusTarget] = useState<{ target: "heading" | "error" } | null>(null);
+  useEffect(() => {
+    if (focusTarget) (focusTarget.target === "error" ? errorRef.current : headingRef.current)?.focus();
+  }, [focusTarget]);
   const [approval, setApproval] = useState(initialApproval);
   const [comment, setComment] = useState(initialApproval.decisionComment ?? "");
   const [submitting, setSubmitting] = useState<"approved" | "rejected" | null>(null);
@@ -41,8 +51,10 @@ export function ApprovalDecisionClient({
         throw new Error(payload.error || "Beslutningen kunne ikke gemmes.");
       }
       setApproval(payload.approval);
+      setFocusTarget({ target: "heading" });
     } catch (reason) {
       setError((reason as Error).message);
+      setFocusTarget({ target: "error" });
     } finally {
       setSubmitting(null);
     }
@@ -60,7 +72,7 @@ export function ApprovalDecisionClient({
         <header>
           <div>
             <span className="section-label dark">Ledergodkendelse · {approval.caseNumber}</span>
-            <h1>{open ? `Hej ${approval.approverName}` : approved ? "Godkendelsen er registreret" : approval.status === "rejected" ? "Afvisningen er registreret" : "Godkendelsen er lukket"}</h1>
+            <h1 ref={headingRef} tabIndex={-1}>{open ? `Hej ${approval.approverName}` : approved ? "Godkendelsen er registreret" : approval.status === "rejected" ? "Afvisningen er registreret" : "Godkendelsen er lukket"}</h1>
             <p>{open ? `${approval.applicantName} har bedt dig tage stilling til version ${approval.versionNumber} af ansøgningen.` : `Beslutningen er gemt med tidspunkt og auditspor på version ${approval.versionNumber}.`}</p>
           </div>
           <span className={approved ? "approval-state approved" : approval.status === "rejected" ? "approval-state rejected" : "approval-state"}>
@@ -101,7 +113,7 @@ export function ApprovalDecisionClient({
             <ul>{approval.attachments.map((attachment) => (
               <li key={attachment.id}>
                 <div><strong>{attachment.name}</strong><small>{formatBytes(attachment.size)} · {attachmentLabel(attachment.kind)}</small></div>
-                <a href={`/api/approvals/${encodeURIComponent(token)}/attachments/${encodeURIComponent(attachment.id)}`}>
+                <a aria-label={`Hent ${attachment.name}`} href={`/api/approvals/${encodeURIComponent(token)}/attachments/${encodeURIComponent(attachment.id)}`}>
                   <Download size={16} /> Hent
                 </a>
               </li>
@@ -114,12 +126,12 @@ export function ApprovalDecisionClient({
           <div className="approval-decision">
             <label>
               Bemærkning til beslutningen <small>Påkrævet ved afvisning</small>
-              <textarea rows={5} value={comment} onChange={(event) => setComment(event.target.value)} maxLength={4000} placeholder="Skriv en kort begrundelse eller eventuelle forbehold" />
+              <textarea disabled={!hydrated || Boolean(submitting)} aria-describedby={error ? "approval-decision-error" : undefined} rows={5} value={comment} onChange={(event) => setComment(event.target.value)} maxLength={4000} placeholder="Skriv en kort begrundelse eller eventuelle forbehold" />
             </label>
-            {error ? <p className="field-error">{error}</p> : null}
+            {error ? <p id="approval-decision-error" ref={errorRef} tabIndex={-1} role="alert" className="field-error">{error}</p> : null}
             <div>
-              <button className="line-button approval-reject" type="button" disabled={Boolean(submitting)} onClick={() => void decide("rejected")}><XCircle size={17} /> {submitting === "rejected" ? "Gemmer…" : "Afvis"}</button>
-              <button className="solid-button green" type="button" disabled={Boolean(submitting)} onClick={() => void decide("approved")}><Check size={17} /> {submitting === "approved" ? "Gemmer…" : "Godkend version"}</button>
+              <button className="line-button approval-reject" type="button" disabled={!hydrated || Boolean(submitting)} onClick={() => void decide("rejected")}><XCircle size={17} /> {submitting === "rejected" ? "Gemmer…" : "Afvis"}</button>
+              <button className="solid-button green" type="button" disabled={!hydrated || Boolean(submitting)} onClick={() => void decide("approved")}><Check size={17} /> {submitting === "approved" ? "Gemmer…" : "Godkend version"}</button>
             </div>
             <small><LockKeyhole size={13} /> Linket kan kun bruges én gang og udløber {formatDate(approval.expiresAt)}.</small>
           </div>
@@ -146,7 +158,7 @@ function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short" }).format(date);
+    : new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Copenhagen" }).format(date);
 }
 
 function formatBytes(value: number) {

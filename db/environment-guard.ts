@@ -8,8 +8,19 @@ export class DatabaseEnvironmentError extends Error {
   }
 }
 
+export class RecoveryQuarantineError extends Error {
+  readonly code = "DATABASE_RECOVERY_QUARANTINED";
+  constructor() {
+    super("Gendannelseskopien er i karantæne og må kun undersøges med offlineværktøjer.");
+    this.name = "RecoveryQuarantineError";
+  }
+}
+
 /** A durable, one-way label prevents an existing pilot DB becoming production. */
 export async function assertDatabaseEnvironment(DB: D1Database, environment: RuntimeEnvironment) {
+  const quarantine = await DB.prepare("SELECT tenant_id FROM portal_bootstrap_state WHERE scope = 'recovery-quarantine' LIMIT 1")
+    .first<{ tenant_id: string }>();
+  if (quarantine) throw new RecoveryQuarantineError();
   const intended = deploymentStage(environment) === "production" ? "production" : "test";
   if (intended === "production") {
     const legacy = await DB.prepare(

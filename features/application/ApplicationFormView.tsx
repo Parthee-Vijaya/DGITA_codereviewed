@@ -8,26 +8,20 @@ import {
   CircleHelp,
   Info,
   Mail,
-  Paperclip,
   Search,
   Send,
   Sparkles,
-  Upload,
-  X,
 } from "lucide-react";
 import {
   useEffect,
-  useContext,
-  useId,
   useRef,
   useState,
   type ChangeEvent,
-  type ReactNode,
 } from "react";
 
 import type { CatalogSystem } from "../catalog/search";
 import { useUnsavedChanges } from "./use-unsaved-changes";
-import { labelQuestionControls, QuestionLabelContext, QuestionErrorContext } from "./QuestionContent";
+import { Question, Money, UploadField, FormMessage, FieldErrorText } from "./ApplicationFields";
 import { SegmentedChoice } from "../ui/SegmentedChoice";
 import {
   isAllowedPrivateBlobUrl,
@@ -130,6 +124,22 @@ export function ApplicationFormView({
   draftCaseNumber = null,
 }: Props) {
   const [step, setStep] = useState(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
+  const [focusRequest, setFocusRequest] = useState<{ target: "heading" | "errors" } | null>(null);
+  useEffect(() => {
+    if (!focusRequest) return;
+    const target = focusRequest.target === "errors"
+      ? sheetRef.current?.querySelector<HTMLElement>(".form-message.error") ?? headingRef.current
+      : headingRef.current;
+    // Step height changes can move the browser's scroll anchor after React's
+    // commit. Position focus on the next frame, once the new layout is ready.
+    const frame = requestAnimationFrame(() => {
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusRequest]);
   const [form, setForm] = useState<ApplicationFormState>(() =>
     structuredClone(initialApplicationState),
   );
@@ -405,20 +415,19 @@ export function ApplicationFormView({
       const blockedAt = firstInvalidStep(form) ?? step;
       markAttempted(blockedAt);
       setStep(blockedAt);
+      setFocusRequest({ target: "errors" });
       onToast("Udfyld de markerede felter, før du går videre.");
       return;
     }
     setStep(target);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setFocusRequest({ target: "heading" });
   }
 
   function continueForm() {
     markAttempted(step);
     if (currentErrors.length > 0) {
       onToast("Udfyld de markerede felter, før du går videre.");
-      requestAnimationFrame(() => {
-        document.querySelector<HTMLElement>(".form-message.error")?.focus();
-      });
+      setFocusRequest({ target: "errors" });
       return;
     }
     goToStep(Math.min(step + 1, steps.length - 1));
@@ -679,6 +688,7 @@ export function ApplicationFormView({
       const invalidStep = firstInvalidStep(currentForm) ?? step;
       markAttempted(invalidStep);
       setStep(invalidStep);
+      setFocusRequest({ target: "errors" });
       onToast("Ansøgningen mangler oplysninger, før den kan indsendes.");
       return;
     }
@@ -798,9 +808,9 @@ export function ApplicationFormView({
           <div className="rail-help"><CircleHelp size={20} /><div><strong>Brug for hjælp?</strong><p>Book et formøde med din lokale konsulent.</p><a href="mailto:ckra@kalundborg.dk?subject=Ønske%20om%20D-GITA-formøde">Book formøde</a></div></div>
         </aside>
 
-        <section className="application-sheet">
+        <section className="application-sheet" ref={sheetRef}>
           <div className="sheet-heading">
-            <span>Trin {step + 1}</span><h2>{steps[step]}</h2><p>{descriptions[step]}</p>
+            <span>Trin {step + 1}</span><h2 ref={headingRef} tabIndex={-1}>{steps[step]}</h2><p>{descriptions[step]}</p>
           </div>
           <div className="sheet-fields">
             {showErrors && currentErrors.length > 0 ? (
@@ -1104,23 +1114,13 @@ function splitList(value: string) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
-function Question({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
-  const titleId = useId();
-  const errorId = `${titleId}-error`;
-  return <QuestionLabelContext.Provider value={title}><QuestionErrorContext.Provider value={errorId}><div className="question" role="group" aria-labelledby={titleId}><div className="question-copy"><div className="question-title" id={titleId}>{title}</div>{hint ? <p>{hint}</p> : null}</div><div>{labelQuestionControls(children, title, errorId)}</div></div></QuestionErrorContext.Provider></QuestionLabelContext.Provider>;
-}
-
 function Choice({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
   return <SegmentedChoice value={value} options={options} onChange={onChange} />;
 }
 
-function Money({ id, value, error, onChange }: { id?: string; value: string; error?: string; onChange: (value: string) => void }) {
-  return <><div className="money-field"><span>DKK</span><input id={id} className={error ? "invalid" : undefined} inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} /></div><FieldErrorText message={error} /></>;
-}
-
 function CatalogResult({ system, onChoose }: { system: CatalogSystem; onChoose: () => void }) {
   const status = catalogStatus(system);
-  return <div className="lookup-card catalog-result"><span>{initials(system.name)}</span><div><strong>{system.name}</strong><small>{system.supplier || system.rightsHolder || "Leverandør ikke angivet"}</small><em className={status.local ? "local" : "kitos"}>{status.label}</em></div><button type="button" onClick={onChoose}>Vælg</button></div>;
+  return <div className="lookup-card catalog-result"><span>{initials(system.name)}</span><div><strong>{system.name}</strong><small>{system.supplier || system.rightsHolder || "Leverandør ikke angivet"}</small><em className={status.local ? "local" : "kitos"}>{status.label}</em></div><button type="button" onClick={onChoose} aria-label={`Vælg ${system.name}`}>Vælg</button></div>;
 }
 
 function CatalogSelection({ system }: { system: SelectedCatalogSystem }) {
@@ -1146,31 +1146,8 @@ function initials(value: string) {
   return value.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
-function UploadField({ kind, title, detail, files, error, onAdd, onRemove, icon = "upload" }: { kind: UploadKind; title: string; detail: string; files: AttachmentDraft[]; error?: string; onAdd: (kind: UploadKind, event: ChangeEvent<HTMLInputElement>) => void | Promise<void>; onRemove: (kind: UploadKind, id: string) => void | Promise<void>; icon?: "upload" | "paperclip" }) {
-  const Icon = icon === "paperclip" ? Paperclip : Upload;
-  return <div className={cx("upload-group", error && "has-error")}><div className="upload-field"><Icon size={22} /><div><strong>{title}</strong><small>{detail}</small></div><label className="upload-button">Vælg fil<input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onChange={(event) => onAdd(kind, event)} /></label></div>{files.length > 0 ? <div className="upload-list">{files.map((file) => <div className={cx("upload-file", file.status === "failed" && "failed")} key={file.id}><FileStatus file={file} /><button type="button" onClick={() => onRemove(kind, file.id)} aria-label={`Fjern ${file.name}`}><X size={15} /></button></div>)}</div> : null}<FieldErrorText message={error} /></div>;
-}
-
-function FileStatus({ file }: { file: AttachmentDraft }) {
-  const status = file.status === "uploading" ? "uploades…" : file.status === "uploaded" ? "uploadet" : "klar til upload";
-  return <div><strong>{file.name}</strong><small>{file.error || `${formatBytes(file.size)} · ${status}`}</small></div>;
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toLocaleString("da-DK", { maximumFractionDigits: 1 })} MB`;
-}
-
-function FormMessage({ tone, title, messages }: { tone: "error" | "warning"; title: string; messages: string[] }) {
-  return <div className={cx("form-message", tone)} tabIndex={tone === "error" ? -1 : undefined} role={tone === "error" ? "alert" : undefined}><Info size={20} /><div><strong>{title}</strong>{messages.map((message) => <p key={message}>{message}</p>)}</div></div>;
-}
-
-function FieldErrorText({ message }: { message?: string }) {
-  const errorId = useContext(QuestionErrorContext);
-  return message ? <p id={errorId} className="field-error" role="alert">{message}</p> : null;
-}
-
 function ReviewApplication({ form, error, onEdit, onConsent }: { form: ApplicationFormState; error?: string; onEdit: (step: number) => void; onConsent: (checked: boolean) => void }) {
+  const errorId = "application-review-consent-error";
   const rows: Array<[string, string, number]> = [
     ["System", `${getDisplaySystemName(form)}${form.selectedSystem ? form.selectedSystem.usedInKalundborg ? " · bruges i Kalundborg" : " · fundet i KITOS" : " · manuelt registreret"}`, 0],
     ["Organisation", form.responsibleOrganization, 1],
@@ -1181,7 +1158,7 @@ function ReviewApplication({ form, error, onEdit, onConsent }: { form: Applicati
     ["Godkendende chef", form.approvingLeader, 8],
   ];
   const warnings: FieldError[] = [getStepWarnings(form, 5), getStepWarnings(form, 7)].flat();
-  return <div className="review-block"><div className="review-status"><CheckCircle2 size={25} /><div><strong>Klar til kontrol</strong><p>Den indsendte version låses i databasen. PDF-kvitteringen kan hentes på sagen, og en kvitteringsmail lægges i den sikre Outlook-kø.</p></div></div>{warnings.length > 0 ? <FormMessage tone="warning" title="Ansøgningen kan indsendes med opmærksomhedspunkter" messages={warnings.map((warning) => warning.message)} /> : null}{rows.map(([label, value, targetStep]) => <div className="review-line" key={label}><span>{label}</span><strong>{value || "Ikke angivet"}</strong><button type="button" onClick={() => onEdit(targetStep)}>Redigér</button></div>)}<label className="consent-check"><input type="checkbox" checked={form.consent} onChange={(event) => onConsent(event.target.checked)} /><span>{form.consent ? <Check size={14} /> : null}</span>Jeg har kontrolleret oplysningerne og de vedlagte bilag.</label><FieldErrorText message={error} /></div>;
+  return <div className="review-block"><div className="review-status"><CheckCircle2 size={25} /><div><strong>Klar til kontrol</strong><p>Den indsendte version låses i databasen. PDF-kvitteringen kan hentes på sagen, og en kvitteringsmail lægges i den sikre Outlook-kø.</p></div></div>{warnings.length > 0 ? <FormMessage tone="warning" title="Ansøgningen kan indsendes med opmærksomhedspunkter" messages={warnings.map((warning) => warning.message)} /> : null}{rows.map(([label, value, targetStep]) => <div className="review-line" key={label}><span>{label}</span><strong>{value || "Ikke angivet"}</strong><button type="button" aria-label={`Redigér ${label}`} onClick={() => onEdit(targetStep)}>Redigér</button></div>)}<label className="consent-check"><input type="checkbox" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} checked={form.consent} onChange={(event) => onConsent(event.target.checked)} /><span>{form.consent ? <Check size={14} /> : null}</span>Jeg har kontrolleret oplysningerne og de vedlagte bilag.</label><FieldErrorText id={errorId} message={error} /></div>;
 }
 
 function formatDate(value: string) {

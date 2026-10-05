@@ -1,0 +1,773 @@
+{
+  "schemaVersion": 1,
+  "documentType": "environment-acceptance-preparation",
+  "preparedOn": "2026-10-05",
+  "productionApproved": false,
+  "statusLegend": {
+    "U": "Uafklaret eller ikke afprøvet/accepteret i det faktiske miljø",
+    "P": "Bestået med reviewet evidens for eksakt kandidat og miljø",
+    "F": "Afvist eller fejl under miljøprøven"
+  },
+  "local_ready_to_test": {
+    "status": "ready",
+    "meaning": "Scenarier og evidensskabelon er forberedt. Dette er ikke en accept af applikation, cloudressourcer eller kommunalt miljø.",
+    "localEvidenceBoundary": "Lokale syntetiske tests kan vedlægges som forberedelse; de kan ikke udfylde ekstern accept automatisk."
+  },
+  "external_acceptance": {
+    "status": "U",
+    "productionApproved": false,
+    "candidateSha": null,
+    "artifactSha256": null,
+    "environmentReference": null,
+    "reviewedAt": null,
+    "reviewerReferences": [],
+    "decisionReference": null
+  },
+  "candidate": {
+    "status": "U",
+    "sourceSha": null,
+    "workingTreeClean": null,
+    "lockfileSha256": null,
+    "buildRuntime": null,
+    "artifactSha256": null,
+    "deploymentId": null,
+    "immutableUrl": null,
+    "deploymentTarget": null
+  },
+  "previewConstraints": {
+    "observedOn": "2026-10-05",
+    "observationScope": "Read-only metadata og workflowkode; ingen envværdier dekrypteret eller kopieret.",
+    "existingWorkflow": "release-vercel.yml vælger production-target med --prod selv når workflowmiljøet hedder pilot; må ikke bruges som autorisation til isoleret preview.",
+    "existingProject": "Observeret dgita-projekt har production/development-variablemetadata og ingen preview-variablemetadata. Den eksisterende pilot skal bevares.",
+    "requiredBeforePreview": [
+      "Eksplicit preview-target og entydigt projektvalg i isoleret checkout",
+      "Særskilte syntetiske database-/private Blob-ressourcer og secrets",
+      "Betroet kandidat-origin samt pilotkode og sikker cookiepolitik",
+      "Ingen production-pull, promotion, --prod eller ændring af gammel pilots aliaser",
+      "Aftalt testadgang gennem eksisterende deploymentbeskyttelse"
+    ],
+    "previewConfigurationStatus": "U",
+    "isolatedResourcesStatus": "U",
+    "oldPilotPreservationStatus": "U",
+    "localCliAuthentication": "Read-only whoami fungerede; dette dokument attesterer ingen fortsat eller scopespecifik deploytilladelse."
+  },
+  "roles": {
+    "platform_owner": {
+      "proposedRole": "Kommunens platformansvarlige eller udpegede testmiljøoperatør",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "release_owner": {
+      "proposedRole": "Releaseansvarlig med særskilt godkendelsesmandat",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "identity_owner": {
+      "proposedRole": "Kommunens identitets- og adgangsansvarlige",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "security_owner": {
+      "proposedRole": "Informationssikkerhedsansvarlig eller udpeget sikkerhedsreviewer",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "application_owner": {
+      "proposedRole": "Systemejer og faglig procesejer",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "storage_owner": {
+      "proposedRole": "Data-/lagerplatformansvarlig",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "messaging_owner": {
+      "proposedRole": "Microsoft 365-/mailansvarlig",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "operations_owner": {
+      "proposedRole": "Driftsansvarlig og beredskabsvagt",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "accessibility_owner": {
+      "proposedRole": "Tilgængelighedsansvarlig med relevante testbrugere",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    },
+    "data_owner": {
+      "proposedRole": "Kommunens dataansvarlige/procesejer med relevant juridisk og databeskyttelsesfaglig støtte",
+      "assignmentStatus": "U",
+      "assigneeReference": null
+    }
+  },
+  "evidencePolicy": {
+    "requiredPerScenario": [
+      "scenarioId",
+      "candidateSha",
+      "artifactSha256",
+      "environmentReference",
+      "executedAt",
+      "executorRole",
+      "redactedArtifactReferences",
+      "expectedResult",
+      "observedResult",
+      "status",
+      "reviewerRole",
+      "reviewedAt",
+      "decisionReference"
+    ],
+    "prohibitedContent": [
+      "Tokens, adgangskoder og envværdier",
+      "Sessioncookies, rå authheaders og aktive bearerlinks",
+      "Rå persondata eller produktionsdokumenter",
+      "Uredigerede providerfejl, forbindelsesstrenge og hemmelighedsbehæftede logs"
+    ],
+    "artifactReferenceFormat": {
+      "location": "Godkendt bevislagerreference, ikke secret eller aktivt engangslink",
+      "sha256": "Kontrolsum på den redigerede evidens",
+      "redactionReviewed": true
+    }
+  },
+  "scenarios": [
+    {
+      "id": "ENV-01",
+      "title": "Bevar den eksisterende pilot og isoler kandidaten",
+      "requiredForProduction": true,
+      "ownerRole": "platform_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Registrér eksisterende deployment-id, aliaser og ufølsomme health-resultater før og efter previewtesten.",
+        "Kandidaten bruger preview-target samt egne testdataressourcer og secrets; ingen gamle produktionsbindings kopieres.",
+        "Sammenlign projekt-/resourceidentiteter uden at gemme credentials."
+      ],
+      "specificEvidenceFields": [
+        "oldPilotBeforeAfter",
+        "candidateTarget",
+        "resourceIsolationReview"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "REL-01",
+      "title": "Bind alle resultater til præcis kilde og bygget artefakt",
+      "requiredForProduction": true,
+      "ownerRole": "release_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Fastlås fuld Git-SHA fra en ren kandidat og registrér dependency-lockhash.",
+        "Registrér buildkommando, Node-version, outputdigest, deployment-id og immutable URL.",
+        "Godkend kun evidens, der dækker samme SHA og artefakt; ændringer kræver relevant gentest."
+      ],
+      "specificEvidenceFields": [
+        "sourceSha",
+        "workingTreeClean",
+        "lockfileSha256",
+        "artifactSha256",
+        "deploymentId",
+        "immutableUrl"
+      ],
+      "localPreparationReferences": [
+        "scripts/ci-release.mjs",
+        "scripts/ci-release-codeql.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "AUTH-01",
+      "title": "Entra-login og tenant-/rollebinding",
+      "requiredForProduction": true,
+      "ownerRole": "identity_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Afprøv den aftalte issuer/tenant, redirectbinding, MFA-/Conditional Access-politik og korrekte roller.",
+        "Afvis forkert tenant, forkert issuer/audience, udløbet/replayed state og uautoriseret rolle.",
+        "Kontrollér public origin mod intern Next-URL uden at stole på vilkårlige proxyheaders."
+      ],
+      "specificEvidenceFields": [
+        "identityConfigurationReview",
+        "positiveAndNegativeResults",
+        "redirectAndOriginEvidence"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "AUTH-02",
+      "title": "Rolleafgang og tilbagekaldte sessioner",
+      "requiredForProduction": true,
+      "ownerRole": "identity_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Fjern rettighed eller deaktivér syntetisk bruger, der allerede har en aktiv session.",
+        "Afprøv eksisterende cookie mod API, downloads, redigering og godkendelse efter den aftalte tilbagekaldelsesfrist.",
+        "Dokumentér faktisk målt frist og ansvarlig proces for afgang."
+      ],
+      "specificEvidenceFields": [
+        "revocationTimeline",
+        "existingSessionResults",
+        "approvedRevocationObjective"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "AUTH-03",
+      "title": "Pilotkode og produktionsmiljøets afvisning af testlogin",
+      "requiredForProduction": true,
+      "ownerRole": "security_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Pilot på offentlig HTTPS kræver adgangskode; intern loopback-request må ikke gøre offentlig kandidat til lokal undtagelse.",
+        "Forkert/manglende kode afvises, og cookies har den aftalte Secure/HttpOnly/SameSite-politik.",
+        "Produktionskonfiguration afviser dev-login og seed, også ved fejlkonfigureret miljønavn."
+      ],
+      "specificEvidenceFields": [
+        "publicVersusInternalOriginResults",
+        "cookieAttributeReview",
+        "productionNegativeResults"
+      ],
+      "localPreparationReferences": [
+        "tests/runtime-origin.test.mjs",
+        "scripts/ci-server.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "ACCESS-01",
+      "title": "Tenant-, rolle- og versionsafgrænset sagsadgang",
+      "requiredForProduction": true,
+      "ownerRole": "application_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Afprøv læsning, ændring, bilag, receipt, feltkommentar og lederlink på tværs af syntetiske brugere og tenants.",
+        "Afvis selv-godkendelse, tilbagekaldt mandat, forældet version, genbrug af token og forældet skriveversion.",
+        "Bekræft at afviste forsøg hverken ændrer status eller frigiver bytes."
+      ],
+      "specificEvidenceFields": [
+        "accessMatrixResults",
+        "stateAndAuditDiff",
+        "versionBindingResults"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "BLOB-01",
+      "title": "Privat direct-upload og download",
+      "requiredForProduction": true,
+      "ownerRole": "storage_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Kør den faktiske browsergren presign → privat Blob PUT → complete → submit → versionsbundet download.",
+        "Afprøv forkert fil-/tenantreference, udløbet delegation, størrelse/type/checksum-mismatch og afbrudt upload.",
+        "Bekræft private objekter, læseadgang uden session afvist samt signerede URLers TTL og begrænsning."
+      ],
+      "specificEvidenceFields": [
+        "directUploadBrowserTraceRedacted",
+        "blobPrivacyReview",
+        "delegationAndIntegrityResults"
+      ],
+      "localPreparationReferences": [
+        "tests/e2e-local.mjs",
+        "features/application/direct-upload-persistence.test.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "SCAN-01",
+      "title": "Scanner frigiver kun kontrolleret indhold",
+      "requiredForProduction": true,
+      "ownerRole": "security_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Brug aftalte uskadelige syntetiske clean/reject-fixtures.",
+        "Timeout, utilgængelig scanner, ukendt verdict og checksum-mismatch må ikke frigive bilag.",
+        "Vis at karantæne/oprydning og alarm virker i samme runtime og ressourceopsætning."
+      ],
+      "specificEvidenceFields": [
+        "scannerContractResults",
+        "quarantineEvidence",
+        "scannerAlarmEvidence"
+      ],
+      "localPreparationReferences": [
+        "tests/runtime/provider-server.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "MAIL-01",
+      "title": "Graph-afsender, rettigheder og kontrolleret levering",
+      "requiredForProduction": true,
+      "ownerRole": "messaging_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Verificér at appens rettigheder begrænses til aftalt afsender/mailbox og at uautoriseret afsender/modtager afvises.",
+        "Afprøv kun eksplicit godkendte syntetiske testmodtagere; ingen almindelige borgermails.",
+        "Adskil Graph-accept fra faktisk modtagelse; bekræft public-origin i lederlink og korrekt versions-PDF."
+      ],
+      "specificEvidenceFields": [
+        "graphScopeReview",
+        "approvedTestRecipientReference",
+        "providerAcceptance",
+        "deliveryObservation",
+        "linkAndAttachmentReview"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "JOB-01",
+      "title": "Schedulerinterval, maskinidentitet og sikker genkørsel",
+      "requiredForProduction": true,
+      "ownerRole": "operations_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Mål det valgte hosts faktiske interval, køalder, batchkapacitet og kørselsvarighed.",
+        "Afprøv overlappende ticks, tilbagekaldelse under processing, backoff og ukendt leveringsstatus.",
+        "Kontrollér serviceaudit uden lånt personidentitet og samme oprydningskontrakt på valgt adapter."
+      ],
+      "specificEvidenceFields": [
+        "scheduleConfiguration",
+        "measuredQueueAndDuration",
+        "overlapRetryResults",
+        "machineAuditEvidence"
+      ],
+      "localPreparationReferences": [
+        "features/mail/outbox-policy.test.mjs",
+        "features/mail/receipt-claim.test.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "OPS-01",
+      "title": "Alarmer, heartbeat og operatørreaktion",
+      "requiredForProduction": true,
+      "ownerRole": "operations_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Udskift lokal testsink med godkendt driftskanal efter separat konfiguration.",
+        "Fremprovokér syntetisk scannerfejl, køalder, manglende tick og database-/cleanupfejl.",
+        "Dokumentér alarmmodtagelse, kvittering, eskalationsvej og frist; ingen secrets eller sagsindhold i driftsloggen."
+      ],
+      "specificEvidenceFields": [
+        "alarmDeliveryAndAcknowledgement",
+        "missingTickResult",
+        "redactedLogCanaryResult",
+        "responseOwnerReference"
+      ],
+      "localPreparationReferences": [
+        "tests/scheduled-maintenance.test.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "REC-01",
+      "title": "Backup og isoleret restore",
+      "requiredForProduction": true,
+      "ownerRole": "operations_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Gendan en konsistent syntetisk database-/filkopi til særskilte ressourcer.",
+        "Kontrollér checksums, audit/versionsintegritet, private filer og spærring af gamle sessioner, links og mail.",
+        "Restorekarantæne må ikke ophæves automatisk; original lagerressource/pilot må ikke ændres."
+      ],
+      "specificEvidenceFields": [
+        "backupManifestReference",
+        "restoreIntegrityResults",
+        "quarantineResults",
+        "sourceResourcesUnchanged"
+      ],
+      "localPreparationReferences": [
+        "tests/migrations.test.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "REL-02",
+      "title": "Applikationsrollback og datakompatibilitet",
+      "requiredForProduction": true,
+      "ownerRole": "release_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Afprøv tilbagegang til en konkret tidligere SHA i isoleret testmiljø.",
+        "Bekræft database-/filkompatibilitet og definer stopkriterium, hvis rollback kræver datagendannelse.",
+        "Registrér beslutningsansvarlig, faktisk varighed og efterfølgende health/readiness."
+      ],
+      "specificEvidenceFields": [
+        "rollbackSourceSha",
+        "compatibilityReview",
+        "rollbackTimeline",
+        "postRollbackChecks"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "A11Y-01",
+      "title": "Browser, tastatur og skærmlæser",
+      "requiredForProduction": true,
+      "ownerRole": "accessibility_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Afprøv hele ansøgning/godkendelse/receipt på aftalte browsere, viewport og hjælpemidler.",
+        "Brug kun tastatur, kontrollér fokus, fejlopsummering, trin-/statusmeddelelser og skærmlæserens læserækkefølge.",
+        "Automatiske axe-prøver suppleres med dokumenteret menneskelig afprøvning."
+      ],
+      "specificEvidenceFields": [
+        "browserAssistiveTechnologyMatrix",
+        "keyboardAndScreenReaderResults",
+        "automatedAccessibilityReport"
+      ],
+      "localPreparationReferences": [
+        "tests/a11y/application.spec.ts"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "A11Y-02",
+      "title": "HTML-kvittering og PDF",
+      "requiredForProduction": true,
+      "ownerRole": "accessibility_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Sammenlign HTML/PDF med præcis indsendt version og beslutningsdata.",
+        "Afprøv langt indhold, tabeller, læserækkefølge, sprog og betydningsfulde labels med aftalte hjælpemidler.",
+        "En tagged-PDF-prototype er ikke dokumentation for accepteret produktions-PDF."
+      ],
+      "specificEvidenceFields": [
+        "receiptVersionComparison",
+        "manualDocumentAccessibilityReview",
+        "acceptedPdfDecision"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "GOV-01",
+      "title": "Hændelser, persondata og driftsprocedurer",
+      "requiredForProduction": true,
+      "ownerRole": "data_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Gennemgå datakategorier, formål, leverandører, adgang, audit og supportadgang med kommunens udpegede roller.",
+        "Afprøv en syntetisk hændelse fra detektion til triage, kommunikation og lukning.",
+        "Fastlæg opbevaring af acceptbeviser i godkendt system frem for secrets/persondata i repoet."
+      ],
+      "specificEvidenceFields": [
+        "dataflowOwnerReview",
+        "incidentExerciseReference",
+        "evidenceStorageDecision"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "GOV-02",
+      "title": "Retention, sletning og dokumentationspligt",
+      "requiredForProduction": true,
+      "ownerRole": "data_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Kommunens ansvarlige fastsætter kategoriopdelte frister og undtagelser før automatisering.",
+        "Sammenlign retention-dry-run med syntetisk datasæt, juridisk hold og audit-/versionsafhængigheder.",
+        "Ingen destruktiv retention aktiveres alene på grundlag af lokal test."
+      ],
+      "specificEvidenceFields": [
+        "approvedRetentionSchedule",
+        "holdAndDryRunResults",
+        "destructiveActionApprovalReference"
+      ],
+      "localPreparationReferences": [],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    },
+    {
+      "id": "SEC-01",
+      "title": "Afhængigheder og uafklaret værktøjsgæld",
+      "requiredForProduction": true,
+      "ownerRole": "security_owner",
+      "externalStatus": "U",
+      "procedure": [
+        "Kør runtime- og fuld audit samt låst deployment-tool-audit for kandidatens SHA.",
+        "Bekræft at den specifikke braces-undtagelse stadig er afgrænset og ikke udløbet; ingen fristforlængelse følger af dette dokument.",
+        "Luk nye/ændrede kritiske eller høje fund efter den gældende gate før miljøaccept."
+      ],
+      "specificEvidenceFields": [
+        "runtimeAudit",
+        "fullAudit",
+        "deploymentToolAudit",
+        "exceptionOwnerDecision"
+      ],
+      "localPreparationReferences": [
+        "scripts/ci-audit.mjs",
+        "tests/tooling-compatibility.test.mjs"
+      ],
+      "acceptance": {
+        "status": "U",
+        "candidateSha": null,
+        "artifactSha256": null,
+        "environmentReference": null,
+        "executedAt": null,
+        "executorRole": null,
+        "redactedArtifactReferences": [],
+        "expectedResult": "Alle beskrevne positive og negative kriterier opfyldt uden uautoriserede sideeffekter.",
+        "observedResult": null,
+        "reviewerRole": null,
+        "reviewedAt": null,
+        "decisionReference": null
+      }
+    }
+  ],
+  "releaseDecision": {
+    "status": "U",
+    "productionApproved": false,
+    "blockingScenarioIds": [
+      "ENV-01",
+      "REL-01",
+      "AUTH-01",
+      "AUTH-02",
+      "AUTH-03",
+      "ACCESS-01",
+      "BLOB-01",
+      "SCAN-01",
+      "MAIL-01",
+      "JOB-01",
+      "OPS-01",
+      "REC-01",
+      "REL-02",
+      "A11Y-01",
+      "A11Y-02",
+      "GOV-01",
+      "GOV-02",
+      "SEC-01"
+    ],
+    "approvedByReferences": [],
+    "approvedAt": null,
+    "decisionReference": null,
+    "rule": "Ingen lokal succes, udfyldt skabelon eller preview-READY-status giver automatisk produktionsgodkendelse. Alle obligatoriske miljøscenarier kræver særskilt reviewet evidens og ansvarlig beslutning."
+  }
+}
