@@ -43,6 +43,45 @@ test("valid HTTPS, local and uploaded raster images remain previewable", () => {
   }
 });
 
+test("URI output encoding preserves existing escapes, Unicode, query boundaries and fragments", () => {
+  for (const source of [
+    "https://images.invalid/rød%20mappe/a%2Fb.png?name=smør%20og%252F&token=a%2Bb%3Dc#høj%20kant",
+    "https://images.invalid/%2f/%20/%252F/%25/%3Cimage%3E.png?signature=a%2fb%3Dc%26d%23e&next=%2F#section%2Fone",
+    "/billeder/rød%20mappe/a%2Fb.webp?signature=a%2Bb%3Dc&label=to%20ord#høj%20kant",
+  ]) {
+    const normalized = new URL(source, "https://image-preview.invalid");
+    const expected = source.startsWith("/") ? normalized.pathname + normalized.search + normalized.hash : normalized.href;
+    assert.equal(safeImagePreviewSource(source), expected);
+    assert.equal(safeImagePreviewSource(expected), expected, "encoding is idempotent");
+    const html = renderImageEditor(source);
+    assert.match(html, /<img\b/u);
+  }
+});
+
+test("URI output encoding escapes literal metacharacters without changing raster bytes", () => {
+  assert.equal(
+    safeImagePreviewSource("https://images.invalid/image[1].png?label=[a]&literal=%#[]"),
+    "https://images.invalid/image%5B1%5D.png?label=%5Ba%5D&literal=%25#%5B%5D",
+  );
+  const malformedPercent = "/images/%zz/%2/%25/%2525.png?literal=%&escaped=%25#%";
+  const encodedPercent = "/images/%25zz/%252/%25/%2525.png?literal=%25&escaped=%25#%25";
+  assert.equal(safeImagePreviewSource(malformedPercent), encodedPercent);
+  assert.equal(safeImagePreviewSource(encodedPercent), encodedPercent);
+  for (const mime of ["avif", "gif", "jpeg", "png", "webp"]) {
+    const data = `data:image/${mime};base64,AAECA/7/+/==`;
+    assert.equal(safeImagePreviewSource(data), data);
+  }
+});
+
+test("literal quotes remain URI-encoded or React-escaped inside the preview attribute", () => {
+  const source = "https://images.invalid/a'\"b.png?next=one%26two%23three#'\"";
+  const expected = "https://images.invalid/a'%22b.png?next=one%26two%23three#'%22";
+  assert.equal(safeImagePreviewSource(source), expected);
+  const html = renderImageEditor(source);
+  assert.ok(html.includes(`src="${expected.replaceAll("'", "&#x27;")}"`));
+  assert.doesNotMatch(html, /<img[^>]*\sonerror=/iu);
+});
+
 test("rejecting a preview preserves the editable value as escaped text", () => {
   const html = renderImageEditor('<img src=x onerror="alert(1)">');
   assert.match(html, /value="&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;"/u);
