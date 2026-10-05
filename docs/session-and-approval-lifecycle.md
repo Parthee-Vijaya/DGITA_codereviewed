@@ -29,3 +29,5 @@ Kølagt/fejlet linkmail annulleres, og ubekræftet mailindhold neutraliseres. En
 `features/auth/session-lifecycle.test.mjs` og `session-administration.test.mjs` dækker grænsetidspunkter, konfiguration, samtidige aktivitetsskrivninger, passiv polling, tenantisolering, auditrollback og selve session-endpointet. `features/approval/operator-revocation.test.mjs` dækker tilbagekaldelse før/efter både godkendelse og afvisning, versionsbevaring, scope, gentagelse og auditrollback. Eksisterende mandat-/outbox-racetests gælder fortsat.
 
 Dette erstatter ikke rigtig Entra/MFA- og brugerafgangstest. Autentificeret ledergodkendelse bør afklares som produktionsvalg; de nuværende tidsbegrænsede bearerlinks bevares i pilot, og en ny loginvariant er ikke stiltiende indført.
+
+En sagsversion med en allerede committet lederbeslutning kan ikke få en ny lederanmodning. Både forkontrol og den atomiske skrivebetingelse håndhæver dette; et samtidigt beslutningscommit kan ikke overskrives. En tilbagekaldt, ubesluttet anmodning kan erstattes. En ny beslutning kræver en ny sagsversion. Historiske beslutninger og PDF-filer omskrives ikke.

@@ -76,6 +76,8 @@ for (const decision of ["approved", "rejected"]) {
     await assert.rejects(revoke(item), { status: 409 });
     assert.equal(await status(item), decision);
     assert.deepEqual(await DB.prepare("SELECT * FROM portal_audit_events WHERE id = ?").bind(`approval-decision:${item.id}`).first(), audit);
+    await assert.rejects(createLeaderApprovalRequest(actors.consultant, item.application.caseNumber, "https://portal.example.invalid"), { status: 409 });
+    assert.equal(await DB.prepare("SELECT count(*) AS n FROM portal_approval_requests WHERE application_id = ?").bind(item.application.id).first("n"),1);
   });
 }
 
@@ -95,4 +97,24 @@ test("revoking a processing mail keeps its delivery state but invalidates its li
   await revoke(item);
   assert.equal(await DB.prepare("SELECT status FROM portal_mail_outbox WHERE idempotency_key LIKE ?").bind(`approval.requested:${item.id}:%`).first("status"), "processing");
   await assert.rejects(getPublicApprovalRequest(item.token), { status: 410 });
+});
+
+test("an undecided revoked link can be replaced for the same immutable version", async () => {
+  const item = await issue(); await revoke(item);
+  const replacement = await createLeaderApprovalRequest(actors.consultant,item.application.caseNumber,"https://portal.example.invalid");
+  assert.notEqual(replacement.id,item.id);
+  assert.equal((await getPublicApprovalRequest(await approvalTokenForRequest(replacement.id))).caseNumber,item.application.caseNumber);
+});
+
+test("a decision committed between request precheck and CAS cannot be superseded", async () => {
+  const item = await issue();
+  const originalBatch=DB.batch.bind(DB); let injected=false;
+  DB.batch=async (statements) => {
+    if (!injected) { injected=true; await decideLeaderApproval(item.token,{decision:"approved",comment:"Syntetisk race"}); }
+    return originalBatch(statements);
+  };
+  try { await assert.rejects(createLeaderApprovalRequest(actors.consultant,item.application.caseNumber,"https://portal.example.invalid"),{status:409}); }
+  finally { DB.batch=originalBatch; }
+  assert.equal(await status(item),"approved");
+  assert.equal(await DB.prepare("SELECT count(*) AS n FROM portal_approval_requests WHERE application_id = ?").bind(item.application.id).first("n"),1);
 });

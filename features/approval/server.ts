@@ -1,5 +1,6 @@
 import { hashSessionToken } from "../auth/primitives";
 import { approvalMandateSql, hasApprovalMandate } from "./mandate";
+import { noCommittedLeaderDecisionSql } from "./decision-integrity";
 import { assertAttachmentScanAllowed } from "../application/malware-scan";
 import { getPersistenceBindings } from "../../db/persistence";
 import type { ServerActor } from "../auth/types";
@@ -166,6 +167,11 @@ export async function createLeaderApprovalRequest(
       "Ansøgeren skal rette og genindsende en ny version, før sagen kan sendes til ledergodkendelse igen.",
     );
   }
+  const undecided = await DB.prepare(`SELECT id FROM portal_applications
+    WHERE id = ? AND tenant_id = ? AND current_version_id = ? AND ${noCommittedLeaderDecisionSql()}`)
+    .bind(application.id, actor.tenantId, application.current_version_id).first<{ id: string }>();
+  if (!undecided) throw new ApprovalWorkflowError(409, "APPROVAL_VERSION_ALREADY_DECIDED",
+    "Denne version har allerede en gemt lederbeslutning. En ny lederbeslutning kræver en ny sagsversion.");
   const snapshot = parseSnapshot(application.snapshot_json);
   const selectedApproverId = snapshot.approvingLeaderId;
   if (!selectedApproverId) {
@@ -239,6 +245,7 @@ export async function createLeaderApprovalRequest(
           SELECT 1 FROM portal_applications
           WHERE id = ? AND tenant_id = ? AND current_version_id = ?
             AND status = ? AND row_version = ?
+            AND ${noCommittedLeaderDecisionSql()}
         )
     `).bind(
       actor.tenantId,
@@ -261,6 +268,7 @@ export async function createLeaderApprovalRequest(
           SELECT 1 FROM portal_applications
           WHERE id = ? AND tenant_id = ? AND current_version_id = ?
             AND status = ? AND row_version = ?
+            AND ${noCommittedLeaderDecisionSql()}
         )
     `).bind(
       now,
@@ -282,6 +290,7 @@ export async function createLeaderApprovalRequest(
         SELECT 1 FROM portal_applications
         WHERE id = ? AND tenant_id = ? AND current_version_id = ?
           AND status = ? AND row_version = ?
+            AND ${noCommittedLeaderDecisionSql()}
       )
     `).bind(
       requestId,
@@ -305,6 +314,7 @@ export async function createLeaderApprovalRequest(
       SET status = 'awaiting_leader', updated_at = ?, row_version = row_version + 1
       WHERE id = ? AND tenant_id = ? AND current_version_id = ?
         AND status = ? AND row_version = ?
+            AND ${noCommittedLeaderDecisionSql()}
         AND EXISTS (
           SELECT 1 FROM portal_approval_requests
           WHERE id = ? AND tenant_id = ? AND application_id = ?
