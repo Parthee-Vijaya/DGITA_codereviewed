@@ -1,5 +1,7 @@
 "use client";
 
+import { ReceiptLinks } from "../features/receipt/ReceiptLinks";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -1259,7 +1261,7 @@ function CaseDetail({
       <button className="back-text" type="button" onClick={onBack}><ArrowLeft size={18} /> {viewer.role === "user" ? "Mine ansøgninger" : "Alle sager"}</button>
       <section className="case-title-block">
         <div><span className="section-label dark">{item.id} · {item.municipality} Kommune</span><h1>{item.system}</h1><div className="case-title-meta"><PhaseTag phase={item.phase} /><span>Ændret {item.changed}</span></div></div>
-        <div>{item.receiptAvailable ? <a className="line-button" href={`/api/cases/${encodeURIComponent(item.id)}/receipt?kind=submission`}><Download size={17} /> Indsendelseskvittering</a> : <button className="line-button" type="button" disabled title="Kvitteringen oprettes, når ansøgningen er indsendt"><Download size={17} /> Indsendelseskvittering</button>}{item.approval === "Godkendt" ? <a className="line-button" href={`/api/cases/${encodeURIComponent(item.id)}/receipt?kind=approval`}><Download size={17} /> Godkendelseskvittering</a> : null}{item.phase === "Afsluttet" ? <a className="line-button" href={`/api/cases/${encodeURIComponent(item.id)}/receipt?kind=final`}><Download size={17} /> Slutkvittering</a> : null}{onEditDraft ? <button className="solid-button" type="button" onClick={onEditDraft}><PencilLine size={17} /> Fortsæt kladde</button> : null}{onStartCorrection ? <button className="solid-button" type="button" onClick={onStartCorrection}><PencilLine size={17} /> Ret og genindsend</button> : null}{canProcess ? <button className="solid-button" type="button" onClick={() => setStatusComposerOpen((current) => !current)}><Mail size={17} /> Send statusmail</button> : null}</div>
+        <div><ReceiptLinks caseNumber={item.id} submitted={Boolean(item.receiptAvailable)} approved={item.approval === "Godkendt"} closed={item.phase === "Afsluttet"} />{onEditDraft ? <button className="solid-button" type="button" onClick={onEditDraft}><PencilLine size={17} /> Fortsæt kladde</button> : null}{onStartCorrection ? <button className="solid-button" type="button" onClick={onStartCorrection}><PencilLine size={17} /> Ret og genindsend</button> : null}{canProcess ? <button className="solid-button" type="button" onClick={() => setStatusComposerOpen((current) => !current)}><Mail size={17} /> Send statusmail</button> : null}</div>
       </section>
 
       {statusComposerOpen ? <section className="status-mail-composer" aria-label="Sæt statusmail i kø"><div><span className="section-label dark">Outlook-status</span><h2>Skriv status til {item.applicant}</h2><p>Mailen valideres og lægges i den idempotente mailkø. Den afsendes først, når Microsoft Graph er konfigureret.</p></div><textarea className="clean-input" rows={4} value={statusMessage} onChange={(event) => setStatusMessage(event.target.value)} placeholder="Skriv en kort, konkret status på sagen" maxLength={8000} /><div><button className="line-button" type="button" onClick={() => setStatusComposerOpen(false)}>Annuller</button><button className="solid-button" type="button" disabled={!statusMessage.trim() || mailSending} onClick={() => void queueStatusMessage()}><Send size={16} /> {mailSending ? "Gemmer…" : "Sæt i mailkø"}</button></div></section> : null}

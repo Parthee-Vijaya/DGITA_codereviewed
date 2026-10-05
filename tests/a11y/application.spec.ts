@@ -130,7 +130,7 @@ test("all ten application steps can be opened by keyboard without axe findings",
   }
 });
 
-test("leader can resolve validation and approve using keyboard with a focused outcome", async ({ page }) => {
+test("leader approval and version-bound HTML receipt preserve focus, access and PDF bytes", async ({ page, browser }) => {
   const origin = process.env.DGITA_E2E_BASE_URL!;
   const headers = { Origin: origin };
   expect((await page.request.post("/api/auth/dev-login", { headers, data: { role: "user" } })).status()).toBe(200);
@@ -161,4 +161,27 @@ test("leader can resolve validation and approve using keyboard with a focused ou
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Godkendelsen er registreret", exact: true })).toBeFocused();
   await audit(page);
+  const pdfBefore = await page.request.get(`/api/cases/${caseNumber}/receipt?kind=approval`);
+  expect(pdfBefore.status()).toBe(200);
+  const beforeHash = pdfBefore.headers()["x-content-sha256"];
+  const html = await page.goto(`/cases/${caseNumber}/receipt?kind=approval`);
+  expect(html?.status()).toBe(200);
+  expect(html?.headers()["cache-control"]).toContain("no-store");
+  expect(html?.headers()["x-robots-tag"]).toContain("noindex");
+  const version = new URL(page.url()).searchParams.get("version");
+  expect(version).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Godkendelseskvittering", exact: true })).toBeVisible();
+  await expect(page.locator("main")).toHaveAttribute("lang", "da-DK");
+  await expect(page.getByText("Syntetisk test af beslutning", { exact: true })).toBeVisible();
+  await audit(page);
+  const pdfAfter = await page.request.get(`/api/cases/${caseNumber}/receipt?kind=approval&version=${version}`);
+  expect(pdfAfter.status()).toBe(200);
+  expect(pdfAfter.headers()["x-content-sha256"]).toBe(beforeHash);
+  expect(await pdfAfter.body()).toEqual(await pdfBefore.body());
+  const anonymous = await browser.newContext();
+  try {
+    const denied = await anonymous.request.get(page.url(), { maxRedirects: 0 });
+    expect(denied.status()).toBe(307);
+    expect(denied.headers().location).toContain("/login");
+  } finally { await anonymous.close(); }
 });

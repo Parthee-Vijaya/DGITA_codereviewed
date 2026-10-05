@@ -1,0 +1,11 @@
+.receipt-document { max-width: 76ch; margin: 0 auto; padding: 2rem 1rem; color: #202020; background: #fff; overflow-wrap: anywhere; line-height: 1.6; }
+.receipt-document nav { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; }
+.receipt-document a { color: #084d80; text-decoration: underline; }
+.receipt-document a:focus-visible { outline: 3px solid #084d80; outline-offset: 4px; }
+.receipt-document h1 { font-size: 2rem; line-height: 1.2; }
+.receipt-document h2 { font-size: 1.3rem; margin-top: 2rem; }
+.receipt-document dl > div { padding: .6rem 0; border-bottom: 1px solid #ddd; }
+.receipt-document dt { font-weight: 650; }
+.receipt-document dd { margin: .2rem 0 0; white-space: pre-wrap; }
+.receipt-document footer { margin-top: 3rem; font-size: .9rem; }
+@media print { .receipt-document { max-width: none; padding: 0; } .receipt-document nav { display: none; } .receipt-document h2 { break-after: avoid; } }

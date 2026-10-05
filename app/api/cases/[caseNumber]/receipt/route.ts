@@ -3,8 +3,9 @@ import { requireActor } from "../../../../../features/auth/server";
 import {
   getOrCreateReceipt,
   ReceiptError,
-  type ReceiptKind,
 } from "../../../../../features/receipt/server";
+
+import { receiptKind, receiptVersion } from "../../../../../features/receipt/request";
 
 export async function GET(
   request: Request,
@@ -13,8 +14,10 @@ export async function GET(
   try {
     const actor = await requireActor(request);
     const { caseNumber } = await context.params;
-    const kind = receiptKindFromRequest(request);
-    const receipt = await getOrCreateReceipt(actor, caseNumber, kind);
+    const params = new URL(request.url).searchParams;
+    const kind = receiptKind(params.get("kind"));
+    const version = receiptVersion(params.get("version"));
+    const receipt = await getOrCreateReceipt(actor, caseNumber, kind, version);
     const body = Uint8Array.from(receipt.bytes).buffer;
     return new Response(body, {
       headers: {
@@ -35,12 +38,4 @@ export async function GET(
     }
     return authErrorResponse(error);
   }
-}
-
-function receiptKindFromRequest(request: Request): ReceiptKind {
-  const value = new URL(request.url).searchParams.get("kind") ?? "submission";
-  if (value === "submission" || value === "approval" || value === "final") {
-    return value;
-  }
-  throw new ReceiptError(400, "Kvitteringstypen er ugyldig.");
 }
