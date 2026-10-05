@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "baseline": "81898be496403d71927a38e2680e7709a48f72f3",
+  "allowedCycles": [],
+  "allowedProviderImports": [
+    {
+      "file": "features/application/vercel-blob-transfer.ts",
+      "provider": "@vercel/blob"
+    },
+    {
+      "file": "features/approval/token-service.ts",
+      "provider": "cloudflare:workers"
+    },
+    {
+      "file": "features/mail/config.ts",
+      "provider": "cloudflare:workers"
+    },
+    {
+      "file": "features/runtime/environment.ts",
+      "provider": "cloudflare:workers"
+    },
+    {
+      "file": "db/index.ts",
+      "provider": "cloudflare:workers"
+    },
+    {
+      "file": "db/persistence.ts",
+      "provider": "cloudflare:workers"
+    },
+    {
+      "file": "db/vercel-persistence.ts",
+      "provider": "@libsql/client"
+    },
+    {
+      "file": "db/vercel-persistence.ts",
+      "provider": "@vercel/blob"
+    }
+  ],
+  "criticalFunctionCeilings": {
+    "decideLeaderApproval": 36,
+    "productionConfigurationIssues": 35,
+    "readEntraConfig": 31,
+    "saveApplicationDraft": 22,
+    "submitApplication": 22,
+    "beginApplicationCorrection": 10,
+    "finalizeApplicationAttachmentUpload": 8,
+    "beginApplicationAttachmentUpload": 7,
+    "acquireApplicationAttachmentVerification": 6,
+    "getOwnedDraftForUpload": 3,
+    "discardApplicationAttachmentVerification": 3,
+    "claimAbandonedApplicationUploads": 3,
+    "acknowledgeApplicationAttachmentBlobDeletion": 2
+  }
+}
