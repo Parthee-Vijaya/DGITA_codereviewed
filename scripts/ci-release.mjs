@@ -5,13 +5,15 @@ import { appendFile, readFile, readdir, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 import { requireCodeqlEvidence } from "./ci-release-codeql.mjs";
+import { requirePreviewConfiguration, requirePreviewApplicationEnvironment } from "./ci-preview-policy.mjs";
 
 const mode = process.argv[2];
 const environment = process.env;
 const sourceSha = environment.RELEASE_SHA ?? "";
 const target = environment.RELEASE_ENVIRONMENT;
 assert.match(sourceSha, /^[a-f0-9]{40}$/u, "Release requires a complete lowercase commit SHA.");
-assert.ok(["pilot", "production"].includes(target), "Choose pilot or production.");
+assert.ok(["preview", "pilot", "production"].includes(target), "Choose preview, pilot or production.");
+const applicationStage = target === "preview" ? "pilot" : target;
 async function output(name, value) {
   const formats = new Map([
     ["sha", /^[a-f0-9]{40}$/u],
@@ -56,17 +58,22 @@ function requireDeploymentConfiguration() {
   assert.ok(environment.VERCEL_TOKEN, "Missing environment-scoped VERCEL_TOKEN.");
   assert.match(environment.VERCEL_ORG_ID ?? "", /^[\w-]+$/u, "Missing VERCEL_ORG_ID.");
   assert.match(environment.VERCEL_PROJECT_ID ?? "", /^prj_[\w-]+$/u, "Missing VERCEL_PROJECT_ID.");
+  if (target === "preview") requirePreviewConfiguration(environment);
   if (target === "production") assert.equal(environment.DGITA_PRODUCTION_APPROVED, "true", "Municipal production acceptance is required before deploying production code.");
 }
 async function readApplicationEnvironment() {
-  const configuration = parseEnv(await readFile(".vercel/.env.production.local", "utf8"));
-  assert.equal(configuration.DGITA_ENVIRONMENT, target, "Vercel project must have the matching explicit DGITA_ENVIRONMENT.");
-  assert.equal(configuration.DGITA_ENABLE_DEV_LOGIN, target === "pilot" ? "true" : "false", "Pilot test login and production login isolation must be explicit.");
+  const configuration = parseEnv(await readFile(target === "preview" ? ".vercel/.env.preview.local" : ".vercel/.env.production.local", "utf8"));
+  if (target === "preview") {
+    const project = JSON.parse(await readFile(".vercel/project.json", "utf8"));
+    requirePreviewApplicationEnvironment(environment, configuration, project);
+  }
+  assert.equal(configuration.DGITA_ENVIRONMENT, applicationStage, "Vercel project must have the matching explicit DGITA_ENVIRONMENT.");
+  assert.equal(configuration.DGITA_ENABLE_DEV_LOGIN, applicationStage === "pilot" ? "true" : "false", "Pilot test login and production login isolation must be explicit.");
   assert.equal(new URL(configuration.DGITA_APP_ORIGIN).protocol, "https:");
   assert.ok(configuration.DGITA_APPROVAL_TOKEN_SECRET?.length >= 32, "Configure an approval-token secret.");
   assert.ok(configuration.TURSO_DATABASE_URL && configuration.TURSO_AUTH_TOKEN, "Configure the database.");
   assert.ok(configuration.BLOB_READ_WRITE_TOKEN || configuration.BLOB_STORE_ID, "Configure private Blob storage.");
-  if (target === "pilot") assert.ok(configuration.DGITA_TEST_ACCESS_SECRET?.length >= 8, "Configure a pilot access code.");
+  if (applicationStage === "pilot") assert.ok(configuration.DGITA_TEST_ACCESS_SECRET?.length >= 8, "Configure a pilot access code.");
   if (target === "production") {
     for (const key of ["DGITA_ENTRA_TENANT_ID", "DGITA_ENTRA_CLIENT_ID", "DGITA_ENTRA_CLIENT_SECRET", "DGITA_ENTRA_PORTAL_TENANT_ID", "DGITA_ENTRA_REDIRECT_URI", "DGITA_OIDC_STATE_SECRET"]) {
       assert.ok(configuration[key], `Configure production identity: ${key}`);
@@ -90,7 +97,8 @@ async function verifyDeployment() {
   const deployment = await response.json();
   assert.equal(deployment.projectId, environment.VERCEL_PROJECT_ID);
   assert.equal(deployment.readyState, "READY");
-  assert.equal(deployment.target, "production", "Promote only staged production builds; previews can trigger a rebuild.");
+  if (target === "preview") assert.equal(deployment.target, null, "Preview must have the Vercel preview target; staging and production are forbidden.");
+  else assert.equal(deployment.target, "production", "Promote only staged production builds; previews can trigger a rebuild.");
   assert.equal(deployment.meta?.dgitaSourceSha, sourceSha);
   assert.equal(deployment.meta?.dgitaWorkflowRun, environment.GITHUB_RUN_ID);
   assert.equal(deployment.meta?.dgitaEnvironment, target);
@@ -117,11 +125,11 @@ async function smoke() {
   assert.equal(cases.status, 401);
   const testLogin = await request("/api/auth/dev-login", {
     method: "POST", headers: { Origin: config.DGITA_APP_ORIGIN, "Content-Type": "application/json" },
-    body: JSON.stringify({ role: "user", ...(target === "pilot" ? { accessCode: config.DGITA_TEST_ACCESS_SECRET } : {}) }),
+    body: JSON.stringify({ role: "user", ...(applicationStage === "pilot" ? { accessCode: config.DGITA_TEST_ACCESS_SECRET } : {}) }),
   });
-  assert.equal(testLogin.status, target === "pilot" ? 200 : 403);
+  assert.equal(testLogin.status, applicationStage === "pilot" ? 200 : 403);
   const result = await testLogin.json();
-  if (target === "pilot") assert.equal(result.authenticated, true);
+  if (applicationStage === "pilot") assert.equal(result.authenticated, true);
   else assert.equal(result.code, "TEST_LOGIN_DISABLED");
   console.log(`Deployment smoke passed for ${target}; no credentials or session data logged.`);
 }

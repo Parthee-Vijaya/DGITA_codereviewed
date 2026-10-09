@@ -207,7 +207,7 @@ jobs:
       - run: node scripts/ci-download-tool.mjs actionlint
       - run: work/ci-tools/actionlint
       - name: Verify release guards reject untrusted source and candidates
-        run: node --test scripts/ci-workspace-policy.test.mjs scripts/ci-release.test.mjs
+        run: node --test scripts/ci-workspace-policy.test.mjs scripts/ci-release.test.mjs scripts/ci-preview.test.mjs
 
   dependency-review:
     name: Dependency change review
