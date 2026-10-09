@@ -185,7 +185,7 @@ export async function listCaseActivity(
           'application.created', 'application.draft_saved',
           'application.correction_started', 'application.correction_saved',
           'application.submitted', 'application.resubmitted',
-          'application.closed',
+          'application.closed', 'application.information_requested', 'application.finally_rejected',
           'approval.requested', 'approval.approved', 'approval.rejected',
           'receipt.generated', 'mail.sent', 'field_comment.created'
         )
@@ -272,6 +272,8 @@ function activitySummary(eventType: string, payloadJson: string) {
   if (eventType === "application.correction_saved") return "Rettelserne blev gemt";
   if (eventType === "application.submitted") return "Ansøgningen blev indsendt";
   if (eventType === "application.resubmitted") return "Ansøgningen blev genindsendt";
+  if (eventType === "application.information_requested") return "D-GITA bad om flere oplysninger";
+  if (eventType === "application.finally_rejected") return "D-GITA gav endeligt afslag";
   if (eventType === "application.closed") return "D-GITA afsluttede sagen";
   if (eventType === "case_comment.created") {
     const payload = safeJsonObject(payloadJson);

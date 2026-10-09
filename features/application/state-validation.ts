@@ -1,4 +1,5 @@
 import type { CatalogRelation } from "../catalog/relations";
+import { AI_SCREENING_FIELDS, isAiUsage, MAX_AI_PURPOSE_LENGTH, MAX_AI_ASSESSMENT_URL_LENGTH } from "./ai-screening";
 import {
   initialApplicationState,
   type ApplicationFormState,
@@ -35,6 +36,7 @@ const UPLOAD_KINDS: UploadKind[] = [
 ];
 
 const RELATION_KEYS = ["replacementCatalogRelation", "relatedCatalogRelation"] as const;
+const OPTIONAL_KEYS = new Set<string>([...RELATION_KEYS, ...AI_SCREENING_FIELDS]);
 const APPLICATION_STATE_KEYS = Object.keys(initialApplicationState);
 const CATALOG_REQUIRED_KEYS = [
   "id",
@@ -55,8 +57,12 @@ const ATTACHMENT_OPTIONAL_KEYS = ["error"] as const;
  */
 export function isApplicationFormState(value: unknown): value is ApplicationFormState {
   if (!isRecord(value) || !hasOnlyKeys(value, APPLICATION_STATE_KEYS)) return false;
-  if (!APPLICATION_STATE_KEYS.filter((key) => !RELATION_KEYS.includes(key as typeof RELATION_KEYS[number])).every((key) => Object.hasOwn(value, key))) return false;
+  if (!APPLICATION_STATE_KEYS.filter((key) => !OPTIONAL_KEYS.has(key)).every((key) => Object.hasOwn(value, key))) return false;
   if (!RELATION_KEYS.every((key) => isCatalogRelation(value[key]))) return false;
+  if (Object.hasOwn(value, "aiUsage") && !isAiUsage(value.aiUsage)) return false;
+  for (const [field, limit] of [["aiPurpose", MAX_AI_PURPOSE_LENGTH], ["aiAssessmentUrl", MAX_AI_ASSESSMENT_URL_LENGTH]] as const) {
+    if (Object.hasOwn(value, field) && (typeof value[field] !== "string" || value[field].length > limit)) return false;
+  }
   if (value.schemaVersion !== "dgita-v1") return false;
   if (!isSelectedCatalogSystem(value.selectedSystem)) return false;
   if (!isAttachmentMap(value.attachments)) return false;
@@ -68,6 +74,7 @@ export function isApplicationFormState(value: unknown): value is ApplicationForm
   for (const key of APPLICATION_STATE_KEYS) {
     if (
       RELATION_KEYS.includes(key as typeof RELATION_KEYS[number]) ||
+      AI_SCREENING_FIELDS.includes(key as typeof AI_SCREENING_FIELDS[number]) ||
       key === "schemaVersion" ||
       key === "selectedSystem" ||
       key === "attachments" ||

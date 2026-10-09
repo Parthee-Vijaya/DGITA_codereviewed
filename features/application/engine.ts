@@ -1,5 +1,6 @@
 import { relationError, type CatalogRelation, type RelationField } from "../catalog/relations";
 import { SYNTHETIC_APPROVERS } from "../workspace/model";
+import { AI_USAGE_OPTIONS, hasAiScreeningDetails, isSafeAiAssessmentUrl, MAX_AI_PURPOSE_LENGTH, type AiUsage } from "./ai-screening";
 
 export type YesNo = "ja" | "nej";
 
@@ -98,6 +99,10 @@ export type ApplicationFormState = {
   yearlyCost: string;
   otherCost: string;
   benefits: string;
+  // Additive fields: an absent legacy answer is never interpreted as No.
+  aiUsage?: AiUsage;
+  aiPurpose?: string;
+  aiAssessmentUrl?: string;
   hasRiskAssessment: YesNo;
   needsRiskHelp: YesNo;
   personalData: YesNo;
@@ -337,6 +342,9 @@ export const initialApplicationState: ApplicationFormState = {
   yearlyCost: "",
   otherCost: "",
   benefits: "",
+  aiUsage: "",
+  aiPurpose: "",
+  aiAssessmentUrl: "",
   hasRiskAssessment: "nej",
   needsRiskHelp: "nej",
   personalData: "nej",
@@ -450,6 +458,9 @@ export const legacyDemoApplicationState: ApplicationFormState = {
 /** New test forms use non-deliverable, neutral identities. Historical snapshots are unchanged. */
 export const demoApplicationState: ApplicationFormState = {
   ...structuredClone(legacyDemoApplicationState),
+  aiUsage: "nej",
+  aiPurpose: "",
+  aiAssessmentUrl: "",
   catalogQuery: "Testsystem 01",
   contactPerson: "contact-01@example.invalid",
   department: "Testafdeling",
@@ -490,6 +501,9 @@ export function isFieldVisible(field: string, state: ApplicationFormState) {
       return state.hasBudget === "ja";
     case "riskHelp":
       return state.hasRiskAssessment === "nej";
+    case "aiPurpose":
+    case "aiAssessmentUrl":
+      return hasAiScreeningDetails(state.aiUsage);
     case "risk-assessment":
       return state.hasRiskAssessment === "ja";
     case "dpaQuestion":
@@ -672,6 +686,14 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
     }
     case 5:
       return compact([
+        choiceError("aiUsage", state.aiUsage ?? "", AI_USAGE_OPTIONS.map((option) => option.value), "Angiv, om anskaffelsen indeholder AI: Ja, Nej eller Ved ikke."),
+        visibleRequired(state, "aiPurpose", state.aiPurpose, "Beskriv, hvad AI skal bruges til. Ved tvivl beskrives den funktion, der skal afklares."),
+        isFieldVisible("aiPurpose", state) && (state.aiPurpose?.length ?? 0) > MAX_AI_PURPOSE_LENGTH
+          ? { field: "aiPurpose", message: `Beskriv AI-formålet med højst ${MAX_AI_PURPOSE_LENGTH} tegn.`, severity: "error" }
+          : null,
+        isFieldVisible("aiAssessmentUrl", state) && state.aiAssessmentUrl?.trim() && !isSafeAiAssessmentUrl(state.aiAssessmentUrl)
+          ? { field: "aiAssessmentUrl", message: "Angiv et gyldigt link til vurderingen med https:// eller http://, uden brugernavn og adgangskode (højst 2048 tegn).", severity: "error" }
+          : null,
         isFieldVisible("dataClassification", state)
           ? choiceError("dataClassification", state.dataClassification, DATA_CLASSIFICATIONS, "Vælg en dataklassifikation fra listen.")
           : null,
@@ -769,6 +791,15 @@ export function normalizeApprovingLeader(state: ApplicationFormState) {
 
 export function getStepWarnings(state: ApplicationFormState, step: number): FieldError[] {
   const warnings: FieldError[] = [];
+  if (step === 5 && hasAiScreeningDetails(state.aiUsage)) {
+    warnings.push({
+      field: "aiUsage",
+      message: state.aiUsage === "ved-ikke"
+        ? "AI-anvendelsen er uafklaret. Kontakt kommunens digitaliserings- eller AI-ansvarlige for hjælp. Screeningen er ikke en juridisk klassifikation eller godkendelse."
+        : "AI-anvendelsen kræver faglig vurdering efter kommunens retningslinjer. Screeningen er ikke en juridisk klassifikation eller godkendelse.",
+      severity: "warning",
+    });
+  }
   if (step === 5 && state.hasRiskAssessment === "nej") {
     warnings.push({
       field: "hasRiskAssessment",
@@ -876,6 +907,8 @@ export function pruneHiddenAnswers(state: ApplicationFormState) {
     "budgetAmount",
     "dataClassification",
     "riskHelp",
+    "aiPurpose",
+    "aiAssessmentUrl",
   ];
   for (const field of hiddenFields) {
     if (!isFieldVisible(field, state)) delete snapshot[field];

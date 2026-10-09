@@ -6818,3 +6818,8 @@ textarea.clean-input {
 .responsible-people-list span { overflow-wrap: anywhere; }
 
 .case-aside .line-button + .line-button { margin-top: 8px; }
+
+.case-decision-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.case-decision-actions form { margin-top: 20px; }
+.case-decision-actions .subfield-label { display: block; margin-top: 16px; }
+.information-request-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

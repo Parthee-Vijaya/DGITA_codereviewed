@@ -103,3 +103,53 @@ test("API preserves legacy text drafts and requires a manual explanation before 
   const submitted = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
   assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
 });
+
+test("API saves a legacy draft but requires an AI answer for a new submitted version", async () => {
+  const draft = state();
+  for (const key of ["aiUsage", "aiPurpose", "aiAssessmentUrl"]) delete draft[key];
+  const id = crypto.randomUUID();
+  const saved = await post({ id, draft, status: "draft" });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const submitted = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(submitted.status, 422);
+  assert.deepEqual(submitted.body.errors.map((error) => error.field), ["aiUsage"]);
+  assert.equal(await DB.prepare("SELECT COUNT(*) AS n FROM portal_application_versions WHERE application_id = ?").bind(id).first("n"), 0);
+});
+
+test("API validates AI purpose and safe references, then freezes them without automatic approval", async () => {
+  const draft = state({ aiUsage: "ved-ikke", aiPurpose: "", aiAssessmentUrl: "javascript:alert(1)" });
+  const id = crypto.randomUUID();
+  const saved = await post({ id, draft, status: "draft" });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const invalid = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(invalid.status, 422);
+  assert.deepEqual(invalid.body.errors.map((error) => error.field), ["aiPurpose", "aiAssessmentUrl"]);
+  draft.aiPurpose = "Afklare om en tekstfunktion bruger AI, før den anvendes til vejledningsudkast.";
+  draft.aiAssessmentUrl = "https://municipality.example.invalid/assessment/123";
+  const submitted = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+  assert.equal(submitted.body.status, "submitted");
+  const serialized = await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json");
+  const snapshot = JSON.parse(serialized);
+  assert.equal(snapshot.aiUsage, "ved-ikke");
+  assert.equal(snapshot.aiPurpose, draft.aiPurpose);
+  assert.equal(snapshot.aiAssessmentUrl, draft.aiAssessmentUrl);
+  assert.equal(Object.hasOwn(snapshot, "aiClassification"), false);
+  assert.equal(await DB.prepare("SELECT status FROM portal_applications WHERE id = ?").bind(id).first("status"), "submitted");
+  const mutation = await post({ id, draft: { ...draft, aiUsage: "nej" }, status: "draft", expectedRowVersion: submitted.body.rowVersion });
+  assert.equal(mutation.status, 409);
+  assert.equal(await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json"), serialized);
+});
+
+test("API rejects forged AI answer types and prunes hidden details for No", async () => {
+  for (const aiUsage of ["maybe", {}, null]) {
+    assert.equal((await post({ id: crypto.randomUUID(), draft: state({ aiUsage }), status: "draft" })).status, 400);
+  }
+  const id = crypto.randomUUID();
+  const submitted = await post({ id, draft: state({ aiUsage: "nej", aiPurpose: "Skal udelades", aiAssessmentUrl: "javascript:alert(1)" }), status: "submitted" });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+  const snapshot = JSON.parse(await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json"));
+  assert.equal(snapshot.aiUsage, "nej");
+  assert.equal(Object.hasOwn(snapshot, "aiPurpose"), false);
+  assert.equal(Object.hasOwn(snapshot, "aiAssessmentUrl"), false);
+});

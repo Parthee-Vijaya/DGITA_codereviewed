@@ -43,3 +43,23 @@ test("CSV matches selected rows and neutralizes spreadsheet formulas", () => {
   assert.doesNotMatch(csv, /"foreign"|"unassigned"|"same-name"/);
   assert.ok(caseRowsCsv([{ ...rows[0], system: '=HYPERLINK("unsafe")' }]).includes('"\'=HYPERLINK'));
 });
+
+
+test("AI filters distinguish stated No, uncertainty and unanswered legacy cases without crossing tenants", () => {
+  const rows = [
+    { ...base, id: "ai-yes", aiUsage: "ja" },
+    { ...base, id: "ai-no", aiUsage: "nej" },
+    { ...base, id: "ai-unknown", aiUsage: "ved-ikke" },
+    { ...base, id: "legacy" },
+    { ...base, id: "foreign-ai", tenantId: "two", aiUsage: "ja" },
+  ];
+  for (const [aiUsage, expected] of [["ja", "ai-yes"], ["nej", "ai-no"], ["ved-ikke", "ai-unknown"], ["unanswered", "legacy"]]) {
+    const filtered = filterConsultantCases(rows, viewer, { ...EMPTY_CASE_FILTERS, aiUsage });
+    assert.deepEqual(filtered.map(item => item.id), [expected]);
+    assert.equal(caseRowsCsv(filtered).split("\r\n").length, 2);
+  }
+  assert.match(caseRowsCsv([rows[2]]), /"AI-anvendelse"/);
+  assert.match(caseRowsCsv([rows[2]]), /"Ved ikke"/);
+  assert.match(caseRowsCsv([rows[3]]), /"Ikke besvaret"/);
+  assert.deepEqual(filterConsultantCases(rows, viewer, { ...EMPTY_CASE_FILTERS, aiUsage: "ja", workStatus: "needs-information" }), []);
+});

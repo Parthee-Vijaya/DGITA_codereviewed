@@ -1,4 +1,5 @@
 import { isCatalogRelation } from "../application/state-validation";
+import { isAiUsage } from "../application/ai-screening";
 import type { CatalogRelation } from "../catalog/relations";
 import type {
   ApplicationFormState,
@@ -93,6 +94,9 @@ export function normalizeApplicationSnapshotJson(
   // memory without inventing an id or rewriting any historical snapshot bytes.
   normalized.replacementCatalogRelation = normalizeCatalogRelation(value.replacementCatalogRelation);
   normalized.relatedCatalogRelation = normalizeCatalogRelation(value.relatedCatalogRelation);
+  // Missing legacy screening stays unanswered in this read projection. Never
+  // infer No or write this default back into immutable historical versions.
+  normalized.aiUsage = isAiUsage(value.aiUsage) ? value.aiUsage : "";
 
   if (value.schemaVersion !== "dgita-v1") {
     const legacy = isRecord(value._demo) ? value._demo : null;
