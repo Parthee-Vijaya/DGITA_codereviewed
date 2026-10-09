@@ -848,8 +848,8 @@
       "input_requirements": [
         "R06/F12: aftalt identitets- og versionsmodel før accept af hele retur- og genindsendelsesforløbet"
       ],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Implementeret i kode; procesaccept udestår",
+      "note": "Etape 3: særskilt retur med offentlig begrundelse og frist, versionsbundet rettelse/genindsendelse og terminalt afslag. Gældende version og revision kontrolleres atomisk; tidligere historik bevares. Kommunal accept af genindsendelsesregler og frister udestår.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },
@@ -862,8 +862,8 @@
       "acceptance": "Ingen anmodning, udløbet link og tidligere versions godkendelse kan ikke føre til endelig accept; undtagelser har begrundelse, rettighed og revisionsspor.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Implementeret i kode; procesaccept udestår",
+      "note": "Etape 3: Ja kræver dokumenteret ledergodkendelse af den aktuelle version, også ved samtidig opdatering. Nej er intern faglig vurdering; endeligt afslag kræver særskilt offentlig begrundelse og bekræftelse. Rolle-/mandataccept udestår.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },
@@ -944,8 +944,8 @@
       "acceptance": "AI-sager kan findes og sendes til rette vurdering; Ved ikke giver rådgivning; en AI-markering er ikke lig med gennemført juridisk klassifikation.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Implementeret i kode; faglig accept udestår",
+      "note": "Etape 3: AI-spørgsmål i eksisterende trin 6, formål ved Ja/Ved ikke, valgfri sikker vurderingsreference, historisk læsning, sagsfiltre og CSV. Ingen automatisk AI-klassifikation, AI-kald eller godkendelse. Faglig metode og kommunal accept udestår.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },

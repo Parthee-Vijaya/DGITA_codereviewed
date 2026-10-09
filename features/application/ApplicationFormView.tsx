@@ -27,6 +27,8 @@ import type { CatalogSystem } from "../catalog/search";
 import { useUnsavedChanges } from "./use-unsaved-changes";
 import { Question, Money, UploadField, FormMessage, FieldErrorText } from "./ApplicationFields";
 import { SegmentedChoice } from "../ui/SegmentedChoice";
+import { AiScreeningFields } from "./AiScreeningFields";
+import { aiUsageLabel, hasAiScreeningDetails, normalizeAiScreeningChanges } from "./ai-screening";
 import {
   isAllowedPrivateBlobUrl,
   isAllowedVercelBlobUploadUrl,
@@ -99,6 +101,10 @@ type CorrectionContext = {
   caseNumber: string;
   currentVersionNumber: number;
   nextVersionNumber: number;
+  informationRequest?: {
+    reason: string;
+    dueDate: string | null;
+  } | null;
   rejection: {
     approverName: string;
     comment: string;
@@ -240,6 +246,7 @@ export function ApplicationFormView({
             nextVersionNumber?: number;
             rowVersion: number;
             rejection?: CorrectionContext["rejection"];
+            informationRequest?: CorrectionContext["informationRequest"];
           } | null;
           error?: string;
         };
@@ -264,6 +271,7 @@ export function ApplicationFormView({
               currentVersionNumber: payload.draft.currentVersionNumber,
               nextVersionNumber: payload.draft.nextVersionNumber,
               rejection: payload.draft.rejection ?? null,
+              informationRequest: payload.draft.informationRequest ?? null,
             });
           }
           setSaveStatus("saved");
@@ -343,7 +351,7 @@ export function ApplicationFormView({
   ) {
     if (submittingRef.current) return formRef.current;
     const changed = updater(formRef.current);
-    const next = normalizeRelationChanges(formRef.current, changed);
+    const next = normalizeAiScreeningChanges(formRef.current, normalizeRelationChanges(formRef.current, changed));
     if ((changed.replacementSystem && !next.replacementSystem && next.replacesExisting === "ja") ||
         (changed.relatedSystem && !next.relatedSystem && next.acquisitionType === "tilkøb")) {
       onToast("Systemvalget er ændret. Vælg de tilknyttede systemer igen, så ansøgningen bruger de rigtige relationer.");
@@ -758,7 +766,7 @@ export function ApplicationFormView({
         </div>
         <div className="form-message warning" role="status">
           <Info size={20} />
-          <div><strong>{correctionCaseNumber ? "Klargør næste version" : "Klargør formularen"}</strong><p>{correctionCaseNumber ? "Formular og bilag hentes sikkert fra den afviste version." : "Vi henter den valgte kladde fra din konto."}</p></div>
+          <div><strong>{correctionCaseNumber ? "Klargør næste version" : "Klargør formularen"}</strong><p>{correctionCaseNumber ? "Formular og bilag hentes sikkert fra den tidligere indsendte version." : "Vi henter den valgte kladde fra din konto."}</p></div>
         </div>
       </div>
     );
@@ -793,6 +801,7 @@ export function ApplicationFormView({
           <span className="section-label dark">{correction ? `${correction.caseNumber} · Version ${correction.nextVersionNumber}` : "Ny IT-anskaffelse"}</span>
           <h1>{correction ? "Ret og genindsend ansøgning" : draftCaseNumber ? "Fortsæt kladde" : "Opret ansøgning"}</h1>
           <p>{correction ? `Version ${correction.currentVersionNumber} forbliver låst. Dine rettelser gemmes som en ny version, når du genindsender.${correction.rejection?.comment ? ` Afvisningsgrund fra ${correction.rejection.approverName}: ${correction.rejection.comment}` : ""}` : guidance?.intro ?? "Spørgsmålene følger D-GITA-processen og tilpasses dine svar undervejs."}</p>
+          {correction?.informationRequest ? <p><strong>Der er bedt om supplerende oplysninger:</strong> {correction.informationRequest.reason}{correction.informationRequest.dueDate ? <> <strong>Svarfrist:</strong> {formatDate(correction.informationRequest.dueDate)}.</> : null}</p> : null}
         </div>
         <div className="application-progress"><strong>{step + 1}</strong><span>af {steps.length}</span></div>
       </div>
@@ -1033,6 +1042,7 @@ export function ApplicationFormView({
 
             {step === 5 ? (
               <>
+                <AiScreeningFields form={form} errorFor={errorFor} onChange={update} />
                 <Question title="Har du allerede lavet en risikovurdering?" hint="Risikovurderingen skal bruges, før ansøgningen kan vurderes."><Choice value={form.hasRiskAssessment} onChange={(value) => setYesNo("hasRiskAssessment", value)} options={yesNoOptions} /></Question>
                 {isFieldVisible("riskHelp", form) ? <Question title="Har du brug for hjælp til risikovurdering?"><Choice value={form.needsRiskHelp} onChange={(value) => setYesNo("needsRiskHelp", value)} options={yesNoOptions} /></Question> : null}
                 {isFieldVisible("risk-assessment", form) ? <UploadField kind="risk-assessment" title="Upload risikovurdering" files={form.attachments["risk-assessment"]} onAdd={addFiles} onRemove={removeFile} /> : null}
@@ -1144,6 +1154,8 @@ function ReviewApplication({ form, error, onEdit, onConsent }: { form: Applicati
     ["Anskaffelsesform", form.acquisitionMethod, 2],
     ...(form.acquisitionType === "tilkøb" ? [["Tilkøb til system", form.relatedSystem, 2] as [string, string, number]] : []),
     ["Persondata", form.personalData === "ja" ? `Ja · ${form.dataClassification}` : "Nej", 5],
+    ["AI i anskaffelsen", aiUsageLabel(form.aiUsage), 5],
+    ...(hasAiScreeningDetails(form.aiUsage) ? [["AI-formål", form.aiPurpose ?? "", 5] as [string, string, number], ["Link til AI-vurdering", form.aiAssessmentUrl || "Ikke angivet", 5] as [string, string, number]] : []),
     ["Samlet finansiering", `${formatDanishAmount(getFinanceTotal(form))} kr.`, 4],
     ["Implementering", `${formatDate(form.startDate)} – ${formatDate(form.endDate)}`, 6],
     ["Godkendende chef", form.approvingLeader, 8],

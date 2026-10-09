@@ -143,8 +143,9 @@ export function lifecycleForDgitaApproval(
     currentVersionId: string | null;
   },
   now: string,
+  finalRejection = false,
 ): ApplicationLifecycle {
-  if (application.status === "changes_requested") {
+  if (application.status === "changes_requested" && !finalRejection) {
     throw new WorkspaceInputError(409, "Anmoderen skal genindsende rettelserne, før D-GITA kan fortsætte behandlingen.");
   }
   if (!application.currentVersionId && (approval.phase !== "Kladde" || approval.approved)) {
@@ -169,6 +170,9 @@ export function lifecycleForDgitaApproval(
     );
   }
   if (approval.phase === "Afsluttet") {
+    if (approval.approved === "Nej" && !finalRejection) {
+      throw new WorkspaceInputError(422, "Brug handlingen Endeligt afslag til at afslutte en sag med afslag.");
+    }
     if (!approval.approved) {
       throw new WorkspaceInputError(
         422,
@@ -187,7 +191,7 @@ export function lifecycleForDgitaApproval(
     return { status: "approved", phase: approval.phase, closedAt: null };
   }
   if (approval.approved === "Nej") {
-    return { status: "rejected", phase: approval.phase, closedAt: null };
+    return { status: "under_review", phase: approval.phase, closedAt: null };
   }
   if (approval.phase === "Under behandling") {
     return { status: "under_review", phase: approval.phase, closedAt: null };
@@ -242,6 +246,19 @@ export function normalizeWorkspaceCaseId(value: unknown) {
     throw new WorkspaceInputError(422, "Sagsnummeret er ugyldigt.");
   }
   return caseId;
+}
+
+export function normalizeInformationRequestInput(value: unknown) {
+  const input = objectInput(value, "Anmodningen om oplysninger er ugyldig.");
+  const reason = boundedString(input.reason, "Mangelbegrundelsen", 8000).trim();
+  const dueDate = boundedString(input.dueDate, "Fristen", 10);
+  const expectedVersionId = boundedString(input.expectedVersionId, "Versions-id", 160);
+  if (reason.length < 3) throw new WorkspaceInputError(422, "Beskriv hvilke oplysninger anmoderen skal supplere.");
+  if (!isCalendarDate(dueDate)) throw new WorkspaceInputError(422, "Angiv en gyldig frist i formatet ÅÅÅÅ-MM-DD.");
+  if (!expectedVersionId || !Number.isSafeInteger(input.expectedRowVersion) || Number(input.expectedRowVersion) < 1) {
+    throw new WorkspaceInputError(409, "Hent den aktuelle sag, før du beder om flere oplysninger.");
+  }
+  return { reason, dueDate, expectedVersionId, expectedRowVersion: input.expectedRowVersion as number };
 }
 
 function objectInput(value: unknown, message: string): Record<string, unknown> {

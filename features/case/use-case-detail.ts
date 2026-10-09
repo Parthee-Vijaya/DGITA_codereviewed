@@ -21,6 +21,7 @@ export type UseCaseDetailResult = {
 
 type CaseDetailState = {
   caseNumber: string | null;
+  refreshKey: string;
   detail: CaseDetail | null;
   status: "idle" | "loading" | "success" | "error";
   error: CaseDetailError | null;
@@ -28,10 +29,12 @@ type CaseDetailState = {
 
 export function useCaseDetail(
   caseNumber: string | null | undefined,
+  refreshKey = "",
 ): UseCaseDetailResult {
   const normalizedCaseNumber = caseNumber?.trim().toUpperCase() || null;
   const [state, setState] = useState<CaseDetailState>({
     caseNumber: null,
+    refreshKey,
     detail: null,
     status: "idle",
     error: null,
@@ -41,13 +44,14 @@ export function useCaseDetail(
     controller: AbortController;
   } | null>(null);
 
-  const load = useCallback(async (targetCaseNumber: string) => {
+  const load = useCallback(async (targetCaseNumber: string, targetRefreshKey: string) => {
     requestRef.current?.controller.abort();
     const controller = new AbortController();
     const request = { caseNumber: targetCaseNumber, controller };
     requestRef.current = request;
     setState((current) => ({
       caseNumber: targetCaseNumber,
+      refreshKey: targetRefreshKey,
       detail: current.caseNumber === targetCaseNumber ? current.detail : null,
       status: "loading",
       error: null,
@@ -58,6 +62,7 @@ export function useCaseDetail(
       if (controller.signal.aborted || requestRef.current !== request) return;
       setState({
         caseNumber: targetCaseNumber,
+        refreshKey: targetRefreshKey,
         detail,
         status: "success",
         error: null,
@@ -66,6 +71,7 @@ export function useCaseDetail(
       if (isAbortError(caught) || requestRef.current !== request) return;
       setState((current) => ({
         caseNumber: targetCaseNumber,
+        refreshKey: targetRefreshKey,
         detail: current.caseNumber === targetCaseNumber ? current.detail : null,
         status: "error",
         error: toCaseDetailError(caught),
@@ -81,25 +87,25 @@ export function useCaseDetail(
     if (!normalizedCaseNumber) return;
 
     const loadTimeout = window.setTimeout(() => {
-      void load(normalizedCaseNumber);
+      void load(normalizedCaseNumber, refreshKey);
     }, 0);
     return () => {
       window.clearTimeout(loadTimeout);
       requestRef.current?.controller.abort();
       requestRef.current = null;
     };
-  }, [load, normalizedCaseNumber]);
+  }, [load, normalizedCaseNumber, refreshKey]);
 
   const refetch = useCallback(async () => {
     if (!normalizedCaseNumber) return;
-    await load(normalizedCaseNumber);
-  }, [load, normalizedCaseNumber]);
+    await load(normalizedCaseNumber, refreshKey);
+  }, [load, normalizedCaseNumber, refreshKey]);
 
   const isCurrentCase = state.caseNumber === normalizedCaseNumber;
   return {
     detail: isCurrentCase ? state.detail : null,
     isLoading: Boolean(
-      normalizedCaseNumber && (!isCurrentCase || state.status === "loading"),
+      normalizedCaseNumber && (!isCurrentCase || state.refreshKey !== refreshKey || state.status === "loading"),
     ),
     error: isCurrentCase ? state.error : null,
     refetch,

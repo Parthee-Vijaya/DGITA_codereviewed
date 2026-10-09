@@ -55,9 +55,23 @@ export const LEGACY_DEMO_VIEWERS: Record<WorkspaceRole, WorkspaceViewer> = {
 export type Phase = "Kladde" | "Indsendt" | "Under behandling" | "Afsluttet";
 export type Approval = "Ikke startet" | "Afventer" | "Godkendt" | "Afvist";
 
+export type InformationRequest = {
+  reason: string;
+  dueDate: string;
+  requestedAt: string;
+  applicationVersionId: string;
+  revision: number;
+};
+
 export type CaseRecord = {
   id: string;
   status?: string;
+  currentVersionId?: string | null;
+  revision?: number;
+  informationRequest?: InformationRequest | null;
+  aiUsage?: "" | "ja" | "nej" | "ved-ikke";
+  hasCurrentLeaderApproval?: boolean;
+  finalDecision?: { outcome: "approved" | "rejected"; reason: string; decidedAt: string } | null;
   tenantId: string;
   ownerSubject: string;
   ownerEmail: string;

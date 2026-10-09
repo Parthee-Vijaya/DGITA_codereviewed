@@ -38,6 +38,7 @@ import { canonicalizeApprovingLeader } from "./approver-repository";
 import { assertAttachmentScanAllowed, scanUploadBytes } from "./malware-scan";
 import { deploymentStage, readRuntimeEnvironment } from "../runtime/environment";
 import { newCaseNumber } from "./case-number";
+import { informationRequestEventId, publicInformationRequest } from "../cases/workflow-policy";
 
 type AttachmentRow = {
   id: string;
@@ -128,7 +129,7 @@ export async function beginApplicationCorrection(
   if (row.status !== "changes_requested" || !row.current_version_id) {
     throw new ApplicationRepositoryError(
       409,
-      "Sagen er ikke klar til rettelser efter en afvisning.",
+      "Sagen er ikke klar til at blive suppleret.",
     );
   }
 
@@ -137,30 +138,7 @@ export async function beginApplicationCorrection(
     throw new ApplicationRepositoryError(409, "Sagens formularversion kunne ikke åbnes.");
   }
 
-  const now = new Date().toISOString();
-  await DB.batch([
-    DB.prepare(`
-      UPDATE portal_approval_requests
-      SET status = 'cancelled'
-      WHERE tenant_id = ? AND application_id = ?
-        AND status IN ('pending', 'approving', 'rejecting')
-        AND application_version_id = ?
-        AND EXISTS (SELECT 1 FROM portal_applications WHERE id = ? AND status = 'changes_requested' AND current_version_id = ?)
-    `).bind(actor.tenantId, row.id, row.current_version_id, row.id, row.current_version_id),
-    DB.prepare(`
-      UPDATE portal_mail_outbox
-      SET status = CASE
-            WHEN status IN ('queued', 'failed') THEN 'cancelled'
-            ELSE status
-          END,
-          text_body = '[Godkendelseslink annulleret, fordi ansøgningen rettes]',
-          html_body = '<p>Godkendelseslinket er annulleret, fordi ansøgningen rettes.</p>',
-          updated_at = ?
-      WHERE tenant_id = ? AND application_id = ?
-        AND template_key = 'approval.requested' AND status <> 'sent'
-        AND EXISTS (SELECT 1 FROM portal_applications WHERE id = ? AND status = 'changes_requested' AND current_version_id = ?)
-    `).bind(now, actor.tenantId, row.id, row.id, row.current_version_id),
-  ]);
+  await assertCorrectionHasNoOpenLeaderRequest(DB, actor.tenantId, row.id);
   await initializeCorrectionAttachments(DB, actor, row);
 
   const current = await findApplicationById(DB, row.id);
@@ -178,6 +156,7 @@ export async function beginApplicationCorrection(
     currentVersionNumber: row.current_version_number,
     nextVersionNumber: row.current_version_number + 1,
     mode: "correction" as const,
+    informationRequest: await correctionInformationRequest(DB, actor.tenantId, row),
     rejection: rejection
       ? {
           approverName: rejection.approver_name,
@@ -186,6 +165,21 @@ export async function beginApplicationCorrection(
         }
       : null,
   };
+}
+
+async function correctionInformationRequest(DB: D1Database, tenantId: string, application: ApplicationRow) {
+  const row = await DB.prepare(`SELECT payload_json FROM portal_audit_events
+    WHERE id = ? AND tenant_id = ? AND application_id = ? AND event_type = 'application.information_requested'`)
+    .bind(informationRequestEventId(application.id, String(application.current_version_id)), tenantId, application.id)
+    .first<{ payload_json: string }>();
+  return publicInformationRequest(row?.payload_json ?? null);
+}
+
+async function assertCorrectionHasNoOpenLeaderRequest(DB: D1Database, tenantId: string, applicationId: string) {
+  const open = await DB.prepare(`SELECT id FROM portal_approval_requests
+    WHERE tenant_id = ? AND application_id = ? AND status IN ('pending', 'approving', 'rejecting') LIMIT 1`)
+    .bind(tenantId, applicationId).first();
+  if (open) throw new ApplicationRepositoryError(409, "En åben lederanmodning skal tilbagekaldes af D-GITA, før ansøgningen kan rettes.");
 }
 
 export async function saveApplicationDraft(
