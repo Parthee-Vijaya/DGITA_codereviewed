@@ -6809,3 +6809,12 @@ textarea.clean-input {
 }
 .review-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .review-lock-note { display: flex; align-items: center; gap: .6rem; padding: 1rem 0; color: #344556; line-height: 1.6; }
+
+/* Additional work filters keep the existing controls and wrap on narrow screens. */
+.consultant-records .records-toolbar { flex-wrap: wrap; padding: 18px 0; }
+
+.responsible-people-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.responsible-people-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.responsible-people-list span { overflow-wrap: anywhere; }
+
+.case-aside .line-button + .line-button { margin-top: 8px; }

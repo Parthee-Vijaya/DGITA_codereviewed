@@ -1,3 +1,4 @@
+import type { CatalogRelation } from "../catalog/relations";
 import {
   initialApplicationState,
   type ApplicationFormState,
@@ -33,6 +34,7 @@ const UPLOAD_KINDS: UploadKind[] = [
   "architecture",
 ];
 
+const RELATION_KEYS = ["replacementCatalogRelation", "relatedCatalogRelation"] as const;
 const APPLICATION_STATE_KEYS = Object.keys(initialApplicationState);
 const CATALOG_REQUIRED_KEYS = [
   "id",
@@ -52,7 +54,9 @@ const ATTACHMENT_OPTIONAL_KEYS = ["error"] as const;
  * the expected runtime type so a saved draft can always be rendered safely.
  */
 export function isApplicationFormState(value: unknown): value is ApplicationFormState {
-  if (!isRecord(value) || !hasExactKeys(value, APPLICATION_STATE_KEYS)) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, APPLICATION_STATE_KEYS)) return false;
+  if (!APPLICATION_STATE_KEYS.filter((key) => !RELATION_KEYS.includes(key as typeof RELATION_KEYS[number])).every((key) => Object.hasOwn(value, key))) return false;
+  if (!RELATION_KEYS.every((key) => isCatalogRelation(value[key]))) return false;
   if (value.schemaVersion !== "dgita-v1") return false;
   if (!isSelectedCatalogSystem(value.selectedSystem)) return false;
   if (!isAttachmentMap(value.attachments)) return false;
@@ -63,6 +67,7 @@ export function isApplicationFormState(value: unknown): value is ApplicationForm
   const template = initialApplicationState as unknown as Record<string, unknown>;
   for (const key of APPLICATION_STATE_KEYS) {
     if (
+      RELATION_KEYS.includes(key as typeof RELATION_KEYS[number]) ||
       key === "schemaVersion" ||
       key === "selectedSystem" ||
       key === "attachments" ||
@@ -171,4 +176,14 @@ function hasExactKeys(value: Record<string, unknown>, expectedKeys: readonly str
 function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: readonly string[]) {
   const allowed = new Set(allowedKeys);
   return Object.keys(value).every((key) => allowed.has(key));
+}
+
+export function isCatalogRelation(value: unknown): value is CatalogRelation | null | undefined {
+  if (value === null || value === undefined) return true;
+  if (!isRecord(value)) return false;
+  if (value.kind === "manual") return hasExactKeys(value, ["kind", "reason"]) && typeof value.reason === "string" && value.reason.length <= 2000;
+  return value.kind === "catalog" && hasExactKeys(value, ["kind", "id", "name", "revision"]) &&
+    typeof value.id === "string" && value.id.length <= 200 &&
+    typeof value.name === "string" && value.name.length <= 500 &&
+    typeof value.revision === "string" && value.revision.length <= 100;
 }

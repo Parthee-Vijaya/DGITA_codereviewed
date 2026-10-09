@@ -394,7 +394,7 @@ export async function submitApplication(
   const attachments = await getApplicationAttachments(DB, id);
   let canonicalState: ApplicationFormState;
   try {
-    canonicalState = canonicalCatalogSelection(hydratePortalAttachments(state, attachments));
+    canonicalState = canonicalCatalogSelection(hydratePortalAttachments(state, attachments), { validateRelations: true });
     canonicalState = await canonicalizeApprovingLeader(DB, actor, canonicalState);
   }
   catch (error) { throw new ApplicationRepositoryError(422, (error as Error).message); }

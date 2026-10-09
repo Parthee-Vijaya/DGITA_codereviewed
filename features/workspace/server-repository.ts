@@ -24,6 +24,8 @@ import { ensureVersionedSeed, PORTAL_DEFAULT_SEED } from "./seed-guard";
 import { seedPortalDefaults, seedContentDefaults, seedImageDefaults } from "./pilot-seed";
 export { seedPortalDefaults } from "./pilot-seed";
 import { permitsDemoSeed, readRuntimeEnvironment } from "../runtime/environment";
+import { canonicalizeResponsiblePeople, listResponsiblePeople } from "./responsible-directory";
+import { approvalMandateSql } from "../approval/mandate";
 
 export type PortalActor = {
   userId?: string;
@@ -51,7 +53,11 @@ type ApplicationRow = {
   phase: string;
   current_version_number: number;
   consultant_name: string | null;
+  assigned_consultant_user_id: string | null;
+  consultant_subject: string | null;
+  consultant_provider: string | null;
   leader_approval_status: string | null;
+  leader_review_request_id: string | null;
   draft_state_json: string;
   created_at: string;
   updated_at: string;
@@ -70,6 +76,8 @@ type StoredApprovalRow = {
   phase: DgitaApproval["phase"];
   case_number: string;
   internal_fields_json: string;
+  assigned_consultant_user_id: string | null;
+  consultant_name: string | null;
 };
 
 type StoredFieldCommentRow = {
@@ -98,6 +106,8 @@ type AccessibleApplicationRow = {
   row_version: number;
   current_version_id: string | null;
   owner_user_id: string;
+  assigned_consultant_user_id: string | null;
+  consultant_name: string | null;
   owner_email: string;
   owner_name: string;
   system_name: string | null;
@@ -135,6 +145,13 @@ export async function resolveActorUserId(DB: D1Database, actor: PortalActor) {
   return row.id;
 }
 
+export async function listResponsiblePeopleForActor(actor: PortalActor) {
+  if (actor.role !== "consultant" && actor.role !== "admin") {
+    throw new PortalAccessError(403, "Kun D-GITA kan hente listen over ansvarlige.");
+  }
+  return listResponsiblePeople(await preparePortalData(), actor.tenantId);
+}
+
 export async function listCasesForActor(actor: PortalActor): Promise<CaseRecord[]> {
   const DB = await preparePortalData();
   const userId = await resolveActorUserId(DB, actor);
@@ -148,16 +165,28 @@ export async function listCasesForActor(actor: PortalActor): Promise<CaseRecord[
       owner.email AS owner_email,
       owner.display_name AS applicant_name,
       tenant.name AS municipality,
+      consultant.id AS assigned_consultant_user_id,
       consultant.display_name AS consultant_name,
-      leader_approval.status AS leader_approval_status
+      consultant.external_subject AS consultant_subject,
+      consultant.identity_provider AS consultant_provider,
+      (SELECT open_request.id FROM portal_approval_requests open_request
+        WHERE open_request.tenant_id = a.tenant_id AND open_request.application_id = a.id
+          AND open_request.status IN ('pending', 'approving', 'rejecting')
+        ORDER BY open_request.created_at DESC, open_request.id DESC LIMIT 1) AS leader_review_request_id,
+      CASE WHEN leader_approval.status IN ('pending', 'approving', 'rejecting')
+        AND (COALESCE(julianday(leader_approval.expires_at) > julianday('now'), 0) = 0
+          OR NOT EXISTS (SELECT 1 FROM portal_approval_requests request
+            WHERE request.id = leader_approval.id AND ${approvalMandateSql()})) THEN 'expired'
+        ELSE leader_approval.status END AS leader_approval_status
     FROM portal_applications a
     INNER JOIN portal_users owner ON owner.id = a.owner_user_id
     INNER JOIN portal_tenants tenant ON tenant.id = a.tenant_id
-    LEFT JOIN portal_users consultant ON consultant.id = a.assigned_consultant_user_id
+    LEFT JOIN portal_users consultant ON consultant.id = a.assigned_consultant_user_id AND consultant.tenant_id = a.tenant_id
     LEFT JOIN portal_approval_requests leader_approval
       ON leader_approval.id = (
         SELECT request.id FROM portal_approval_requests request
         WHERE request.tenant_id = a.tenant_id AND request.application_id = a.id
+          AND request.application_version_id IS a.current_version_id
         ORDER BY request.created_at DESC, request.id DESC LIMIT 1
       )
     WHERE a.tenant_id = ? ${ownerClause}
@@ -167,7 +196,7 @@ export async function listCasesForActor(actor: PortalActor): Promise<CaseRecord[
   const result = actor.role === "user"
     ? await statement.bind(actor.tenantId, userId).all<ApplicationRow>()
     : await statement.bind(actor.tenantId).all<ApplicationRow>();
-  return result.results.map(toCaseRecord);
+  return result.results.map((row) => toCaseRecord(row, actor.role !== "user"));
 }
 
 export async function listWorkspaceContentForActor(
@@ -236,8 +265,11 @@ export async function getWorkspaceForActor(actor: PortalActor) {
   let approvals: Record<string, DgitaApproval> = {};
   if (actor.role !== "user") {
     const approvalRows = await DB.prepare(`
-      SELECT a.case_number, a.row_version, a.phase, approval.internal_fields_json, approval.updated_at
+      SELECT a.case_number, a.row_version, a.phase, approval.internal_fields_json, approval.updated_at,
+        consultant.id AS assigned_consultant_user_id, consultant.display_name AS consultant_name
       FROM portal_applications a
+      LEFT JOIN portal_users consultant ON consultant.id = a.assigned_consultant_user_id
+        AND consultant.tenant_id = a.tenant_id
       LEFT JOIN portal_dgita_approvals approval
         ON a.id = approval.application_id AND a.tenant_id = approval.tenant_id
         AND approval.application_version_id IS a.current_version_id
@@ -249,7 +281,11 @@ export async function getWorkspaceForActor(actor: PortalActor) {
     approvals = Object.fromEntries(
       approvalRows.results.flatMap((row) => {
         const parsed = parseJson<DgitaApproval>(row.internal_fields_json);
-        return [[row.case_number, { ...normalizeDgitaApproval(parsed ?? { ...EMPTY_D_GITA_APPROVAL, phase: row.phase }), updatedAt: row.updated_at ?? undefined, revision: row.row_version }]];
+        return [[row.case_number, { ...normalizeDgitaApproval(parsed ?? {
+          ...EMPTY_D_GITA_APPROVAL, phase: row.phase,
+          responsibleUserId: row.assigned_consultant_user_id ?? "",
+          responsible: row.consultant_name ?? "",
+        }), updatedAt: row.updated_at ?? undefined, revision: row.row_version }]];
       }),
     );
   }
@@ -561,9 +597,9 @@ export async function saveApprovalForActor(
   if (expectedUpdatedAt !== null && typeof expectedUpdatedAt !== "string") {
     throw new PortalAccessError(409, "Hent D-GITA-felterne igen, før du gemmer.");
   }
-  const prior = await DB.prepare(`SELECT updated_at FROM portal_dgita_approvals
+  const prior = await DB.prepare(`SELECT updated_at, internal_fields_json FROM portal_dgita_approvals
     WHERE tenant_id = ? AND application_id = ? AND application_version_id IS ?`)
-    .bind(actor.tenantId, application.id, application.current_version_id).first<{ updated_at: string }>();
+    .bind(actor.tenantId, application.id, application.current_version_id).first<{ updated_at: string; internal_fields_json: string }>();
   if ((prior?.updated_at ?? null) !== expectedUpdatedAt) {
     throw new PortalAccessError(409, "D-GITA-felterne er ændret af en anden. Dine ændringer er bevaret her; åbn sagen igen for at se den nyeste version.");
   }
@@ -576,16 +612,13 @@ export async function saveApprovalForActor(
     },
     now,
   );
-  const assignee = approval.responsible.trim() ? await DB.prepare(`
-    SELECT user.id FROM portal_users user
-    WHERE user.tenant_id = ? AND user.status = 'active' AND user.display_name = ?
-      AND EXISTS (SELECT 1 FROM portal_user_roles role WHERE role.user_id = user.id
-        AND role.tenant_id = user.tenant_id AND role.role IN ('dgita_consultant', 'admin'))
-    ORDER BY user.id LIMIT 1
-  `).bind(actor.tenantId, approval.responsible.trim()).first<{ id: string }>() : null;
-  if (approval.responsible.trim() && !assignee) {
-    throw new PortalAccessError(422, "D-GITA-ansvarlig skal være navnet på en aktiv konsulent eller administrator i kommunen.");
-  }
+  const previous = parseJson<DgitaApproval>(prior?.internal_fields_json ?? "") ?? {
+    ...EMPTY_D_GITA_APPROVAL,
+    responsibleUserId: application.assigned_consultant_user_id ?? "",
+    responsible: application.consultant_name ?? "",
+  };
+  const identities = await canonicalizeResponsiblePeople(DB, actor.tenantId, approval,
+    previous ? normalizeDgitaApproval(previous) : null, application.assigned_consultant_user_id);
   const activeLeaderApproval = await DB.prepare(`
     SELECT id FROM portal_approval_requests
     WHERE tenant_id = ? AND application_id = ?
@@ -599,7 +632,7 @@ export async function saveApprovalForActor(
     );
   }
   const normalized: DgitaApproval = {
-    ...approval,
+    ...identities.approval,
     revision: application.row_version + 1,
     updatedAt: now,
     updatedBy: actor.displayName,
@@ -617,10 +650,27 @@ export async function saveApprovalForActor(
     DB.prepare(`
       UPDATE portal_applications
       SET status = ?, phase = ?, closed_at = ?, updated_at = ?,
-          assigned_consultant_user_id = COALESCE(?, assigned_consultant_user_id),
+          assigned_consultant_user_id = ?,
           row_version = row_version + 1
       WHERE id = ? AND tenant_id = ? AND row_version = ?
         AND current_version_id IS ?
+        AND EXISTS (SELECT 1 FROM portal_tenants tenant
+          WHERE tenant.id = portal_applications.tenant_id AND tenant.status = 'active')
+        AND NOT EXISTS (
+          SELECT 1 FROM json_each(?) selected WHERE NOT EXISTS (
+            SELECT 1 FROM portal_users person
+            WHERE person.id = selected.value AND person.tenant_id = portal_applications.tenant_id
+              AND person.status = 'active'
+              AND EXISTS (SELECT 1 FROM portal_user_roles role WHERE role.user_id = person.id
+                AND role.tenant_id = person.tenant_id AND role.role IN ('dgita_consultant', 'admin'))
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM json_each(?) selected WHERE NOT EXISTS (
+            SELECT 1 FROM portal_users person
+            WHERE person.id = selected.value AND person.tenant_id = portal_applications.tenant_id
+          )
+        )
         AND NOT EXISTS (
           SELECT 1 FROM portal_approval_requests request
           WHERE request.tenant_id = portal_applications.tenant_id
@@ -632,11 +682,13 @@ export async function saveApprovalForActor(
       lifecycle.phase,
       lifecycle.closedAt,
       now,
-      assignee?.id ?? null,
+      identities.assignmentId,
       application.id,
       actor.tenantId,
       application.row_version,
       application.current_version_id,
+      JSON.stringify(identities.activeIds),
+      JSON.stringify(identities.preservedIds),
     ),
     DB.prepare(`
       INSERT INTO portal_dgita_approvals
@@ -957,12 +1009,15 @@ async function accessibleApplication(
   const statement = DB.prepare(`
     SELECT application.id, application.status, application.phase,
            application.row_version, application.current_version_id,
-           application.owner_user_id, application.system_name,
+           application.owner_user_id, consultant.id AS assigned_consultant_user_id, application.system_name,
+           consultant.display_name AS consultant_name,
            owner.email AS owner_email, owner.display_name AS owner_name
     FROM portal_applications application
     INNER JOIN portal_users owner
       ON owner.id = application.owner_user_id
       AND owner.tenant_id = application.tenant_id
+    LEFT JOIN portal_users consultant ON consultant.id = application.assigned_consultant_user_id
+      AND consultant.tenant_id = application.tenant_id
     WHERE application.tenant_id = ? AND application.case_number = ?
       ${ownerClause}
     LIMIT 1
@@ -995,7 +1050,7 @@ async function recordAudit(
   ).run();
 }
 
-function toCaseRecord(row: ApplicationRow): CaseRecord {
+function toCaseRecord(row: ApplicationRow, includeAssignmentIdentity: boolean): CaseRecord {
   const metadata = parseJson<{ _demo?: { leader?: string; approval?: CaseRecord["approval"] }; approvingLeader?: string }>(row.draft_state_json);
   return {
     id: row.case_number,
@@ -1008,6 +1063,14 @@ function toCaseRecord(row: ApplicationRow): CaseRecord {
     created: formatDanishDate(row.created_at),
     changed: formatDanishDate(row.updated_at),
     consultant: row.consultant_name || "Ikke tildelt",
+    ...(includeAssignmentIdentity ? {
+      assignedConsultantUserId: row.assigned_consultant_user_id,
+      assignedConsultantSubject: row.consultant_subject,
+      assignedConsultantProvider: row.consultant_provider,
+      leaderReviewLocked: Boolean(row.leader_review_request_id),
+      openLeaderApprovalRequestId: row.leader_review_request_id,
+    } : {}),
+    awaitingLeader: row.leader_approval_status !== null && ["pending", "approving", "rejecting"].includes(row.leader_approval_status),
     applicant: row.applicant_name,
     municipality: row.municipality.replace(/ Kommune$/, ""),
     leader: metadata?._demo?.leader || metadata?.approvingLeader || "Ikke valgt",

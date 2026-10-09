@@ -62,3 +62,44 @@ test("API tillader fortsat gratis anskaffelse med nul kroner", async () => {
   assert.equal(result.body.status, "submitted");
   assert.equal(result.body.versionNumber, 1);
 });
+
+test("API persists catalog relations but rejects stale or forged choices when submitted", async () => {
+  const { default: catalog } = await import("../catalog/data/system-catalog.json", { with: { type: "json" } });
+  const { relationFromSystem } = await import("../catalog/relations.ts");
+  const system = catalog.find((entry) => entry.usedInKalundborg);
+  for (const patch of [{ id: "not-in-catalog" }, { name: "Forged label" }, { revision: "stale" }]) {
+    const draft = state({ replacesExisting: "ja", replacementSystem: system.name, replacementCatalogRelation: { ...relationFromSystem(system), ...patch } });
+    const id = crypto.randomUUID();
+    const saved = await post({ id, draft, status: "draft" });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    const submitted = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+    assert.equal(submitted.status, 422, JSON.stringify(submitted.body));
+    assert.match(submitted.body.error, /Søg og vælg systemet igen/);
+    assert.equal(await DB.prepare("SELECT COUNT(*) AS n FROM portal_application_versions WHERE application_id = ?").bind(id).first("n"), 0);
+  }
+  const draft = state({ replacesExisting: "ja", replacementSystem: system.name, replacementCatalogRelation: relationFromSystem(system), acquisitionType: "tilkøb", relatedSystem: system.name, relatedCatalogRelation: relationFromSystem(system) });
+  const id = crypto.randomUUID();
+  const submitted = await post({ id, draft, status: "submitted" });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+  const snapshot = JSON.parse(await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json"));
+  assert.deepEqual(snapshot.replacementCatalogRelation, relationFromSystem(system));
+  assert.deepEqual(snapshot.relatedCatalogRelation, relationFromSystem(system));
+});
+
+test("API preserves legacy text drafts and requires a manual explanation before a new submission", async () => {
+  const draft = state({ replacesExisting: "ja", replacementSystem: "Legacy system", acquisitionType: "tilkøb", relatedSystem: "Lokalt system" });
+  delete draft.replacementCatalogRelation;
+  delete draft.relatedCatalogRelation;
+  const id = crypto.randomUUID();
+  const saved = await post({ id, draft, status: "draft" });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const rejected = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(rejected.status, 422, JSON.stringify(rejected.body));
+  assert.match(rejected.body.error, /kun gemt som tekst/);
+  draft.replacementCatalogRelation = { kind: "manual", reason: " " };
+  draft.relatedCatalogRelation = { kind: "manual", reason: "Findes ikke i kataloget" };
+  assert.equal((await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion })).status, 422);
+  draft.replacementCatalogRelation.reason = "Udgået lokalt system";
+  const submitted = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+});

@@ -37,13 +37,14 @@ export async function revokeLeaderApprovalRequest(actor: ServerActor, caseNumber
       WHERE id = ? AND tenant_id = ? AND status IN ('pending', 'approving', 'rejecting')
         AND EXISTS (SELECT 1 FROM portal_audit_events WHERE id = ? AND tenant_id = ?)`)
       .bind(requestId, actor.tenantId, auditId, actor.tenantId),
+    // Match the literal request prefix without D1's LIKE pattern complexity limit.
     DB.prepare(`UPDATE portal_mail_outbox
       SET status = CASE WHEN status IN ('queued','failed') THEN 'cancelled' ELSE status END,
         text_body = '[Godkendelseslink tilbagekaldt]', html_body = '<p>Godkendelseslinket er tilbagekaldt.</p>', updated_at = ?
       WHERE tenant_id = ? AND application_id = ? AND template_key = 'approval.requested' AND status <> 'sent'
-        AND idempotency_key LIKE ?
+        AND instr(idempotency_key, ?) = 1
         AND EXISTS (SELECT 1 FROM portal_audit_events WHERE id = ? AND tenant_id = ?)`)
-      .bind(now, actor.tenantId, row.application_id, `approval.requested:${requestId}:%`, auditId, actor.tenantId),
+      .bind(now, actor.tenantId, row.application_id, `approval.requested:${requestId}:`, auditId, actor.tenantId),
     DB.prepare(`UPDATE portal_applications SET status = 'submitted', updated_at = ?, row_version = row_version + 1
       WHERE id = ? AND tenant_id = ? AND current_version_id = ? AND status = 'awaiting_leader'
         AND EXISTS (SELECT 1 FROM portal_audit_events WHERE id = ? AND tenant_id = ?)

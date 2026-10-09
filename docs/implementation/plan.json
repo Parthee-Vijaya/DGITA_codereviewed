@@ -705,8 +705,8 @@
       "acceptance": "Samme navn kan ikke forveksle to personer; inaktive personer kan ikke nytilknyttes; flere ansvarlige gemmes separat; rettigheder testes på tværs af kommuner.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Delvist implementeret",
+      "note": "Etape 2: stabile ID-valg for primær, ekstra og IT-ansvarlig; kommunal aktiv personliste, historik, rydning og samtidighed testet. Autoritativ organisationskilde, afdelingsopslag og fratrædelsesprocedure mangler.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },
@@ -719,8 +719,8 @@
       "acceptance": "Relationen gemmes med katalog-ID; forældede poster håndteres; skift af system rydder irrelevante oplysninger; brugeren kan se udtrækkets aktualitet.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Kode implementeret; kildeaccept mangler",
+      "note": "Etape 2: erstatning og tilkøb vælger katalog-ID/revision eller manuel begrundelse; kladde, ny indsendelse og historisk visning dækket. Katalogets faktiske opdateringsdato er ukendt; ejer/kadence skal accepteres.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },
@@ -832,8 +832,8 @@
       "acceptance": "Filtre giver korrekte resultater i tests; nul-resultater er forståelige; liste og eksport matcher; ingen andre kommuners sager returneres.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Implementeret; afventer samlet review",
+      "note": "Etape 2: Afventer leder, Mangler oplysninger, Ufordelte og Mine kombineres med fase/søgning. Liste/CSV og identitets-/kommunegrænser er testet.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },
@@ -1031,8 +1031,8 @@
       "acceptance": "En godkendt rettighedsmatrix har negative tests for bruger, konsulent og admin i mindst to kommuner; egenbehandling og eventuelle undtagelser er eksplicitte.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Afventer procesvalg",
+      "note": "Eksisterende tenant-afgrænsede roller bevaret. Forslag om konsulent som anmoder og forbud mod egenbehandling er konkret kortlagt, men afventer brugerens procesvalg; ikke aktiveret.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },

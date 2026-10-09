@@ -1,3 +1,4 @@
+import { relationError, type CatalogRelation, type RelationField } from "../catalog/relations";
 import { SYNTHETIC_APPROVERS } from "../workspace/model";
 
 export type YesNo = "ja" | "nej";
@@ -53,6 +54,7 @@ export type ApplicationFormState = {
   knownSystem: YesNo;
   replacesExisting: YesNo;
   replacementSystem: string;
+  replacementCatalogRelation?: CatalogRelation | null;
   catalogQuery: string;
   selectedSystem: SelectedCatalogSystem | null;
   manualCatalogEntry: boolean;
@@ -81,6 +83,7 @@ export type ApplicationFormState = {
   marketResearchSystems: string;
   acquisitionType: "nyanskaffelse" | "tilkøb";
   relatedSystem: string;
+  relatedCatalogRelation?: CatalogRelation | null;
   purpose: string;
   functionDescription: string;
   kleTopics: string[];
@@ -173,7 +176,7 @@ export const FORM_RULES: FormRule[] = [
     id: "replacement-system",
     sourceField: "replacesExisting",
     equals: "ja",
-    affectedFields: ["replacementSystem"],
+    affectedFields: ["replacementSystem", "replacementCatalogRelation"],
     required: true,
     sourceReference: "Power Pages: fm_systemerstatning → fm_erstatsningssystem",
   },
@@ -197,7 +200,7 @@ export const FORM_RULES: FormRule[] = [
     id: "related-system",
     sourceField: "acquisitionType",
     equals: "tilkøb",
-    affectedFields: ["relatedSystem"],
+    affectedFields: ["relatedSystem", "relatedCatalogRelation"],
     required: true,
     sourceReference: "Power Pages: fm_nyanskaffelsetilkob → fm_tilknyttetsystemnavn",
   },
@@ -290,6 +293,7 @@ export const initialApplicationState: ApplicationFormState = {
   knownSystem: "ja",
   replacesExisting: "nej",
   replacementSystem: "",
+  replacementCatalogRelation: null,
   catalogQuery: "",
   selectedSystem: null,
   manualCatalogEntry: false,
@@ -318,6 +322,7 @@ export const initialApplicationState: ApplicationFormState = {
   marketResearchSystems: "",
   acquisitionType: "nyanskaffelse",
   relatedSystem: "",
+  relatedCatalogRelation: null,
   purpose: "",
   functionDescription: "",
   kleTopics: [],
@@ -366,6 +371,7 @@ export const legacyDemoApplicationState: ApplicationFormState = {
   knownSystem: "ja",
   replacesExisting: "nej",
   replacementSystem: "",
+  replacementCatalogRelation: null,
   catalogQuery: "WSUS klient",
   selectedSystem: null,
   manualCatalogEntry: false,
@@ -394,6 +400,7 @@ export const legacyDemoApplicationState: ApplicationFormState = {
   marketResearchSystems: "System A, System B",
   acquisitionType: "nyanskaffelse",
   relatedSystem: "",
+  relatedCatalogRelation: null,
   purpose:
     "Anskaffelsen skal sikre en stabil og ensartet håndtering af klientopdateringer på tværs af kommunen.",
   functionDescription:
@@ -462,6 +469,7 @@ export function isRuleActive(rule: FormRule, state: ApplicationFormState) {
 export function isFieldVisible(field: string, state: ApplicationFormState) {
   switch (field) {
     case "replacementSystem":
+    case "replacementCatalogRelation":
       return state.replacesExisting === "ja";
     case "catalogQuery":
     case "selectedSystem":
@@ -471,6 +479,7 @@ export function isFieldVisible(field: string, state: ApplicationFormState) {
     case "marketResearchSystems":
       return state.marketResearch === "ja";
     case "relatedSystem":
+    case "relatedCatalogRelation":
       return state.acquisitionType === "tilkøb";
     case "existingProcessSystems":
       return state.existingProcessSystem === "ja";
@@ -552,6 +561,12 @@ function dateError(field: string, value: string, label: string): FieldError | nu
   });
 }
 
+function visibleRelationError(state: ApplicationFormState, field: RelationField): FieldError | null {
+  if (!isFieldVisible(field, state)) return null;
+  const message = relationError(state, field);
+  return message ? { field, message, severity: "error" } : null;
+}
+
 export function getStepErrors(state: ApplicationFormState, step: number): FieldError[] {
   switch (step) {
     case 0:
@@ -565,12 +580,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           state.manualSystemName,
           "Angiv systemets officielle navn.",
         ),
-        visibleRequired(
-          state,
-          "replacementSystem",
-          state.replacementSystem,
-          "Vælg det system, der erstattes.",
-        ),
+        visibleRelationError(state, "replacementSystem"),
         required("contactPerson", state.contactPerson, "Angiv en kontaktperson."),
         required("department", state.department, "Angiv center eller afdeling."),
         ...(isFieldVisible("manualSystem", state) ? [
@@ -603,12 +613,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           state.marketResearchSystems,
           "Angiv de afdækkede systemer.",
         ),
-        visibleRequired(
-          state,
-          "relatedSystem",
-          state.relatedSystem,
-          "Vælg det eksisterende system, tilkøbet vedrører.",
-        ),
+        visibleRelationError(state, "relatedSystem"),
       ]);
     case 3:
       return compact([
@@ -861,8 +866,10 @@ export function pruneHiddenAnswers(state: ApplicationFormState) {
   const snapshot: Record<string, unknown> = { ...state };
   const hiddenFields = [
     "replacementSystem",
+    "replacementCatalogRelation",
     "marketResearchSystems",
     "relatedSystem",
+    "relatedCatalogRelation",
     "existingProcessSystems",
     "crossFunctionality",
     "crossDepartments",

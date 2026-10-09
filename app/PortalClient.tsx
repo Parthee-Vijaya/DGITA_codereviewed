@@ -115,7 +115,8 @@ import {
   type WorkspaceViewer,
 } from "../features/workspace/model";
 import { searchKnowledge } from "../features/workspace/knowledge-search";
-import { csvCell } from "../features/workspace/csv";
+import { caseRowsCsv, EMPTY_CASE_FILTERS, filterConsultantCases, type CaseFilters } from "../features/workspace/case-filters";
+import { AdditionalResponsiblePeople, ResponsiblePersonSelect, useResponsiblePeople } from "../features/workspace/ResponsiblePeopleFields";
 import { useDemoWorkspace } from "../features/workspace/use-demo-workspace";
 
 type View = WorkspaceArea;
@@ -492,7 +493,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
           <CasesView personal={role === "user"} rows={visibleCases} onNew={() => navigate("application")} onOpen={openCase} />
         ) : null}
         {view === "consultant" && casesLoaded && !casesError ? (
-          <ConsultantView rows={visibleCases} onOpen={openCase} />
+          <ConsultantView rows={visibleCases} viewer={viewer} onOpen={openCase} />
         ) : null}
         {view === "application" ? (
           <ApplicationFormView
@@ -544,7 +545,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
               if (navigate("application")) setDraftCaseNumber(selectedCase.id);
             } : undefined}
             onCaseChanged={async () => {
-              await reloadCases();
+              await Promise.all([reloadCases(), workspace.refresh()]);
             }}
             onSaveApproval={async (approval) => {
               try {
@@ -1028,25 +1029,22 @@ function CasesView({ personal, rows: availableRows, onNew, onOpen }: { personal:
   );
 }
 
-function ConsultantView({ rows: availableRows, onOpen }: { rows: CaseRecord[]; onOpen: (id: string) => void }) {
-  const [query, setQuery] = useState("");
-  const [phase, setPhase] = useState("Alle faser");
-  const rows = useMemo(() => availableRows.filter((item) => {
-    const q = query.toLowerCase();
-    return (!q || `${item.id} ${item.system} ${item.applicant}`.toLowerCase().includes(q)) && (phase === "Alle faser" || item.phase === phase);
-  }), [availableRows, query, phase]);
+function ConsultantView({ rows: availableRows, viewer, onOpen }: { rows: CaseRecord[]; viewer: Actor; onOpen: (id: string) => void }) {
+  const [filters, setFilters] = useState<CaseFilters>(EMPTY_CASE_FILTERS);
+  const rows = useMemo(() => filterConsultantCases(availableRows, viewer, filters), [availableRows, viewer, filters]);
+  function setFilter<K extends keyof CaseFilters>(key: K, value: CaseFilters[K]) {
+    setFilters((current) => ({ ...current, [key]: value }));
+  }
   const stats = useMemo(() => ({
     submitted: availableRows.filter((item) => item.phase === "Indsendt").length,
     reviewing: availableRows.filter((item) => item.phase === "Under behandling").length,
-    awaitingLeader: availableRows.filter((item) => item.approval === "Afventer").length,
+    awaitingLeader: availableRows.filter((item) => item.awaitingLeader === true).length,
     closed: availableRows.filter((item) => item.phase === "Afsluttet").length,
   }), [availableRows]);
-  const actionCount = new Set(availableRows.filter((item) => item.phase === "Indsendt" || item.approval === "Afventer").map((item) => item.id)).size;
+  const actionCount = new Set(availableRows.filter((item) => item.phase === "Indsendt" || item.awaitingLeader === true).map((item) => item.id)).size;
 
   function exportRows() {
-    const header = ["Sagsnummer", "System", "Fase", "Anmoder", "Kommune", "Konsulent", "Ledergodkendelse", "Oprettet", "Ændret"];
-    const data = rows.map((item) => [item.id, item.system, item.phase, item.applicant, item.municipality, item.consultant, item.approval, item.created, item.changed]);
-    const csv = `\uFEFF${[header, ...data].map((line) => line.map(csvCell).join(";")).join("\r\n")}`;
+    const csv = caseRowsCsv(rows);
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
@@ -1069,12 +1067,16 @@ function ConsultantView({ rows: availableRows, onOpen }: { rows: CaseRecord[]; o
       </section>
 
       <section className="records-section consultant-records">
-        <div className="consultant-filter-title"><div><span className="section-label dark">Sagsliste</span><h2>Aktive ansøgninger</h2></div><button className="line-button" type="button" disabled={rows.length === 0} onClick={exportRows}><Download size={17} /> Eksportér CSV</button></div>
+        <div className="consultant-filter-title"><div><span className="section-label dark">Sagsliste</span><h2>Ansøgninger</h2></div><button className="line-button" type="button" disabled={rows.length === 0} onClick={exportRows}><Download size={17} /> Eksportér CSV</button></div>
         <div className="records-toolbar">
-          <label className="clean-search"><Search size={18} /><input aria-label="Søg i alle sager" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sagsnummer, system eller anmoder" /></label>
-          <label className="clean-select"><Filter size={17} /><select value={phase} onChange={(event) => setPhase(event.target.value)}><option>Alle faser</option><option>Kladde</option><option>Indsendt</option><option>Under behandling</option><option>Afsluttet</option></select><ChevronDown size={16} /></label>
+          <label className="clean-search"><Search size={18} /><input aria-label="Søg i alle sager" value={filters.query} onChange={(event) => setFilter("query", event.target.value)} placeholder="Sagsnummer, system eller anmoder" /></label>
+          <label className="clean-select"><Filter size={17} /><select aria-label="Filtrér på fase" value={filters.phase} onChange={(event) => setFilter("phase", event.target.value)}><option>Alle faser</option><option>Kladde</option><option>Indsendt</option><option>Under behandling</option><option>Afsluttet</option></select><ChevronDown size={16} /></label>
+          <label className="clean-select"><select aria-label="Filtrér efter arbejdsstatus" value={filters.workStatus} onChange={(event) => setFilter("workStatus", event.target.value as CaseFilters["workStatus"])}><option value="all">Alle arbejdsstatusser</option><option value="awaiting-leader">Afventer leder</option><option value="needs-information">Mangler oplysninger</option></select><ChevronDown size={16} /></label>
+          <label className="clean-select"><select aria-label="Filtrér efter ansvarlig" value={filters.assignment} onChange={(event) => setFilter("assignment", event.target.value as CaseFilters["assignment"])}><option value="all">Alle ansvarlige</option><option value="unassigned">Ufordelte</option><option value="mine">Mine sager</option></select><ChevronDown size={16} /></label>
+          <button className="line-button" type="button" onClick={() => setFilters(EMPTY_CASE_FILTERS)} disabled={JSON.stringify(filters) === JSON.stringify(EMPTY_CASE_FILTERS)}>Nulstil filtre</button>
         </div>
-        <RecordsTable rows={rows} onOpen={onOpen} />
+        <p role="status" aria-live="polite">{rows.length} {rows.length === 1 ? "sag matcher" : "sager matcher"} dine filtre.{filters.assignment === "mine" ? " Mine sager er de sager, hvor du er valgt som primær ansvarlig." : ""}{filters.assignment === "unassigned" ? " Ufordelte sager har ingen primær ansvarlig." : ""}{filters.workStatus === "needs-information" ? " Mangler oplysninger viser sager, der er åbnet for rettelser." : ""}{filters.workStatus === "awaiting-leader" ? " Afventer leder viser åbne godkendelser af den aktuelle version." : ""}</p>
+        <RecordsTable rows={rows} onOpen={onOpen} emptyMessage="Prøv at ændre eller nulstille filtrene." />
       </section>
     </div>
   );
@@ -1084,7 +1086,7 @@ function SummaryStat({ value, label, detail }: { value: string; label: string; d
   return <article><strong>{value}</strong><div><span>{label}</span><small>{detail}</small></div></article>;
 }
 
-function RecordsTable({ rows, onOpen, applicantMode }: { rows: CaseRecord[]; onOpen: (id: string) => void; applicantMode?: boolean }) {
+function RecordsTable({ rows, onOpen, applicantMode, emptyMessage = "Prøv et andet søgeord eller en anden fase." }: { rows: CaseRecord[]; onOpen: (id: string) => void; applicantMode?: boolean; emptyMessage?: string }) {
   return (
     <div className="clean-table-wrap">
       <table className="clean-table">
@@ -1101,7 +1103,7 @@ function RecordsTable({ rows, onOpen, applicantMode }: { rows: CaseRecord[]; onO
           </tr>
         ))}</tbody>
       </table>
-      {rows.length === 0 ? <div className="no-records"><Search size={25} /><strong>Ingen sager matcher</strong><p>Prøv et andet søgeord eller en anden fase.</p></div> : null}
+      {rows.length === 0 ? <div className="no-records"><Search size={25} /><strong>Ingen sager matcher</strong><p>{emptyMessage}</p></div> : null}
     </div>
   );
 }
@@ -1248,18 +1250,18 @@ function CaseDetail({
     }
   }
 
-  async function requestLeaderApproval() {
-    if (approvalRequesting) return;
+  async function requestLeaderApproval(revoke = false) {
+    if (approvalRequesting || (revoke && !item.openLeaderApprovalRequestId)) return;
     setApprovalRequesting(true);
     try {
       const response = await fetch(`/api/cases/${encodeURIComponent(item.id)}/approval-request`, {
-        method: "POST",
+        method: revoke ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify(revoke ? { requestId: item.openLeaderApprovalRequestId } : {}),
       });
       const payload = await response.json() as { approverName?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error || "Godkendelsen kunne ikke oprettes.");
-      onToast(`Godkendelsen er sat i mailkø til ${payload.approverName ?? item.leader}.`);
+      if (!response.ok) throw new Error(payload.error || (revoke ? "Godkendelseslinket kunne ikke tilbagekaldes." : "Godkendelsen kunne ikke oprettes."));
+      onToast(revoke ? "Godkendelseslinket er tilbagekaldt." : `Godkendelsen er sat i mailkø til ${payload.approverName ?? item.leader}.`);
       await Promise.all([caseFeed.refresh(), caseDetail.refetch(), onCaseChanged()]);
     } catch (reason) {
       onToast((reason as Error).message);
@@ -1284,11 +1286,11 @@ function CaseDetail({
         {tabs.map((name) => <button className={tab === name ? "active" : ""} type="button" key={name} onClick={() => { if (confirmNavigation()) setTab(name); }}>{name === "overblik" ? <LayoutGrid size={17} /> : name === "ansøgning" ? <FileText size={17} /> : name === "filer" ? <Paperclip size={17} /> : name === "kommentarer" ? <MessageSquare size={17} /> : name === "dgita" ? <ShieldCheck size={17} /> : <History size={17} />}{name === "dgita" ? "D-GITA godkendelse" : name}<span>{name === "kommentarer" ? String(caseFeed.comments.length) : ""}</span></button>)}
       </nav>
 
-      {tab === "overblik" ? caseDetail.detail ? <CaseOverview item={item} detail={caseDetail.detail} canRequestApproval={canProcess && Boolean(item.receiptAvailable) && !["closed", "approved", "rejected", "changes_requested"].includes(item.status ?? "")} approvalRequesting={approvalRequesting} onRequestApproval={() => void requestLeaderApproval()} /> : <CaseDetailDataState loading={caseDetail.isLoading} error={caseDetail.error?.message ?? null} onRetry={() => void caseDetail.refetch()} /> : null}
+      {tab === "overblik" ? caseDetail.detail ? <CaseOverview item={item} detail={caseDetail.detail} canRequestApproval={canProcess && Boolean(item.receiptAvailable) && !["closed", "approved", "rejected", "changes_requested"].includes(item.status ?? "")} approvalRequesting={approvalRequesting} onRequestApproval={() => void requestLeaderApproval()} onRevokeApproval={canProcess && item.openLeaderApprovalRequestId ? () => void requestLeaderApproval(true) : undefined} /> : <CaseDetailDataState loading={caseDetail.isLoading} error={caseDetail.error?.message ?? null} onRetry={() => void caseDetail.refetch()} /> : null}
       {tab === "ansøgning" ? caseDetail.detail ? <ApplicationSnapshot detail={caseDetail.detail} canComment={canProcess} comments={fieldComments} onAddComment={onAddFieldComment} /> : <CaseDetailDataState loading={caseDetail.isLoading} error={caseDetail.error?.message ?? null} onRetry={() => void caseDetail.refetch()} /> : null}
       {tab === "filer" ? <FileList caseId={item.id} /> : null}
       {tab === "kommentarer" ? <Comments comments={caseFeed.comments} loading={caseFeed.isLoading} submitting={caseFeed.isSubmitting} error={caseFeed.error?.message ?? null} canInternal={canProcess} onSubmit={caseFeed.submitComment} /> : null}
-      {tab === "dgita" && canProcess ? workspaceReady ? <DgitaApprovalPanel lockedReason={item.status === "closed" ? "Sagen er afsluttet. D-GITA-felterne er låst og vises til læsning." : item.status === "changes_requested" ? "Afvent anmoderens genindsendelse, før behandlingen fortsættes." : item.approval === "Afventer" ? "Afvent lederens beslutning, før D-GITA-felterne gemmes." : null} value={approval.updatedAt ? approval : { ...approval, phase: item.phase }} onSave={async (next) => { const saved = await onSaveApproval(next); if (saved) await Promise.all([caseDetail.refetch(), caseFeed.refresh()]); return saved; }} /> : <div className="data-state" role="status"><Info size={20} /><p>D-GITA-felterne skal hentes, før de kan redigeres.</p><button className="line-button" onClick={onRetryWorkspace}>Hent igen</button></div> : null}
+      {tab === "dgita" && canProcess ? workspaceReady ? <DgitaApprovalPanel lockedReason={item.status === "closed" ? "Sagen er afsluttet. D-GITA-felterne er låst og vises til læsning." : item.status === "changes_requested" ? "Afvent anmoderens genindsendelse, før behandlingen fortsættes." : item.leaderReviewLocked ? item.awaitingLeader ? "Afvent lederens beslutning, før D-GITA-felterne gemmes." : "Der ligger en åben godkendelsesanmodning, som ikke længere kan bruges. Den skal tilbagekaldes under Overblik → Ledergodkendelse, før D-GITA-felterne kan gemmes." : null} value={approval.updatedAt ? approval : { ...approval, phase: item.phase }} onSave={async (next) => { const saved = await onSaveApproval(next); if (saved) await Promise.all([caseDetail.refetch(), caseFeed.refresh()]); return saved; }} /> : <div className="data-state" role="status"><Info size={20} /><p>D-GITA-felterne skal hentes, før de kan redigeres.</p><button className="line-button" onClick={onRetryWorkspace}>Hent igen</button></div> : null}
       {tab === "historik" ? <AuditTrail events={caseFeed.events} loading={caseFeed.isLoading} error={caseFeed.error?.message ?? null} /> : null}
     </div>
   );
@@ -1300,7 +1302,7 @@ function CaseJourney({ active }: { active: Phase }) {
   return <div className="case-journey">{steps.map((step, index) => <div className={cx(index < activeIndex && "done", index === activeIndex && "current")} key={step}><span>{index < activeIndex ? <Check size={15} /> : index + 1}</span><strong>{step}</strong>{index < steps.length - 1 ? <i /> : null}</div>)}</div>;
 }
 
-function CaseOverview({ item, detail, canRequestApproval, approvalRequesting, onRequestApproval }: { item: CaseRecord; detail: CaseDetail; canRequestApproval: boolean; approvalRequesting: boolean; onRequestApproval: () => void }) {
+function CaseOverview({ item, detail, canRequestApproval, approvalRequesting, onRequestApproval, onRevokeApproval }: { item: CaseRecord; detail: CaseDetail; canRequestApproval: boolean; approvalRequesting: boolean; onRequestApproval: () => void; onRevokeApproval?: () => void }) {
   const snapshot = detail.snapshot;
   const metadata = detail.case;
   const architectureReady = snapshot.hasArchitecture === "ja";
@@ -1315,7 +1317,7 @@ function CaseOverview({ item, detail, canRequestApproval, approvalRequesting, on
     <section className="plain-section"><div className="plain-heading"><span className="section-label dark">Faglig vurdering</span><h2>To centrale kontroller</h2></div><div className="assessment-list"><div className={cx("assessment", marketReady ? "ok" : "missing")}>{marketReady ? <CheckCircle2 size={21} /> : <XCircle size={21} />}<div><strong>{marketReady ? "Markedsafdækning gennemført" : "Markedsafdækning ikke gennemført"}</strong><p>Spørgsmål 26 er besvaret {marketReady ? "ja" : "nej"}.</p></div></div><div className={cx("assessment", architectureReady ? "ok" : "missing")}>{architectureReady ? <CheckCircle2 size={21} /> : <XCircle size={21} />}<div><strong>{architectureReady ? "Arkitekturbeskrivelse registreret" : "Arkitekturbeskrivelse mangler"}</strong><p>Spørgsmål 50 er besvaret {architectureReady ? "ja" : "nej"}.</p></div></div></div></section>
   </div><aside className="case-aside">
     <section><span className="section-label dark">Ansvar</span><h3>Personer på sagen</h3><Person name={metadata.applicantName} role="Anmoder" initials={personInitials(metadata.applicantName)} /><Person name={consultant || "Ikke tildelt"} role="D-GITA Konsulent" initials={consultant ? personInitials(consultant) : ""} unassigned={!consultant} /><Person name={leader || "Ikke valgt"} role="Godkendende leder" initials={leader ? personInitials(leader) : ""} unassigned={!leader} /></section>
-    <section><span className="section-label dark">Godkendelse</span><h3>Ledergodkendelse</h3><ApprovalTag approval={item.approval} /><p>En beslutning bindes altid til den konkrete, indsendte version af ansøgningen.</p>{canRequestApproval ? <button className="line-button full" type="button" disabled={approvalRequesting} onClick={onRequestApproval}><Mail size={17} /> {approvalRequesting ? "Opretter…" : item.approval === "Afventer" ? "Send nyt godkendelseslink" : "Send til ledergodkendelse"}</button> : null}</section>
+    <section><span className="section-label dark">Godkendelse</span><h3>Ledergodkendelse</h3><ApprovalTag approval={item.approval} /><p>En beslutning bindes altid til den konkrete, indsendte version af ansøgningen.</p>{canRequestApproval ? <button className="line-button full" type="button" disabled={approvalRequesting} onClick={onRequestApproval}><Mail size={17} /> {approvalRequesting ? "Arbejder…" : item.approval === "Afventer" ? "Send nyt godkendelseslink" : "Send til ledergodkendelse"}</button> : null}{onRevokeApproval ? <button className="line-button full" type="button" disabled={approvalRequesting} onClick={onRevokeApproval}><XCircle size={17} /> Tilbagekald godkendelseslink</button> : null}</section>
     <section><span className="section-label dark">Sagsdata</span><dl><div><dt>Version</dt><dd>{metadata.versionNumber || "Kladde"}</dd></div><div><dt>Oprettet</dt><dd>{formatFeedDate(metadata.createdAt)}</dd></div><div><dt>Ændret</dt><dd>{formatFeedDate(metadata.updatedAt)}</dd></div><div><dt>Kommune</dt><dd>{item.municipality}</dd></div><div><dt>ESDH</dt><dd>{snapshot.esdhContractUrl && isSafeContentUrl(snapshot.esdhContractUrl) ? <a href={snapshot.esdhContractUrl} target="_blank" rel="noreferrer">Åbn reference</a> : "Ikke angivet"}</dd></div></dl></section>
   </aside></div>;
 }
@@ -1393,14 +1395,21 @@ function applicationFieldValues(snapshot: ApplicationFormState): Record<string, 
   };
 }
 
+function catalogRelationRows(label: string, value: string, relation: ApplicationFormState["replacementCatalogRelation"]) {
+  return [
+    { label, value },
+    { label: `${label} · grundlag`, value: relation?.kind === "manual" ? `Manuel registrering: ${relation.reason}` : relation?.kind === "catalog" ? "Valgt i systemkataloget" : "Tidligere tekstangivelse" },
+  ];
+}
+
 function applicationSnapshotSections(snapshot: ApplicationFormState) {
   const yesNo = (value: "ja" | "nej") => value === "ja" ? "Ja" : "Nej";
   const list = (values: string[]) => values.length ? values.join(", ") : "Ikke oplyst";
   const files = (kind: keyof ApplicationFormState["attachments"]) => snapshot.attachments[kind].map((file) => file.name).join(", ") || "Ingen bilag";
   return [
-    { title: "Generelle oplysninger", rows: [{ label: "System", value: getDisplaySystemName(snapshot) }, { label: "Kontaktperson", value: snapshot.contactPerson }, { label: "Afdeling", value: snapshot.department }, { label: "Forretningsområde", value: snapshot.businessType }] },
+    { title: "Generelle oplysninger", rows: [{ label: "System", value: getDisplaySystemName(snapshot) }, ...(snapshot.replacesExisting === "ja" ? catalogRelationRows("System, der erstattes", snapshot.replacementSystem, snapshot.replacementCatalogRelation) : []), { label: "Kontaktperson", value: snapshot.contactPerson }, { label: "Afdeling", value: snapshot.department }, { label: "Forretningsområde", value: snapshot.businessType }] },
     { title: "Systemoplysninger", rows: [{ label: "Beskrivelse", value: snapshot.systemDescription }, { label: "Leverandør", value: snapshot.supplier }, { label: "Rettighedshaver", value: snapshot.rightsHolder }, { label: "Dataejer", value: snapshot.dataOwner }, { label: "Systemejer", value: snapshot.systemOwner }] },
-    { title: "System og anskaffelsesform", rows: [{ label: "Anskaffelsesform", value: snapshot.acquisitionMethod }, { label: "Anskaffelsestype", value: snapshot.acquisitionType === "tilkøb" ? "Tilkøb" : "Nyanskaffelse" }, { label: "Markedsafdækning", value: yesNo(snapshot.marketResearch) }, { label: "Undersøgte systemer", value: snapshot.marketResearchSystems }] },
+    { title: "System og anskaffelsesform", rows: [{ label: "Anskaffelsesform", value: snapshot.acquisitionMethod }, { label: "Anskaffelsestype", value: snapshot.acquisitionType === "tilkøb" ? "Tilkøb" : "Nyanskaffelse" }, { label: "Markedsafdækning", value: yesNo(snapshot.marketResearch) }, { label: "Undersøgte systemer", value: snapshot.marketResearchSystems }, ...(snapshot.acquisitionType === "tilkøb" ? catalogRelationRows("System, tilkøbet vedrører", snapshot.relatedSystem, snapshot.relatedCatalogRelation) : [])] },
     { title: "Værdi for kommunen", rows: [{ label: "Formål", value: snapshot.purpose }, { label: "Funktionalitet", value: snapshot.functionDescription }, { label: "KLE-emner", value: list(snapshot.kleTopics) }, { label: "Tværgående", value: yesNo(snapshot.crossCutting) }, { label: "Afdelinger", value: list(snapshot.crossDepartments) }] },
     { title: "Investering", rows: [{ label: "Budget", value: yesNo(snapshot.hasBudget) }, { label: "Budgetbeløb", value: `${snapshot.budgetAmount || "0"} kr.` }, { label: "Engangsomkostning", value: `${snapshot.oneTimeCost || "0"} kr.` }, { label: "Årlig omkostning", value: `${snapshot.yearlyCost || "0"} kr.` }, { label: "Forventede gevinster", value: snapshot.benefits }] },
     { title: "Risikovurdering", rows: [{ label: "Risikovurdering udført", value: yesNo(snapshot.hasRiskAssessment) }, { label: "Behov for hjælp", value: yesNo(snapshot.needsRiskHelp) }, { label: "Personoplysninger", value: yesNo(snapshot.personalData) }, { label: "Dataklassifikation", value: snapshot.dataClassification }, { label: "Bilag", value: files("risk-assessment") }] },
@@ -1428,6 +1437,7 @@ function YesNoControl({ value, onChange }: { value: "" | "Ja" | "Nej"; onChange:
 
 function DgitaApprovalPanel({ value, onSave, lockedReason }: { lockedReason: string | null; value: DgitaApproval; onSave: (value: DgitaApproval) => Promise<boolean> }) {
   const [draft, setDraft] = useState<DgitaApproval>(() => structuredClone(value));
+  const directory = useResponsiblePeople();
   const [infrastructureError, setInfrastructureError] = useState("");
   const infrastructureRef = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
@@ -1453,13 +1463,22 @@ function DgitaApprovalPanel({ value, onSave, lockedReason }: { lockedReason: str
     } finally { setSaving(false); }
   }
 
+  function updatePerson(field: "responsible" | "itConsultant", id: string, name: string) {
+    setDraft((current) => ({ ...current, [field]: name, [field === "responsible" ? "responsibleUserId" : "itConsultantUserId"]: id,
+      ...(field === "responsible" && id && current.additionalResponsibleUserIds?.includes(id) ? {
+        additionalResponsibleUserIds: current.additionalResponsibleUserIds.filter((value) => value !== id),
+        additionalResponsible: current.additionalResponsibleUserIds.filter((value) => value !== id).map((value) => directory.people.find((person) => person.id === value)?.name ?? "Tidligere valgt person").join(", "),
+      } : {}),
+    }));
+  }
+
   function update<K extends keyof DgitaApproval>(field: K, next: DgitaApproval[K]) {
     if (saving) return;
     if (field === "infrastructureDescription" || field === "infrastructureChanges") setInfrastructureError("");
-    setDraft((current) => ({ ...current, [field]: next, ...(field === "infrastructureChanges" && next !== "Ja" ? { infrastructureDescription: "" } : {}) }));
+    setDraft((current) => ({ ...current, [field]: next, ...(field === "infrastructureChanges" && next !== "Ja" ? { infrastructureDescription: "" } : {}), ...(field === "hasAdditionalResponsible" && next !== "Ja" ? { additionalResponsible: "", additionalResponsibleUserIds: [] } : {}) }));
   }
 
-  return <div className="dgita-review-layout"><section className="plain-section dgita-review"><div className="plain-heading"><span className="section-label dark">Internt arbejdsområde</span><h2>D-GITA-godkendelse</h2><button className="solid-button" type="button" disabled={saving || Boolean(lockedReason)} onClick={() => void save()}><Save size={17} /> {saving ? "Gemmer…" : "Gem D-GITA-felter"}</button></div><div className="internal-notice"><LockKeyhole size={18} /><p>Dette område er kun tilgængeligt for D-GITA-konsulenter og administratorer. Interne kommentarer vises aldrig for anmoderen eller i PDF-kvitteringen.</p></div>{lockedReason ? <p className="review-lock-note" role="status"><LockKeyhole size={16} /> {lockedReason}</p> : null}<fieldset className="review-fields" disabled={saving || Boolean(lockedReason)}><Question title="D-GITA felt: Er ansøgningen godkendt?"><YesNoControl value={draft.approved} onChange={(next) => update("approved", next)} /></Question><Question title="D-GITA felt: Dato"><input className="clean-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} /></Question><Question title="D-GITA felt: Relevant sikkerheds- og regelramme" hint="Valget angiver en ramme, ikke det konkrete behandlingsgrundlag. Afklar hjemmel og krav med kommunens ansvarlige."><label className="clean-select review-select"><select value={draft.legalBasis} onChange={(event) => update("legalBasis", event.target.value as DgitaApproval["legalBasis"])}><option value="">Vælg ramme</option>{D_GITA_FRAMEWORKS.map((basis) => <option key={basis}>{basis}</option>)}</select><ChevronDown size={16} /></label></Question><Question title="D-GITA felt: D-GITA ansvarlig" hint="Skriv her hvem der er ansvarlig for behandling af formularen."><input className="clean-input" value={draft.responsible} onChange={(event) => update("responsible", event.target.value)} placeholder="Søg efter person" /></Question><Question title="D-GITA felt: Er der flere D-GITA ansvarlige?"><YesNoControl value={draft.hasAdditionalResponsible} onChange={(next) => update("hasAdditionalResponsible", next)} /></Question>{draft.hasAdditionalResponsible === "Ja" ? <Question title="Hvis ja, angiv næste D-GITA ansvarlige"><input className="clean-input" value={draft.additionalResponsible} onChange={(event) => update("additionalResponsible", event.target.value)} placeholder="Angiv en eller flere personer" /></Question> : null}<Question title="D-GITA felt: IT-konsulent" hint="Vælg den person som bliver koblet på løsningen, som en teknisk ansvarlig fra IT-afdelingen."><input className="clean-input" value={draft.itConsultant} onChange={(event) => update("itConsultant", event.target.value)} placeholder="Søg efter person" /></Question><Question title="D-GITA felt: Medfører systemet ændringer i den eksisterende infrastruktur?"><YesNoControl value={draft.infrastructureChanges} onChange={(next) => update("infrastructureChanges", next)} /></Question>{draft.infrastructureChanges === "Ja" ? <Question title="Beskriv ændringerne i infrastrukturen" hint="Beskriv fx integrationer, netværk eller adgang. Oplysningerne er interne og indgår ikke i brugerens kvittering."><textarea ref={infrastructureRef} className="clean-input" rows={4} maxLength={8000} aria-required="true" aria-invalid={infrastructureError ? true : undefined} aria-describedby={infrastructureError ? "infrastructure-description-error" : undefined} value={draft.infrastructureDescription ?? ""} onChange={(event) => update("infrastructureDescription", event.target.value)} />{infrastructureError ? <p className="field-error" id="infrastructure-description-error" role="alert">{infrastructureError}</p> : null}</Question> : null}<Question title="D-GITA felt: Bemærkninger"><textarea className="clean-input" rows={4} value={draft.notes} onChange={(event) => update("notes", event.target.value)} /></Question><Question title="D-GITA felt: Interne kommentarer" hint="Kommentarer mellem D-GITA konsulenter. Feltet er skjult for anmoder og medtages ikke i den PDF, der genereres ved endelig godkendelse."><textarea className="clean-input internal-comment-input" rows={5} value={draft.internalComments} onChange={(event) => update("internalComments", event.target.value)} /></Question><Question title="D-GITA felt: Fase" hint="Beskriver hvilken fase ansøgningen er i."><label className="clean-select review-select"><select value={draft.phase} onChange={(event) => update("phase", event.target.value as DgitaApproval["phase"])}>{D_GITA_PHASES.map((phase) => <option key={phase}>{phase}</option>)}</select><ChevronDown size={16} /></label></Question></fieldset></section><aside className="review-source-note"><ShieldCheck size={23} /><span className="section-label dark">Kildematch</span><h3>Felter fra den nuværende løsning</h3><p>Godkendelsesfelterne og hjælpeteksterne er kortlagt fra Power Pages-formularen “D-GITA-Godkendelse”.</p><ul><li><Check size={14} /> Betinget ekstra ansvarlig</li><li><Check size={14} /> Ramme: NSIS, NIS2 eller GDPR</li><li><Check size={14} /> Intern kommentar adskilt fra ansøger</li><li><Check size={14} /> Fase og infrastrukturbeslutning</li></ul></aside></div>;
+  return <div className="dgita-review-layout"><section className="plain-section dgita-review"><div className="plain-heading"><span className="section-label dark">Internt arbejdsområde</span><h2>D-GITA-godkendelse</h2><button className="solid-button" type="button" disabled={saving || Boolean(lockedReason)} onClick={() => void save()}><Save size={17} /> {saving ? "Gemmer…" : "Gem D-GITA-felter"}</button></div><div className="internal-notice"><LockKeyhole size={18} /><p>Dette område er kun tilgængeligt for D-GITA-konsulenter og administratorer. Interne kommentarer vises aldrig for anmoderen eller i PDF-kvitteringen.</p></div>{lockedReason ? <p className="review-lock-note" role="status"><LockKeyhole size={16} /> {lockedReason}</p> : null}<fieldset className="review-fields" disabled={saving || Boolean(lockedReason)}><Question title="D-GITA felt: Er ansøgningen godkendt?"><YesNoControl value={draft.approved} onChange={(next) => update("approved", next)} /></Question><Question title="D-GITA felt: Dato"><input className="clean-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} /></Question><Question title="D-GITA felt: Relevant sikkerheds- og regelramme" hint="Valget angiver en ramme, ikke det konkrete behandlingsgrundlag. Afklar hjemmel og krav med kommunens ansvarlige."><label className="clean-select review-select"><select value={draft.legalBasis} onChange={(event) => update("legalBasis", event.target.value as DgitaApproval["legalBasis"])}><option value="">Vælg ramme</option>{D_GITA_FRAMEWORKS.map((basis) => <option key={basis}>{basis}</option>)}</select><ChevronDown size={16} /></label></Question><Question title="D-GITA felt: D-GITA ansvarlig" hint="Vælg den primære ansvarlige blandt kommunens aktive konsulenter og administratorer."><div>{directory.loading ? <p role="status">Henter personliste…</p> : directory.error ? <div role="alert"><p>{directory.error}</p><button className="line-button" type="button" onClick={directory.retry}>Hent personliste igen</button></div> : directory.people.length === 0 ? <p>Der er ingen aktive personer at vælge i kommunens personliste.</p> : null}<ResponsiblePersonSelect label="D-GITA felt: D-GITA ansvarlig" id={draft.responsibleUserId ?? ""} name={draft.responsible} people={directory.people} disabled={directory.loading || Boolean(directory.error)} onChange={(id, name) => updatePerson("responsible", id, name)} /></div></Question><Question title="D-GITA felt: Er der flere D-GITA ansvarlige?"><YesNoControl value={draft.hasAdditionalResponsible} onChange={(next) => update("hasAdditionalResponsible", next)} /></Question>{draft.hasAdditionalResponsible === "Ja" ? <Question title="Hvis ja, angiv næste D-GITA ansvarlige" hint="Tilføj de personer, der skal hjælpe med behandlingen. Hver person gemmes særskilt."><AdditionalResponsiblePeople ids={draft.additionalResponsibleUserIds ?? []} snapshotNames={draft.additionalResponsible} primaryId={draft.responsibleUserId ?? ""} people={directory.people} disabled={directory.loading || Boolean(directory.error)} onChange={(ids, names) => setDraft((current) => ({ ...current, additionalResponsibleUserIds: ids, additionalResponsible: names }))} /></Question> : null}<Question title="D-GITA felt: IT-konsulent" hint="Vælg den registrerede konsulent, der er teknisk ansvarlig for løsningen."><ResponsiblePersonSelect label="D-GITA felt: IT-konsulent" id={draft.itConsultantUserId ?? ""} name={draft.itConsultant} people={directory.people} disabled={directory.loading || Boolean(directory.error)} onChange={(id, name) => updatePerson("itConsultant", id, name)} /></Question><Question title="D-GITA felt: Medfører systemet ændringer i den eksisterende infrastruktur?"><YesNoControl value={draft.infrastructureChanges} onChange={(next) => update("infrastructureChanges", next)} /></Question>{draft.infrastructureChanges === "Ja" ? <Question title="Beskriv ændringerne i infrastrukturen" hint="Beskriv fx integrationer, netværk eller adgang. Oplysningerne er interne og indgår ikke i brugerens kvittering."><textarea ref={infrastructureRef} className="clean-input" rows={4} maxLength={8000} aria-required="true" aria-invalid={infrastructureError ? true : undefined} aria-describedby={infrastructureError ? "infrastructure-description-error" : undefined} value={draft.infrastructureDescription ?? ""} onChange={(event) => update("infrastructureDescription", event.target.value)} />{infrastructureError ? <p className="field-error" id="infrastructure-description-error" role="alert">{infrastructureError}</p> : null}</Question> : null}<Question title="D-GITA felt: Bemærkninger"><textarea className="clean-input" rows={4} value={draft.notes} onChange={(event) => update("notes", event.target.value)} /></Question><Question title="D-GITA felt: Interne kommentarer" hint="Kommentarer mellem D-GITA konsulenter. Feltet er skjult for anmoder og medtages ikke i den PDF, der genereres ved endelig godkendelse."><textarea className="clean-input internal-comment-input" rows={5} value={draft.internalComments} onChange={(event) => update("internalComments", event.target.value)} /></Question><Question title="D-GITA felt: Fase" hint="Beskriver hvilken fase ansøgningen er i."><label className="clean-select review-select"><select value={draft.phase} onChange={(event) => update("phase", event.target.value as DgitaApproval["phase"])}>{D_GITA_PHASES.map((phase) => <option key={phase}>{phase}</option>)}</select><ChevronDown size={16} /></label></Question></fieldset></section><aside className="review-source-note"><ShieldCheck size={23} /><span className="section-label dark">Kildematch</span><h3>Felter fra den nuværende løsning</h3><p>Godkendelsesfelterne og hjælpeteksterne er kortlagt fra Power Pages-formularen “D-GITA-Godkendelse”.</p><ul><li><Check size={14} /> Betinget ekstra ansvarlig</li><li><Check size={14} /> Ramme: NSIS, NIS2 eller GDPR</li><li><Check size={14} /> Intern kommentar adskilt fra ansøger</li><li><Check size={14} /> Fase og infrastrukturbeslutning</li></ul></aside></div>;
 }
 
 function FileList({ caseId }: { caseId: string }) {

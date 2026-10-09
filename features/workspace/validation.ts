@@ -70,6 +70,9 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
   const date = boundedString(input.date, "Datoen", 10);
   const legalBasis = enumString(input.legalBasis, LEGAL_BASES, "Lovgrundlaget er ugyldigt.");
   const responsible = boundedString(input.responsible, "D-GITA-ansvarlig", 240);
+  const responsibleUserId = identityId(input.responsibleUserId, "D-GITA-ansvarlig");
+  const itConsultantUserId = identityId(input.itConsultantUserId, "IT-konsulent");
+  const additionalResponsibleUserIds = identityIds(input.additionalResponsibleUserIds);
   const hasAdditionalResponsible = enumString(
     input.hasAdditionalResponsible,
     YES_NO_OR_EMPTY,
@@ -78,7 +81,7 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
   const additionalResponsible = boundedString(
     input.additionalResponsible,
     "Yderligere D-GITA-ansvarlige",
-    1_000,
+    6_000,
   );
   const itConsultant = boundedString(input.itConsultant, "IT-konsulent", 240);
   const infrastructureChanges = enumString(
@@ -102,7 +105,7 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
   if (date && !isCalendarDate(date)) {
     throw new WorkspaceInputError(422, "Datoen skal være en gyldig dato i formatet ÅÅÅÅ-MM-DD.");
   }
-  if (hasAdditionalResponsible === "Ja" && !additionalResponsible.trim()) {
+  if (hasAdditionalResponsible === "Ja" && !additionalResponsible.trim() && additionalResponsibleUserIds.length === 0) {
     throw new WorkspaceInputError(
       422,
       "Angiv mindst én yderligere D-GITA-ansvarlig.",
@@ -117,6 +120,9 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     date,
     legalBasis: legalBasis as DgitaApproval["legalBasis"],
     responsible,
+    responsibleUserId,
+    itConsultantUserId,
+    additionalResponsibleUserIds,
     hasAdditionalResponsible:
       hasAdditionalResponsible as DgitaApproval["hasAdditionalResponsible"],
     additionalResponsible,
@@ -280,4 +286,19 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(
     value,
   );
+}
+
+function identityId(value: unknown, label: string) {
+  const id = boundedString(value ?? "", label, 160).trim();
+  if (/[\u0000-\u001f\u007f]/u.test(id)) throw new WorkspaceInputError(422, `${label} har et ugyldigt person-id.`);
+  return id;
+}
+
+function identityIds(value: unknown) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new WorkspaceInputError(400, "Listen over yderligere ansvarlige er ugyldig.");
+  if (value.length > 20) throw new WorkspaceInputError(422, "Vælg højst 20 yderligere D-GITA-ansvarlige.");
+  const ids = value.map((entry) => identityId(entry, "Yderligere D-GITA-ansvarlig"));
+  if (ids.some((id) => !id)) throw new WorkspaceInputError(422, "Vælg en person for hver yderligere D-GITA-ansvarlig.");
+  return [...new Set(ids)];
 }
