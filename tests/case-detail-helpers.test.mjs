@@ -94,3 +94,41 @@ test("ødelagt snapshot afvises kontrolleret", () => {
     (error) => error instanceof CaseDetailError && error.status === 409,
   );
 });
+
+test("catalog and manual relations survive detail normalization and repeated reads", () => {
+  const source = {
+    ...initialApplicationState,
+    replacesExisting: "ja", replacementSystem: "Historisk katalognavn",
+    replacementCatalogRelation: { kind: "catalog", id: "stable-system-id", name: "Historisk katalognavn", revision: "historical-revision" },
+    acquisitionType: "tilkøb", relatedSystem: "Lokalt system",
+    relatedCatalogRelation: { kind: "manual", reason: "Systemet fandtes kun i den lokale oversigt ved indsendelsen." },
+  };
+  const bytes = JSON.stringify(source);
+  const baseBytes = JSON.stringify(initialApplicationState);
+  for (let read = 0; read < 3; read += 1) {
+    const result = normalizeApplicationSnapshotJson(bytes, initialApplicationState);
+    assert.deepEqual(result.replacementCatalogRelation, source.replacementCatalogRelation);
+    assert.deepEqual(result.relatedCatalogRelation, source.relatedCatalogRelation);
+    assert.equal(result.replacementSystem, source.replacementSystem);
+    result.relatedCatalogRelation.reason = "Client-side modification";
+  }
+  assert.equal(JSON.stringify(source), bytes);
+  assert.equal(JSON.stringify(initialApplicationState), baseBytes);
+});
+
+test("legacy or invalid relation blobs project null without disclosing extra fields or losing labels", () => {
+  for (const relation of [undefined, null, "", "legacy", [], { kind: "manual", reason: 3 },
+    { kind: "manual", reason: "valid text", internalNote: "must not escape" },
+    { kind: "catalog", id: "id", name: "Name" },
+    { kind: "catalog", id: "id", name: "Name", revision: "r", storageKey: "private/key" }]) {
+    const source = JSON.stringify({ ...initialApplicationState, replacementSystem: "Legacy label", relatedSystem: "Second label",
+      replacementCatalogRelation: relation, relatedCatalogRelation: relation });
+    const result = normalizeApplicationSnapshotJson(source, initialApplicationState);
+    assert.equal(result.replacementCatalogRelation, null);
+    assert.equal(result.relatedCatalogRelation, null);
+    assert.equal(result.replacementSystem, "Legacy label");
+    assert.equal(result.relatedSystem, "Second label");
+    assert.equal(JSON.stringify(result).includes("must not escape"), false);
+    assert.equal(JSON.stringify(result).includes("private/key"), false);
+  }
+});

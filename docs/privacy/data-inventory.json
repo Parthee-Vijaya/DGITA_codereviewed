@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "reviewed_at": "2026-10-05",
+  "reviewed_at": "2026-10-09",
   "status": "Teknisk feltfortegnelse; kommunal nødvendighed/hjemmel/retention/accept U",
   "scope": "Applikationsformularens topniveau og deklarerede DB-kolonner; JSON-understruktur beskrevet særskilt. Ingen inspektion af live persondata.",
   "decision_legend": {
@@ -149,11 +149,31 @@
         "implementationUsers",
         "hasArchitecture",
         "checklistJournalized",
-        "consent"
+        "consent",
+        "replacementCatalogRelation",
+        "relatedCatalogRelation"
       ],
       "purpose": "Katalogreference, risikospørgsmål, tidsplan og formularbekræftelse; consent er ikke i sig selv et GDPR-samtykke.",
       "category": "case-linked",
       "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
+    "ai-screening": {
+      "fields": [
+        "aiUsage",
+        "aiPurpose",
+        "aiAssessmentUrl"
+      ],
+      "purpose": "Menneskelig screening af AI-anvendelse og reference til særskilt vurdering. Fritekst og URL kan indeholde persondata; ingen automatisk klassifikation eller eksterne AI-kald.",
+      "category": "unstructured-potential-personal",
+      "source": "Anmoderens svar; ældre versioners manglende svar vises som ikke besvaret.",
       "storage": [
         "portal_applications.draft_state_json",
         "portal_application_versions.snapshot_json"
@@ -167,10 +187,13 @@
   "nested_structures": {
     "selectedSystem": "Katalog: id, name, supplier, rightsHolder, source, usedInKalundborg, optional localSystemId/localStatus/kitosStatus. Identifikatorer og fritekst kan være personhenførbare i kontekst.",
     "attachments": "Fem dokumenttyper; id, kind, name, size, type, status, valgfri error. Server accepterer ikke browsermetadata som bevis for storage, ejer eller scan.",
-    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel.",
+    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/infrastructureDescription/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel. Vurderingshistorik gemmer samme interne snapshot uden offentlig projektion. Ansvar gemmes desuden som responsibleUserId, additionalResponsibleUserIds og itConsultantUserId; navnefelterne er læsbare snapshots. Personopslag er kommuneafgrænset til aktive konsulenter/admins og giver ikke approver-mandat.",
     "payload_json": "Eventbestemt revisionspayload; individuelt flow og autoriseret projektion, ikke generel log.",
     "attachments_json": "Mailbilagsreferencer/metadata; privat dokumentkopi kan indgå i transporten.",
-    "roles_snapshot_json": "Historisk sessionkontekst; aktuelle roller kontrolleres fra DB."
+    "roles_snapshot_json": "Historisk sessionkontekst; aktuelle roller kontrolleres fra DB.",
+    "catalogRelations": "replacementCatalogRelation/relatedCatalogRelation: enten katalogets id, name og tekniske revision eller en manuel begrundelse. Fritekst kan indeholde personoplysninger; opdateringsdato er ukendt og vises som ukendt. Gemmes med kladde/låst snapshot, ikke i almindelige logs.",
+    "informationRequest": "application.information_requested auditpayload: offentlig reason, dueDate, applicationVersionId og revision; tidspunkt fra event. Ejer og autoriseret konsulent/admin ser begrundelse og frist. Ingen kopiering af interne vurderingsfelter; fristen giver ingen automatisk afgørelse. Bevaring/retention U.",
+    "finalDecision": "Kun status=closed og den aktuelle versions portal_dgita_approvals.status/decision_comment/decided_at projiceres til offentlig slutbeslutning. Explicitt afslags reason er offentlig. internal_fields_json forbliver intern. Tidligere kvitteringsbytes omskrives ikke."
   },
   "tables": [
     {
@@ -818,6 +841,30 @@
       "retention_decision": "U",
       "necessity_acceptance": "U",
       "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_dgita_review_history",
+      "purpose": "Uforanderlige snapshots fra nye konsulentgemninger, knyttet til sagens revision, version, behandler og tidspunkt. Ingen rekonstrueret historik.",
+      "flow": "internal-review",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "application_revision",
+          "created_at"
+        ],
+        "direct-or-linked-personal": [
+          "reviewer_user_id",
+          "reviewer_subject"
+        ],
+        "unstructured-potential-personal": [
+          "internal_fields_json"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U"
     }
   ],
   "flows": {

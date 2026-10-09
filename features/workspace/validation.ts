@@ -70,6 +70,9 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
   const date = boundedString(input.date, "Datoen", 10);
   const legalBasis = enumString(input.legalBasis, LEGAL_BASES, "Lovgrundlaget er ugyldigt.");
   const responsible = boundedString(input.responsible, "D-GITA-ansvarlig", 240);
+  const responsibleUserId = identityId(input.responsibleUserId, "D-GITA-ansvarlig");
+  const itConsultantUserId = identityId(input.itConsultantUserId, "IT-konsulent");
+  const additionalResponsibleUserIds = identityIds(input.additionalResponsibleUserIds);
   const hasAdditionalResponsible = enumString(
     input.hasAdditionalResponsible,
     YES_NO_OR_EMPTY,
@@ -78,7 +81,7 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
   const additionalResponsible = boundedString(
     input.additionalResponsible,
     "Yderligere D-GITA-ansvarlige",
-    1_000,
+    6_000,
   );
   const itConsultant = boundedString(input.itConsultant, "IT-konsulent", 240);
   const infrastructureChanges = enumString(
@@ -86,6 +89,11 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     YES_NO_OR_EMPTY,
     "Valget for infrastrukturændringer er ugyldigt.",
   );
+  const infrastructureDescription = boundedString(
+    input.infrastructureDescription ?? "",
+    "Beskrivelse af infrastrukturændringer",
+    8_000,
+  ).trim();
   const notes = boundedString(input.notes, "Bemærkninger", 8_000);
   const internalComments = boundedString(
     input.internalComments,
@@ -97,11 +105,14 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
   if (date && !isCalendarDate(date)) {
     throw new WorkspaceInputError(422, "Datoen skal være en gyldig dato i formatet ÅÅÅÅ-MM-DD.");
   }
-  if (hasAdditionalResponsible === "Ja" && !additionalResponsible.trim()) {
+  if (hasAdditionalResponsible === "Ja" && !additionalResponsible.trim() && additionalResponsibleUserIds.length === 0) {
     throw new WorkspaceInputError(
       422,
       "Angiv mindst én yderligere D-GITA-ansvarlig.",
     );
+  }
+  if (infrastructureChanges === "Ja" && !infrastructureDescription) {
+    throw new WorkspaceInputError(422, "Beskriv ændringerne i infrastrukturen.");
   }
 
   return normalizeDgitaApproval({
@@ -109,12 +120,16 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     date,
     legalBasis: legalBasis as DgitaApproval["legalBasis"],
     responsible,
+    responsibleUserId,
+    itConsultantUserId,
+    additionalResponsibleUserIds,
     hasAdditionalResponsible:
       hasAdditionalResponsible as DgitaApproval["hasAdditionalResponsible"],
     additionalResponsible,
     itConsultant,
     infrastructureChanges:
       infrastructureChanges as DgitaApproval["infrastructureChanges"],
+    infrastructureDescription,
     notes,
     internalComments,
     phase: phase as DgitaApproval["phase"],
@@ -128,8 +143,9 @@ export function lifecycleForDgitaApproval(
     currentVersionId: string | null;
   },
   now: string,
+  finalRejection = false,
 ): ApplicationLifecycle {
-  if (application.status === "changes_requested") {
+  if (application.status === "changes_requested" && !finalRejection) {
     throw new WorkspaceInputError(409, "Anmoderen skal genindsende rettelserne, før D-GITA kan fortsætte behandlingen.");
   }
   if (!application.currentVersionId && (approval.phase !== "Kladde" || approval.approved)) {
@@ -154,6 +170,9 @@ export function lifecycleForDgitaApproval(
     );
   }
   if (approval.phase === "Afsluttet") {
+    if (approval.approved === "Nej" && !finalRejection) {
+      throw new WorkspaceInputError(422, "Brug handlingen Endeligt afslag til at afslutte en sag med afslag.");
+    }
     if (!approval.approved) {
       throw new WorkspaceInputError(
         422,
@@ -172,7 +191,7 @@ export function lifecycleForDgitaApproval(
     return { status: "approved", phase: approval.phase, closedAt: null };
   }
   if (approval.approved === "Nej") {
-    return { status: "rejected", phase: approval.phase, closedAt: null };
+    return { status: "under_review", phase: approval.phase, closedAt: null };
   }
   if (approval.phase === "Under behandling") {
     return { status: "under_review", phase: approval.phase, closedAt: null };
@@ -229,6 +248,19 @@ export function normalizeWorkspaceCaseId(value: unknown) {
   return caseId;
 }
 
+export function normalizeInformationRequestInput(value: unknown) {
+  const input = objectInput(value, "Anmodningen om oplysninger er ugyldig.");
+  const reason = boundedString(input.reason, "Mangelbegrundelsen", 8000).trim();
+  const dueDate = boundedString(input.dueDate, "Fristen", 10);
+  const expectedVersionId = boundedString(input.expectedVersionId, "Versions-id", 160);
+  if (reason.length < 3) throw new WorkspaceInputError(422, "Beskriv hvilke oplysninger anmoderen skal supplere.");
+  if (!isCalendarDate(dueDate)) throw new WorkspaceInputError(422, "Angiv en gyldig frist i formatet ÅÅÅÅ-MM-DD.");
+  if (!expectedVersionId || !Number.isSafeInteger(input.expectedRowVersion) || Number(input.expectedRowVersion) < 1) {
+    throw new WorkspaceInputError(409, "Hent den aktuelle sag, før du beder om flere oplysninger.");
+  }
+  return { reason, dueDate, expectedVersionId, expectedRowVersion: input.expectedRowVersion as number };
+}
+
 function objectInput(value: unknown, message: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new WorkspaceInputError(400, message);
@@ -271,4 +303,19 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(
     value,
   );
+}
+
+function identityId(value: unknown, label: string) {
+  const id = boundedString(value ?? "", label, 160).trim();
+  if (/[\u0000-\u001f\u007f]/u.test(id)) throw new WorkspaceInputError(422, `${label} har et ugyldigt person-id.`);
+  return id;
+}
+
+function identityIds(value: unknown) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new WorkspaceInputError(400, "Listen over yderligere ansvarlige er ugyldig.");
+  if (value.length > 20) throw new WorkspaceInputError(422, "Vælg højst 20 yderligere D-GITA-ansvarlige.");
+  const ids = value.map((entry) => identityId(entry, "Yderligere D-GITA-ansvarlig"));
+  if (ids.some((id) => !id)) throw new WorkspaceInputError(422, "Vælg en person for hver yderligere D-GITA-ansvarlig.");
+  return [...new Set(ids)];
 }

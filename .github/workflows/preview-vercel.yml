@@ -1,0 +1,131 @@
+name: Manual isolated Vercel preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full 40-character commit SHA on protected main with successful CI
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vercel-isolated-preview
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: ${{ inputs.commit_sha }}
+  RELEASE_ENVIRONMENT: preview
+  NEXT_TELEMETRY_DISABLED: "1"
+  VERCEL_TELEMETRY_DISABLED: "1"
+  VERCEL_CLI_USE_NATIVE_BINARY: "false"
+
+jobs:
+  validate:
+    name: Validate immutable release source
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - id: source
+        run: node scripts/ci-release.mjs source
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  stage:
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
+    name: Build and verify isolated preview
+    needs: validate
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: source
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      artifact_sha: ${{ steps.artifact.outputs.artifact_sha }}
+    env:
+      DGITA_DEPLOYMENT_ENABLED: ${{ vars.DGITA_DEPLOYMENT_ENABLED }}
+      DGITA_PREVIEW_ISOLATION_APPROVED: ${{ vars.DGITA_PREVIEW_ISOLATION_APPROVED }}
+      DGITA_PREVIEW_RESOURCE_POLICY: ${{ vars.DGITA_PREVIEW_RESOURCE_POLICY }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+          path: source
+      - name: Require configured and approved environment
+        run: node "$GITHUB_WORKSPACE/scripts/ci-release.mjs" configuration
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Recheck reviewed source after environment approval
+        run: node "$GITHUB_WORKSPACE/scripts/ci-release.mjs" source
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: npm ci
+      - name: Install locked and patched deployment tools
+        run: npm ci --prefix "$GITHUB_WORKSPACE/.github/deployment-tools" --ignore-scripts --no-fund
+      - name: Audit the exact deployment toolchain before exposing credentials
+        run: node "$GITHUB_WORKSPACE/scripts/ci-audit.mjs" "$GITHUB_WORKSPACE/.github/deployment-tools" "$GITHUB_WORKSPACE/.github/deployment-tools/audit-policy.json" "$GITHUB_WORKSPACE/work/ci/deployment-tools"
+      - name: Verify overridden libraries and release command interfaces
+        run: node --test "$GITHUB_WORKSPACE/scripts/ci-deployment-tools.test.mjs"
+      - name: Fetch only the isolated project's preview configuration
+        run: '"$GITHUB_WORKSPACE/.github/deployment-tools/node_modules/.bin/vercel" pull --yes --environment=preview'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Validate the pulled project and isolated synthetic resources
+        run: node "$GITHUB_WORKSPACE/scripts/ci-release.mjs" application-environment
+      - name: Build only the preview artifact
+        run: '"$GITHUB_WORKSPACE/.github/deployment-tools/node_modules/.bin/vercel" build'
+      - id: artifact
+        name: Record the immutable output digest
+        run: node "$GITHUB_WORKSPACE/scripts/ci-release.mjs" artifact
+      - id: deploy
+        name: Deploy this exact artifact without changing live domains
+        run: |
+          deployment_url=$("$GITHUB_WORKSPACE/.github/deployment-tools/node_modules/.bin/vercel" deploy --prebuilt --skip-domain --yes --meta "dgitaSourceSha=$RELEASE_SHA" --meta "dgitaArtifactSha=$ARTIFACT_SHA" --meta "dgitaWorkflowRun=$GITHUB_RUN_ID" --meta "dgitaEnvironment=$RELEASE_ENVIRONMENT")
+          DEPLOYMENT_URL="$deployment_url" node "$GITHUB_WORKSPACE/scripts/ci-preview-url.mjs"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ARTIFACT_SHA: ${{ steps.artifact.outputs.artifact_sha }}
+      - name: Verify candidate identity and externally test the candidate
+        run: node "$GITHUB_WORKSPACE/scripts/ci-release.mjs" smoke
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          ARTIFACT_SHA: ${{ steps.artifact.outputs.artifact_sha }}
+      - name: Remove pulled environment files from the runner
+        if: always()
+        run: rm -f .vercel/.env.preview.local

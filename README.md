@@ -16,6 +16,8 @@ Komponenterne er forfinet med inspiration fra [Fisher UI](https://jakobfisker.dk
 
 ## Status
 
+Den trinvise [gennemførelsesplan](docs/implementation/README.md) følger de 64 udestående krav og bevarer den eksisterende UX/UI.
+
 Den lokale [K01–K12-kandidat og dens restopgaver](docs/candidate-readiness.md) samler implementering, reproducerbare prøver og grænserne for evidensen. [Miljøacceptpakken](docs/municipal-acceptance.md) beskriver de efterfølgende kommunale prøver.
 
 Fremtidigt arbejde og releases hører til [DGITA_codereviewed](https://github.com/Parthee-Vijaya/DGITA_codereviewed). Det tidligere DGITA-repo er bevaret som `upstream`. Produktionsforberedelserne omfatter sikkerhedsrettelser og CI/CD, men en kommunal produktionsaccept kræver stadig de eksterne kontroller i [driftsvejledningen](docs/production-operations.md).
@@ -143,12 +145,12 @@ Datamodellen dækker tenants, brugere, roller, sessions, ansøgninger, uforander
 
 ## Lokal kørsel
 
-Kræver Node.js `>=22.13.0`.
+Kræver Node.js 24 (den bundne version står i `.node-version`).
 
 ```bash
-git clone https://github.com/Parthee-Vijaya/DGITA.git
-cd DGITA
-npm install
+git clone https://github.com/Parthee-Vijaya/DGITA_codereviewed.git
+cd DGITA_codereviewed
+npm ci
 cp .env.example .env.local
 npm run dev
 ```

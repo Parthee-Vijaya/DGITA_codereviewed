@@ -86,6 +86,10 @@ test("a bound historical HTML version remains unchanged after a newer submission
 
 test("a closed decision and its reviewer snapshot remain frozen after profile changes", async () => {
   const submitted = await create();
+  const { createLeaderApprovalRequest, decideLeaderApproval } = await import("../features/approval/server.ts");
+  const { approvalTokenForRequest } = await import("../features/approval/token-service.ts");
+  const request = await createLeaderApprovalRequest(consultant, submitted.caseNumber, "https://portal.example.invalid");
+  await decideLeaderApproval(await approvalTokenForRequest(request.id), { decision: "approved", comment: "" });
   const workspace = await getWorkspaceForActor(consultant);
   const approval = workspace.approvals[submitted.caseNumber];
   await saveApprovalForActor(consultant, submitted.caseNumber, {

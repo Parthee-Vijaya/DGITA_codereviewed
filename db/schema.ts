@@ -496,6 +496,25 @@ export const portalDgitaApprovals = sqliteTable(
   ],
 );
 
+export const portalDgitaReviewHistory = sqliteTable(
+  "portal_dgita_review_history",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => portalTenants.id, { onDelete: "restrict" }),
+    applicationId: text("application_id").notNull().references(() => portalApplications.id, { onDelete: "restrict" }),
+    applicationVersionId: text("application_version_id").references(() => portalApplicationVersions.id, { onDelete: "restrict" }),
+    applicationRevision: integer("application_revision").notNull(),
+    reviewerUserId: text("reviewer_user_id").notNull().references(() => portalUsers.id, { onDelete: "restrict" }),
+    reviewerSubject: text("reviewer_subject").notNull(),
+    internalFieldsJson: text("internal_fields_json").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("portal_dgita_review_history_revision_uidx").on(table.tenantId, table.applicationId, table.applicationRevision),
+    index("portal_dgita_review_history_version_idx").on(table.tenantId, table.applicationId, table.applicationVersionId, table.applicationRevision),
+  ],
+);
+
 export const portalFieldComments = sqliteTable(
   "portal_field_comments",
   {

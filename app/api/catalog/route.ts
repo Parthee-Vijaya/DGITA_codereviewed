@@ -1,3 +1,4 @@
+import { CATALOG_METADATA } from "../../../features/catalog/metadata";
 import catalogData from "../../../features/catalog/data/system-catalog.json";
 import { searchCatalog, type CatalogSystem } from "../../../features/catalog/search";
 import { authErrorResponse } from "../../../features/auth/http";
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         results,
+        metadata: CATALOG_METADATA,
         total: catalog.length,
         usedInKalundborg: catalog.filter((system) => system.usedInKalundborg).length,
       },

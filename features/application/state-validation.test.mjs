@@ -102,3 +102,14 @@ test("et beskåret, indsendt snapshot gendannes som en sikker rettelseskladde", 
   assert.equal(Object.hasOwn(normalized, "internalStorageKey"), false);
   assert.equal(isApplicationFormState(normalized), true);
 });
+
+
+test("ufærdige og semantisk ugyldige svar må stadig gemmes som kladde", () => {
+  const draft = clone();
+  Object.assign(draft, {
+    purpose: " ", acquisitionMethod: "Under afklaring", startDate: "2026-02-30",
+    supplierCvr: "123", descriptionUrl: "afventer link", budgetAmount: "ukendt",
+  });
+  assert.equal(isApplicationFormState(draft), true);
+  assert.deepEqual(normalizePersistedApplicationFormState(draft), draft);
+});

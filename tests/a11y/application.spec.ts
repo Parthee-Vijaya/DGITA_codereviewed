@@ -101,7 +101,7 @@ test("upload has specific name, requirements and persistent live failure feedbac
   const group = page.locator(".upload-group").filter({ has: upload });
   await expect(group.locator('[aria-live="polite"]')).toBeAttached();
   await upload.setInputFiles({ name: "synthetic-invalid.txt", mimeType: "text/plain", buffer: Buffer.from("synthetic") });
-  await expect(group.locator('[aria-live="polite"]')).toContainText(/tilladt|filtype|understøtt|mislykkedes/i);
+  await expect(group.locator('[aria-live="polite"]')).toContainText(/Vælg en fil af typen.*PDF.*DOCX.*XLSX/);
   await audit(page, ".application-sheet");
 });
 
