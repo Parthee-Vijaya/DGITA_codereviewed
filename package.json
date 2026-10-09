@@ -28,7 +28,7 @@
   "dependencies": {
     "@libsql/client": "0.17.4",
     "@vercel/blob": "2.8.0",
-    "drizzle-orm": "0.45.2",
+    "drizzle-orm": "0.45.3",
     "geist": "1.7.2",
     "jose": "6.2.12",
     "lucide-react": "^1.34.0",
