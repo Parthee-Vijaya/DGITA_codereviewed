@@ -1,4 +1,7 @@
 import type { ApplicationFormState } from "../application/engine";
+import { personalDataCategoryLabels } from "../application/procurement";
+import { procurementSummaryRows } from "../cases/procurement-summary";
+import { aiUsageLabel, hasAiScreeningDetails, isSafeAiAssessmentUrl } from "../application/ai-screening";
 
 export function receiptSections(state: ApplicationFormState) {
   return [
@@ -32,10 +35,11 @@ export function receiptSections(state: ApplicationFormState) {
       title: "Økonomi og implementering",
       rows: [
         ["Budget til rådighed", yesNo(state.hasBudget)],
-        ["Budgetbeløb", money(state.budgetAmount)],
+        ["Budgetbeløb for første år", money(state.budgetAmount)],
         ["Engangsomkostning", money(state.oneTimeCost)],
         ["Årlig omkostning", money(state.yearlyCost)],
         ["Øvrige omkostninger", money(state.otherCost)],
+        ...procurementSummaryRows(state),
         ["Startdato", state.startDate],
         ["Slutdato", state.endDate],
         ["Antal brugere", state.implementationUsers],
@@ -47,6 +51,12 @@ export function receiptSections(state: ApplicationFormState) {
       rows: [
         ["Personoplysninger", yesNo(state.personalData)],
         ["Dataklassifikation", state.dataClassification],
+        ["Personoplysningskategorier", state.personalData === "ja" ? personalDataCategoryLabels(state.personalDataCategories).join(", ") || "Ikke besvaret" : "Ingen personoplysninger oplyst"],
+        ["AI-anvendelse", aiUsageLabel(state.aiUsage)],
+        ...(hasAiScreeningDetails(state.aiUsage) ? [
+          ["Formål med AI", state.aiPurpose || "Ikke oplyst"],
+          ["Reference til AI-vurdering", isSafeAiAssessmentUrl(state.aiAssessmentUrl) ? state.aiAssessmentUrl.trim() : "Ingen gyldig reference angivet"],
+        ] as Array<[string, string]> : []),
         ["Risikovurdering", yesNo(state.hasRiskAssessment)],
         ["Databehandleraftale", yesNo(state.hasDpa)],
         ["Kontrakt", yesNo(state.hasContract)],
@@ -60,7 +70,7 @@ export function receiptSections(state: ApplicationFormState) {
       rows: [
         ["Godkendende chef", state.approvingLeader],
         ["Bemærkninger", state.remarks],
-        ["Samtykke registreret", state.consent ? "Ja" : "Nej"],
+        ["Bekræftelse af oplysninger", state.consent ? "Ja" : "Nej"],
       ],
     },
   ] satisfies Array<{ title: string; rows: Array<[string, string]> }>;

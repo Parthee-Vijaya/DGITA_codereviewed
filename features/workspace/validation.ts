@@ -11,6 +11,10 @@ import {
   isSafeContentUrl,
   isSafeImageUrl,
 } from "./model";
+import {
+  getPrivacyAssessmentValidationError, getProcurementAssessmentValidationError,
+  normalizePrivacyAssessment, normalizeProcurementAssessment,
+} from "./case-assessments";
 
 const YES_NO_OR_EMPTY = new Set(["", "Ja", "Nej"]);
 const LEGAL_BASES = new Set<string>(["", ...D_GITA_LEGAL_BASES]);
@@ -101,6 +105,9 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     8_000,
   );
   const phase = enumString(input.phase, PHASES, "D-GITA-fasen er ugyldig.");
+  const assessmentError = getPrivacyAssessmentValidationError(input.privacyAssessment)
+    ?? getProcurementAssessmentValidationError(input.procurementAssessment);
+  if (assessmentError) throw new WorkspaceInputError(422, assessmentError);
 
   if (date && !isCalendarDate(date)) {
     throw new WorkspaceInputError(422, "Datoen skal være en gyldig dato i formatet ÅÅÅÅ-MM-DD.");
@@ -119,6 +126,8 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     approved: approved as DgitaApproval["approved"],
     date,
     legalBasis: legalBasis as DgitaApproval["legalBasis"],
+    ...(input.privacyAssessment !== undefined ? { privacyAssessment: normalizePrivacyAssessment(input.privacyAssessment) } : {}),
+    ...(input.procurementAssessment !== undefined ? { procurementAssessment: normalizeProcurementAssessment(input.procurementAssessment) } : {}),
     responsible,
     responsibleUserId,
     itConsultantUserId,

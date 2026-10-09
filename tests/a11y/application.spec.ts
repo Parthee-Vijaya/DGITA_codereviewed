@@ -59,7 +59,7 @@ test("cost inputs, hints and invalid form steps have accessible names and focus"
   await openForm(page);
   await page.getByRole("button", { name: "Investering", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Investering", exact: true })).toBeFocused();
-  for (const label of ["34. Engangsomkostninger", "35. Årlige driftsudgifter", "36. Andre omkostninger"]) await expect(page.getByRole("textbox", { name: label, exact: true })).toBeVisible();
+  for (const label of ["34. Engangsomkostninger", "35. Årlige driftsudgifter", "36. Andre omkostninger i første år"]) await expect(page.getByRole("textbox", { name: label, exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "33.1 Eksisterende budgetbeløb", exact: true })).toBeVisible();
   await audit(page, ".application-sheet");
   await page.getByRole("textbox", { name: "34. Engangsomkostninger", exact: true }).fill("ikke et beløb");

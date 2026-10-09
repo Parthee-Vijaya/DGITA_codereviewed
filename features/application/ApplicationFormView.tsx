@@ -27,6 +27,9 @@ import type { CatalogSystem } from "../catalog/search";
 import { useUnsavedChanges } from "./use-unsaved-changes";
 import { Question, Money, UploadField, FormMessage, FieldErrorText } from "./ApplicationFields";
 import { SegmentedChoice } from "../ui/SegmentedChoice";
+import { DataCategoryFields } from "./DataCategoryFields";
+import { ProcurementFields } from "./ProcurementFields";
+import { normalizeProcurementChanges, personalDataCategoryLabels, contractValueStatusLabel, contractCoverageLabel, parseContractValue } from "./procurement";
 import { AiScreeningFields } from "./AiScreeningFields";
 import { aiUsageLabel, hasAiScreeningDetails, normalizeAiScreeningChanges } from "./ai-screening";
 import {
@@ -255,7 +258,7 @@ export function ApplicationFormView({
         }
         if (controller.signal.aborted) return;
         if (payload.draft?.state.schemaVersion === "dgita-v1") {
-          const restoredState = normalizeApprovingLeader(payload.draft.state);
+          const restoredState = normalizeProcurementChanges(normalizeApprovingLeader(payload.draft.state));
           draftIdRef.current = payload.draft.id;
           rowVersionRef.current = payload.draft.rowVersion;
           formRef.current = restoredState;
@@ -351,7 +354,7 @@ export function ApplicationFormView({
   ) {
     if (submittingRef.current) return formRef.current;
     const changed = updater(formRef.current);
-    const next = normalizeAiScreeningChanges(formRef.current, normalizeRelationChanges(formRef.current, changed));
+    const next = normalizeProcurementChanges(normalizeAiScreeningChanges(formRef.current, normalizeRelationChanges(formRef.current, changed)));
     if ((changed.replacementSystem && !next.replacementSystem && next.replacesExisting === "ja") ||
         (changed.relatedSystem && !next.relatedSystem && next.acquisitionType === "tilkøb")) {
       onToast("Systemvalget er ændret. Vælg de tilknyttede systemer igen, så ansøgningen bruger de rigtige relationer.");
@@ -1030,12 +1033,13 @@ export function ApplicationFormView({
             {step === 4 ? (
               <>
                 <Question title="33. Er der et eksisterende budget at købe for?"><Choice value={form.hasBudget} onChange={(value) => setYesNo("hasBudget", value)} options={yesNoOptions} />{isFieldVisible("budgetAmount", form) ? <div className="conditional-field"><label className="subfield-label" htmlFor="budget-amount">33.1 Eksisterende budgetbeløb</label><Money id="budget-amount" value={form.budgetAmount} error={errorFor("budgetAmount")} onChange={(value) => update("budgetAmount", value)} /></div> : null}</Question>
-                <div className="finance-overview"><span>Samlet finansiering</span><strong>{formatDanishAmount(getFinanceTotal(form))} kr.</strong><small>Beregnet ud fra felterne nedenfor</small></div>
+                <div className="finance-overview"><span>Omkostninger i første år</span><strong>{formatDanishAmount(getFinanceTotal(form))} kr.</strong><small>Engangsomkostninger, ét års drift og andre omkostninger i første år</small></div>
                 <div className="three-column-fields">
                   <Question title="34. Engangsomkostninger"><Money value={form.oneTimeCost} error={errorFor("oneTimeCost")} onChange={(value) => update("oneTimeCost", value)} /></Question>
                   <Question title="35. Årlige driftsudgifter"><Money value={form.yearlyCost} error={errorFor("yearlyCost")} onChange={(value) => update("yearlyCost", value)} /></Question>
-                  <Question title="36. Andre omkostninger"><Money value={form.otherCost} error={errorFor("otherCost")} onChange={(value) => update("otherCost", value)} /></Question>
+                  <Question title="36. Andre omkostninger i første år"><Money value={form.otherCost} error={errorFor("otherCost")} onChange={(value) => update("otherCost", value)} /></Question>
                 </div>
+                <ProcurementFields form={form} errorFor={errorFor} onChange={update} />
                 <Question title="38. Beskrivelse af gevinsten"><textarea className={cx("clean-input", errorFor("benefits") && "invalid")} rows={4} value={form.benefits} onChange={(event) => update("benefits", event.target.value)} /><FieldErrorText message={errorFor("benefits")} /></Question>
               </>
             ) : null}
@@ -1047,6 +1051,7 @@ export function ApplicationFormView({
                 {isFieldVisible("riskHelp", form) ? <Question title="Har du brug for hjælp til risikovurdering?"><Choice value={form.needsRiskHelp} onChange={(value) => setYesNo("needsRiskHelp", value)} options={yesNoOptions} /></Question> : null}
                 {isFieldVisible("risk-assessment", form) ? <UploadField kind="risk-assessment" title="Upload risikovurdering" files={form.attachments["risk-assessment"]} onAdd={addFiles} onRemove={removeFile} /> : null}
                 <Question title="43. Behandler IT-systemet persondata?"><Choice value={form.personalData} onChange={(value) => setYesNo("personalData", value)} options={yesNoOptions} /></Question>
+                <DataCategoryFields form={form} errorFor={errorFor} onChange={update} />
                 {isFieldVisible("dpaQuestion", form) ? <Question title="44. Har du allerede en databehandleraftale?"><Choice value={form.hasDpa} onChange={(value) => setYesNo("hasDpa", value)} options={yesNoOptions} /></Question> : null}
                 {isFieldVisible("dataClassification", form) ? <Question title="41. Klassifikation af data"><select className={cx("clean-input", errorFor("dataClassification") && "invalid")} value={form.dataClassification} onChange={(event) => update("dataClassification", event.target.value)}><option value="">Vælg dataklassifikation</option>{DATA_CLASSIFICATIONS.map((option) => <option key={option}>{option}</option>)}</select><FieldErrorText message={errorFor("dataClassification")} /></Question> : null}
                 {isFieldVisible("data-processing-agreement", form) ? <UploadField kind="data-processing-agreement" title="Upload databehandleraftale" detail="Dokumentet er obligatorisk, når aftalen findes" files={form.attachments["data-processing-agreement"]} error={errorFor("data-processing-agreement")} onAdd={addFiles} onRemove={removeFile} /> : null}
@@ -1154,13 +1159,23 @@ function ReviewApplication({ form, error, onEdit, onConsent }: { form: Applicati
     ["Anskaffelsesform", form.acquisitionMethod, 2],
     ...(form.acquisitionType === "tilkøb" ? [["Tilkøb til system", form.relatedSystem, 2] as [string, string, number]] : []),
     ["Persondata", form.personalData === "ja" ? `Ja · ${form.dataClassification}` : "Nej", 5],
+    ...(form.personalData === "ja" ? [["Personoplysningskategorier", personalDataCategoryLabels(form.personalDataCategories).join(", ") || "Ikke besvaret", 5] as [string, string, number]] : []),
     ["AI i anskaffelsen", aiUsageLabel(form.aiUsage), 5],
     ...(hasAiScreeningDetails(form.aiUsage) ? [["AI-formål", form.aiPurpose ?? "", 5] as [string, string, number], ["Link til AI-vurdering", form.aiAssessmentUrl || "Ikke angivet", 5] as [string, string, number]] : []),
-    ["Samlet finansiering", `${formatDanishAmount(getFinanceTotal(form))} kr.`, 4],
+    ["Omkostninger i første år", `${formatDanishAmount(getFinanceTotal(form))} kr.`, 4],
+    ["Status for kontraktværdi", contractValueStatusLabel(form.contractValueStatus), 4],
+    ...(form.contractValueStatus === "estimated" ? [
+      ["Anslået samlet kontraktværdi ekskl. moms", parseContractValue(form.estimatedContractValueExVat) === null ? "Ikke angivet" : `${formatDanishAmount(parseContractValue(form.estimatedContractValueExVat)!)} kr.`, 4] as [string, string, number],
+      ["Kontraktperiode i måneder", form.contractDurationMonths || "Ikke angivet", 4] as [string, string, number],
+      ["Optioner og mulige forlængelser", form.contractOptionsDescription || "Ikke angivet", 4] as [string, string, number],
+      ["Grundlag for kontraktværdien", form.contractValueNote || "Ikke angivet", 4] as [string, string, number],
+    ] : []),
+    ["Aftaledækning", contractCoverageLabel(form.contractCoverage), 4],
+    ...(form.contractCoverage === "existing-agreement" ? [["Aftalereference", form.agreementReference || "Ikke angivet", 4] as [string, string, number]] : []),
     ["Implementering", `${formatDate(form.startDate)} – ${formatDate(form.endDate)}`, 6],
     ["Godkendende chef", form.approvingLeader, 8],
   ];
-  const warnings: FieldError[] = [getStepWarnings(form, 5), getStepWarnings(form, 7)].flat();
+  const warnings: FieldError[] = [getStepWarnings(form, 4), getStepWarnings(form, 5), getStepWarnings(form, 7)].flat();
   return <div className="review-block"><div className="review-status"><CheckCircle2 size={25} /><div><strong>Klar til kontrol</strong><p>Den indsendte version låses i databasen. PDF-kvitteringen kan hentes på sagen, og en kvitteringsmail lægges i den sikre Outlook-kø.</p></div></div>{warnings.length > 0 ? <FormMessage tone="warning" title="Ansøgningen kan indsendes med opmærksomhedspunkter" messages={warnings.map((warning) => warning.message)} /> : null}{rows.map(([label, value, targetStep]) => <div className="review-line" key={label}><span>{label}</span><strong>{value || "Ikke angivet"}</strong><button type="button" aria-label={`Redigér ${label}`} onClick={() => onEdit(targetStep)}>Redigér</button></div>)}<label className="consent-check"><input type="checkbox" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} checked={form.consent} onChange={(event) => onConsent(event.target.checked)} /><span>{form.consent ? <Check size={14} /> : null}</span>Jeg har kontrolleret oplysningerne og de vedlagte bilag.</label><FieldErrorText id={errorId} message={error} /></div>;
 }
 
