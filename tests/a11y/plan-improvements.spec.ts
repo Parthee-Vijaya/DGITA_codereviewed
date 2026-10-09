@@ -119,6 +119,9 @@ test("infrastructure explanation follows the existing review UI, focuses errors 
   await expect.poll(async () => (await (await page.request.get("/api/workspace")).json()).workspace.approvals[caseNumber].infrastructureDescription).toBe("");
   saved = (await (await page.request.get("/api/workspace")).json()).workspace.approvals[caseNumber];
   expect(saved.infrastructureChanges).toBe("Nej");
+  // A stored response precedes the case/workspace refresh. Audit the ready UI,
+  // after the save button has left its disabled state and its transitions settle.
+  await expect(page.getByRole("button", { name: "Gem D-GITA-felter", exact: true })).toBeEnabled();
   await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))); });
   const audit = await new AxeBuilder({ page }).include(".dgita-review-layout").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(audit.violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) }))).toEqual([]);
