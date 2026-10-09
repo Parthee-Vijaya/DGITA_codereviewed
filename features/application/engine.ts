@@ -1,4 +1,8 @@
+import { relationError, type CatalogRelation, type RelationField } from "../catalog/relations";
 import { SYNTHETIC_APPROVERS } from "../workspace/model";
+import { AI_USAGE_OPTIONS, hasAiScreeningDetails, isSafeAiAssessmentUrl, MAX_AI_PURPOSE_LENGTH, type AiUsage } from "./ai-screening";
+
+import { getProcurementErrors, isPersonalDataCategories, PROCUREMENT_ESTIMATE_FIELDS, type PersonalDataCategory, type ContractValueStatus, type ContractCoverage } from "./procurement";
 
 export type YesNo = "ja" | "nej";
 
@@ -53,6 +57,7 @@ export type ApplicationFormState = {
   knownSystem: YesNo;
   replacesExisting: YesNo;
   replacementSystem: string;
+  replacementCatalogRelation?: CatalogRelation | null;
   catalogQuery: string;
   selectedSystem: SelectedCatalogSystem | null;
   manualCatalogEntry: boolean;
@@ -81,6 +86,7 @@ export type ApplicationFormState = {
   marketResearchSystems: string;
   acquisitionType: "nyanskaffelse" | "tilkøb";
   relatedSystem: string;
+  relatedCatalogRelation?: CatalogRelation | null;
   purpose: string;
   functionDescription: string;
   kleTopics: string[];
@@ -95,9 +101,21 @@ export type ApplicationFormState = {
   yearlyCost: string;
   otherCost: string;
   benefits: string;
+  contractValueStatus?: ContractValueStatus;
+  estimatedContractValueExVat?: string;
+  contractDurationMonths?: string;
+  contractOptionsDescription?: string;
+  contractValueNote?: string;
+  contractCoverage?: ContractCoverage;
+  agreementReference?: string;
+  // Additive fields: an absent legacy answer is never interpreted as No.
+  aiUsage?: AiUsage;
+  aiPurpose?: string;
+  aiAssessmentUrl?: string;
   hasRiskAssessment: YesNo;
   needsRiskHelp: YesNo;
   personalData: YesNo;
+  personalDataCategories?: PersonalDataCategory[];
   hasDpa: YesNo;
   hasContract: YesNo;
   hasSupplierChecklist: YesNo;
@@ -134,12 +152,46 @@ export type FieldError = {
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
+export const ACQUISITION_METHODS = [
+  "DIGIT udbud/aftale", "Direkte tildeling", "Gratis", "KOMBIT/KL/Offentligt projekt", "SKI-aftale",
+] as const;
+export const DATA_CLASSIFICATIONS = [
+  "1. Almindelige personoplysninger", "2. Følsomme personoplysninger", "3. Fortrolige oplysninger", "4. CPR data",
+] as const;
+export const USER_COUNT_OPTIONS = ["0-9", "10-49", "50-99", "100-499", "500-100000"] as const;
+
+const UPLOAD_MIME_TYPES = {
+  pdf: ["application/pdf"],
+  doc: ["application/msword"],
+  docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  xls: ["application/vnd.ms-excel"],
+  xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  png: ["image/png"],
+  jpg: ["image/jpeg"],
+  jpeg: ["image/jpeg"],
+} satisfies Record<string, string[]>;
+type UploadExtension = keyof typeof UPLOAD_MIME_TYPES;
+const DOCUMENT_EXTENSIONS: readonly UploadExtension[] = ["pdf", "doc", "docx", "xls", "xlsx"];
+const ALL_UPLOAD_EXTENSIONS: readonly UploadExtension[] = [...DOCUMENT_EXTENSIONS, "png", "jpg", "jpeg"];
+
+/** The picker, visible guidance and server validation share this policy. */
+export function getUploadPolicy(kind: UploadKind) {
+  const extensions = kind === "risk-assessment" ? DOCUMENT_EXTENSIONS : ALL_UPLOAD_EXTENSIONS;
+  const formats = extensions.map((extension) => extension.toUpperCase()).join(", ");
+  return {
+    extensions,
+    accept: extensions.map((extension) => `.${extension}`).join(","),
+    guidance: `${formats} · maks. ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB`,
+    invalidTypeMessage: `Vælg en fil af typen ${formats}.`,
+  };
+}
+
 export const FORM_RULES: FormRule[] = [
   {
     id: "replacement-system",
     sourceField: "replacesExisting",
     equals: "ja",
-    affectedFields: ["replacementSystem"],
+    affectedFields: ["replacementSystem", "replacementCatalogRelation"],
     required: true,
     sourceReference: "Power Pages: fm_systemerstatning → fm_erstatsningssystem",
   },
@@ -163,7 +215,7 @@ export const FORM_RULES: FormRule[] = [
     id: "related-system",
     sourceField: "acquisitionType",
     equals: "tilkøb",
-    affectedFields: ["relatedSystem"],
+    affectedFields: ["relatedSystem", "relatedCatalogRelation"],
     required: true,
     sourceReference: "Power Pages: fm_nyanskaffelsetilkob → fm_tilknyttetsystemnavn",
   },
@@ -256,6 +308,7 @@ export const initialApplicationState: ApplicationFormState = {
   knownSystem: "ja",
   replacesExisting: "nej",
   replacementSystem: "",
+  replacementCatalogRelation: null,
   catalogQuery: "",
   selectedSystem: null,
   manualCatalogEntry: false,
@@ -284,6 +337,7 @@ export const initialApplicationState: ApplicationFormState = {
   marketResearchSystems: "",
   acquisitionType: "nyanskaffelse",
   relatedSystem: "",
+  relatedCatalogRelation: null,
   purpose: "",
   functionDescription: "",
   kleTopics: [],
@@ -298,9 +352,20 @@ export const initialApplicationState: ApplicationFormState = {
   yearlyCost: "",
   otherCost: "",
   benefits: "",
+  contractValueStatus: "",
+  estimatedContractValueExVat: "",
+  contractDurationMonths: "",
+  contractOptionsDescription: "",
+  contractValueNote: "",
+  contractCoverage: "",
+  agreementReference: "",
+  aiUsage: "",
+  aiPurpose: "",
+  aiAssessmentUrl: "",
   hasRiskAssessment: "nej",
   needsRiskHelp: "nej",
   personalData: "nej",
+  personalDataCategories: [],
   hasDpa: "nej",
   hasContract: "nej",
   hasSupplierChecklist: "nej",
@@ -332,6 +397,7 @@ export const legacyDemoApplicationState: ApplicationFormState = {
   knownSystem: "ja",
   replacesExisting: "nej",
   replacementSystem: "",
+  replacementCatalogRelation: null,
   catalogQuery: "WSUS klient",
   selectedSystem: null,
   manualCatalogEntry: false,
@@ -360,6 +426,7 @@ export const legacyDemoApplicationState: ApplicationFormState = {
   marketResearchSystems: "System A, System B",
   acquisitionType: "nyanskaffelse",
   relatedSystem: "",
+  relatedCatalogRelation: null,
   purpose:
     "Anskaffelsen skal sikre en stabil og ensartet håndtering af klientopdateringer på tværs af kommunen.",
   functionDescription:
@@ -409,6 +476,17 @@ export const legacyDemoApplicationState: ApplicationFormState = {
 /** New test forms use non-deliverable, neutral identities. Historical snapshots are unchanged. */
 export const demoApplicationState: ApplicationFormState = {
   ...structuredClone(legacyDemoApplicationState),
+  personalDataCategories: ["ordinary"],
+  contractValueStatus: "estimated",
+  estimatedContractValueExVat: "600,00",
+  contractDurationMonths: "36",
+  contractOptionsDescription: "En forlængelse på 12 måneder er medregnet.",
+  contractValueNote: "Syntetisk eksempel: 100 kr. etablering, 4 års drift à 100 kr. samt 100 kr. øvrige omkostninger.",
+  contractCoverage: "new-contract",
+  agreementReference: "",
+  aiUsage: "nej",
+  aiPurpose: "",
+  aiAssessmentUrl: "",
   catalogQuery: "Testsystem 01",
   contactPerson: "contact-01@example.invalid",
   department: "Testafdeling",
@@ -428,6 +506,7 @@ export function isRuleActive(rule: FormRule, state: ApplicationFormState) {
 export function isFieldVisible(field: string, state: ApplicationFormState) {
   switch (field) {
     case "replacementSystem":
+    case "replacementCatalogRelation":
       return state.replacesExisting === "ja";
     case "catalogQuery":
     case "selectedSystem":
@@ -437,6 +516,7 @@ export function isFieldVisible(field: string, state: ApplicationFormState) {
     case "marketResearchSystems":
       return state.marketResearch === "ja";
     case "relatedSystem":
+    case "relatedCatalogRelation":
       return state.acquisitionType === "tilkøb";
     case "existingProcessSystems":
       return state.existingProcessSystem === "ja";
@@ -445,12 +525,23 @@ export function isFieldVisible(field: string, state: ApplicationFormState) {
       return state.crossCutting === "ja";
     case "budgetAmount":
       return state.hasBudget === "ja";
+    case "estimatedContractValueExVat":
+    case "contractDurationMonths":
+    case "contractOptionsDescription":
+    case "contractValueNote":
+      return state.contractValueStatus === "estimated";
+    case "agreementReference":
+      return state.contractCoverage === "existing-agreement";
     case "riskHelp":
       return state.hasRiskAssessment === "nej";
+    case "aiPurpose":
+    case "aiAssessmentUrl":
+      return hasAiScreeningDetails(state.aiUsage);
     case "risk-assessment":
       return state.hasRiskAssessment === "ja";
     case "dpaQuestion":
     case "dataClassification":
+    case "personalDataCategories":
       return state.personalData === "ja";
     case "data-processing-agreement":
       return state.personalData === "ja" && state.hasDpa === "ja";
@@ -469,8 +560,8 @@ function required(field: string, value: unknown, message: string): FieldError | 
   const empty =
     value === null ||
     value === undefined ||
-    value === "" ||
-    (Array.isArray(value) && value.length === 0);
+    (typeof value === "string" && value.trim() === "") ||
+    (Array.isArray(value) && (value.length === 0 || value.every((item) => typeof item === "string" && item.trim() === "")));
   return empty ? { field, message, severity: "error" } : null;
 }
 
@@ -487,6 +578,43 @@ function compact(errors: Array<FieldError | null>) {
   return errors.filter((error): error is FieldError => error !== null);
 }
 
+function choiceError(field: string, value: string, options: readonly string[], message: string, mandatory = true): FieldError | null {
+  if (!mandatory && !value.trim()) return null;
+  return options.includes(value) ? null : { field, message, severity: "error" };
+}
+
+function urlError(field: string, value: string): FieldError | null {
+  if (!value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (["http:", "https:"].includes(url.protocol) && url.hostname && !url.username && !url.password) return null;
+  } catch { /* Present the same actionable error for malformed URLs. */ }
+  return { field, message: "Angiv et gyldigt link, der starter med https:// eller http://, uden brugernavn og adgangskode.", severity: "error" };
+}
+
+function cvrError(field: string, value: string): FieldError | null {
+  if (!value.trim() || /^\d{8}$/u.test(value.replace(/\s/gu, ""))) return null;
+  return { field, message: "CVR-nummeret skal indeholde 8 cifre.", severity: "error" };
+}
+
+function isCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value) || value.startsWith("0000-")) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function dateError(field: string, value: string, label: string): FieldError | null {
+  return required(field, value, `Angiv ${label}.`) ?? (isCalendarDate(value) ? null : {
+    field, message: `Angiv en gyldig ${label}.`, severity: "error",
+  });
+}
+
+function visibleRelationError(state: ApplicationFormState, field: RelationField): FieldError | null {
+  if (!isFieldVisible(field, state)) return null;
+  const message = relationError(state, field);
+  return message ? { field, message, severity: "error" } : null;
+}
+
 export function getStepErrors(state: ApplicationFormState, step: number): FieldError[] {
   switch (step) {
     case 0:
@@ -500,14 +628,14 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           state.manualSystemName,
           "Angiv systemets officielle navn.",
         ),
-        visibleRequired(
-          state,
-          "replacementSystem",
-          state.replacementSystem,
-          "Vælg det system, der erstattes.",
-        ),
+        visibleRelationError(state, "replacementSystem"),
         required("contactPerson", state.contactPerson, "Angiv en kontaktperson."),
         required("department", state.department, "Angiv center eller afdeling."),
+        ...(isFieldVisible("manualSystem", state) ? [
+          urlError("descriptionUrl", state.descriptionUrl),
+          cvrError("supplierCvr", state.supplierCvr),
+          cvrError("rightsHolderCvr", state.rightsHolderCvr),
+        ] : []),
       ]);
     case 1:
       return compact([
@@ -521,22 +649,19 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
               "Angiv ansvarlig afdeling eller enhed.",
             )
           : null,
+        urlError("esdhContractUrl", state.esdhContractUrl),
+        urlError("esdhDpaUrl", state.esdhDpaUrl),
       ]);
     case 2:
       return compact([
-        required("acquisitionMethod", state.acquisitionMethod, "Vælg anskaffelsesform."),
+        choiceError("acquisitionMethod", state.acquisitionMethod, ACQUISITION_METHODS, "Vælg en anskaffelsesform fra listen."),
         visibleRequired(
           state,
           "marketResearchSystems",
           state.marketResearchSystems,
           "Angiv de afdækkede systemer.",
         ),
-        visibleRequired(
-          state,
-          "relatedSystem",
-          state.relatedSystem,
-          "Vælg det eksisterende system, tilkøbet vedrører.",
-        ),
+        visibleRelationError(state, "relatedSystem"),
       ]);
     case 3:
       return compact([
@@ -574,6 +699,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           "Angiv det eksisterende budgetbeløb.",
         ),
         required("benefits", state.benefits, "Beskriv gevinsten."),
+        ...getProcurementErrors(state),
       ]);
       const amountFields: Array<[string, string]> = [
         ["budgetAmount", state.budgetAmount],
@@ -586,7 +712,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
         if (value && parseDanishAmount(value) === null) {
           errors.push({
             field,
-            message: "Beløbet skal være et gyldigt positivt tal.",
+            message: "Angiv et gyldigt beløb på 0 kr. eller derover.",
             severity: "error",
           });
         }
@@ -595,12 +721,21 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
     }
     case 5:
       return compact([
-        visibleRequired(
-          state,
-          "dataClassification",
-          state.dataClassification,
-          "Vælg dataklassifikation.",
-        ),
+        choiceError("aiUsage", state.aiUsage ?? "", AI_USAGE_OPTIONS.map((option) => option.value), "Angiv, om anskaffelsen indeholder AI: Ja, Nej eller Ved ikke."),
+        visibleRequired(state, "aiPurpose", state.aiPurpose, "Beskriv, hvad AI skal bruges til. Ved tvivl beskrives den funktion, der skal afklares."),
+        isFieldVisible("aiPurpose", state) && (state.aiPurpose?.length ?? 0) > MAX_AI_PURPOSE_LENGTH
+          ? { field: "aiPurpose", message: `Beskriv AI-formålet med højst ${MAX_AI_PURPOSE_LENGTH} tegn.`, severity: "error" }
+          : null,
+        isFieldVisible("aiAssessmentUrl", state) && state.aiAssessmentUrl?.trim() && !isSafeAiAssessmentUrl(state.aiAssessmentUrl)
+          ? { field: "aiAssessmentUrl", message: "Angiv et gyldigt link til vurderingen med https:// eller http://, uden brugernavn og adgangskode (højst 2048 tegn).", severity: "error" }
+          : null,
+        isFieldVisible("dataClassification", state)
+          ? choiceError("dataClassification", state.dataClassification, DATA_CLASSIFICATIONS, "Vælg en dataklassifikation fra listen.")
+          : null,
+        state.personalData === "ja" && (!isPersonalDataCategories(state.personalDataCategories) || state.personalDataCategories.length === 0)
+          ? { field: "personalDataCategories", message: "Vælg mindst én kategori af personoplysninger. Flere kan være relevante.", severity: "error" }
+          : null,
+        choiceError("employeeAccess", state.employeeAccess, USER_COUNT_OPTIONS, "Vælg antal medarbejdere fra listen.", false),
         visibleRequired(
           state,
           "data-processing-agreement",
@@ -623,11 +758,11 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           state.implementationResources,
           "Beskriv ressourcetrækket.",
         ),
-        required("startDate", state.startDate, "Angiv startdato."),
-        required("endDate", state.endDate, "Angiv slutdato."),
-        required("implementationUsers", state.implementationUsers, "Vælg antal brugere."),
+        dateError("startDate", state.startDate, "startdato"),
+        dateError("endDate", state.endDate, "slutdato"),
+        choiceError("implementationUsers", state.implementationUsers, USER_COUNT_OPTIONS, "Vælg antal brugere fra listen."),
       ]);
-      if (state.startDate && state.endDate && state.endDate < state.startDate) {
+      if (isCalendarDate(state.startDate) && isCalendarDate(state.endDate) && state.endDate < state.startDate) {
         errors.push({
           field: "endDate",
           message: "Slutdatoen må ikke ligge før startdatoen.",
@@ -694,6 +829,18 @@ export function normalizeApprovingLeader(state: ApplicationFormState) {
 
 export function getStepWarnings(state: ApplicationFormState, step: number): FieldError[] {
   const warnings: FieldError[] = [];
+  if (step === 4 && (state.contractValueStatus === "needs-clarification" || state.contractCoverage === "needs-clarification")) {
+    warnings.push({ field: "contractValueStatus", message: "Afklar kontraktværdi og aftaleform med kommunens indkøbsansvarlige. D-GITA kan registrere den efterfølgende vurdering på sagen.", severity: "warning" });
+  }
+  if (step === 5 && hasAiScreeningDetails(state.aiUsage)) {
+    warnings.push({
+      field: "aiUsage",
+      message: state.aiUsage === "ved-ikke"
+        ? "AI-anvendelsen er uafklaret. Kontakt kommunens digitaliserings- eller AI-ansvarlige for hjælp. Screeningen er ikke en juridisk klassifikation eller godkendelse."
+        : "AI-anvendelsen kræver faglig vurdering efter kommunens retningslinjer. Screeningen er ikke en juridisk klassifikation eller godkendelse.",
+      severity: "warning",
+    });
+  }
   if (step === 5 && state.hasRiskAssessment === "nej") {
     warnings.push({
       field: "hasRiskAssessment",
@@ -756,29 +903,15 @@ export function validateUpload(
   kind: UploadKind,
   file: { name: string; size: number; type: string },
 ): string | null {
+  if (!file.name.trim() || file.name.trim().length > 255 || /[\r\n\0]/u.test(file.name)) return "Filnavnet er ugyldigt.";
+  if (!Number.isSafeInteger(file.size)) return "Filens størrelse er ugyldig.";
   if (file.size > MAX_UPLOAD_BYTES) return "Filen må højst fylde 25 MB.";
   if (file.size <= 0) return "Filen er tom.";
 
-  const extension = file.name.toLowerCase().split(".").pop() ?? "";
-  const allowedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg"]);
-  const documentOnly = new Set(["pdf", "doc", "docx", "xls", "xlsx"]);
-  const allowed = kind === "risk-assessment" ? documentOnly : allowedExtensions;
-  if (!allowed.has(extension)) {
-    return kind === "risk-assessment"
-      ? "Risikovurderingen skal være PDF, DOCX eller XLSX."
-      : "Filtypen understøttes ikke.";
-  }
-  const allowedMimeTypes: Record<string, string[]> = {
-    pdf: ["application/pdf"],
-    doc: ["application/msword"],
-    docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
-    xls: ["application/vnd.ms-excel"],
-    xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
-    png: ["image/png"],
-    jpg: ["image/jpeg"],
-    jpeg: ["image/jpeg"],
-  };
-  if (file.type && !allowedMimeTypes[extension]?.includes(file.type.toLowerCase())) {
+  const extension = (file.name.trim().toLowerCase().split(".").pop() ?? "") as UploadExtension;
+  const policy = getUploadPolicy(kind);
+  if (!policy.extensions.includes(extension)) return policy.invalidTypeMessage;
+  if (file.type.trim() && !UPLOAD_MIME_TYPES[extension]?.includes(file.type.trim().toLowerCase())) {
     return "Filens indholdstype passer ikke til filnavnet.";
   }
   return null;
@@ -805,14 +938,21 @@ export function pruneHiddenAnswers(state: ApplicationFormState) {
   const snapshot: Record<string, unknown> = { ...state };
   const hiddenFields = [
     "replacementSystem",
+    "replacementCatalogRelation",
     "marketResearchSystems",
     "relatedSystem",
+    "relatedCatalogRelation",
     "existingProcessSystems",
     "crossFunctionality",
     "crossDepartments",
     "budgetAmount",
     "dataClassification",
+    "personalDataCategories",
+    ...PROCUREMENT_ESTIMATE_FIELDS,
+    "agreementReference",
     "riskHelp",
+    "aiPurpose",
+    "aiAssessmentUrl",
   ];
   for (const field of hiddenFields) {
     if (!isFieldVisible(field, state)) delete snapshot[field];

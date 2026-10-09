@@ -37,7 +37,7 @@ npm test
 npm run build:next
 npm run test:ci:production
 npm run test:ci:e2e
-node --test scripts/ci-audit.test.mjs scripts/ci-release.test.mjs
+node --test scripts/ci-audit.test.mjs scripts/ci-release.test.mjs scripts/ci-preview.test.mjs
 node scripts/ci-audit.mjs
 npm ci --prefix .github/deployment-tools --ignore-scripts
 node scripts/ci-audit.mjs .github/deployment-tools .github/deployment-tools/audit-policy.json work/ci/deployment-tools
@@ -87,6 +87,29 @@ Den 5. oktober 2026 viste fuld `npm audit` **8 high og 4 moderate fund**, fordel
 
 Undtagelser udløber **4. november 2026 kl. 00.00 UTC**. De skal revurderes før den dato; udløbet forlænges ikke automatisk. Ejer er repositoryvedligeholderen, og kommunen skal udpege en teknisk risikoejer før produktion. De fem adfærdstests i `scripts/ci-audit.test.mjs` verificerer afvisningerne. Actions-artifacts bevarer rå auditdata uden secrets og en særskilt policyrapport, så de accepterede restfund kan efterprøves. Der er fortsat kendt toolingrisiko; CI-status må ikke gengives som "ingen sårbarheder i hele dependencytræet".
 
+## Isoleret preview (R15)
+
+`Manual isolated Vercel preview` er en særskilt manuel workflow med fast GitHub environment `preview`. Den eksisterende `pilot`-release bruger fortsat et staged production-target og må ikke forveksles med denne nye previewvej. Ingen af miljøerne er blevet ændret eller deployet som del af kodeændringen.
+
+Preview accepterer kun en fuld SHA fra beskyttet `main` med grøn CI og de samme CodeQL-kontroller som release. Kildekontrollen gentages efter environment-godkendelse, inden afhængigheder og kode køres. Denne første version åbner derfor ikke secret-adgang for featurebranches eller PR-kode. Først hentes `--environment=preview`, derefter køres `vercel build` og `vercel deploy --prebuilt --skip-domain`. Der er intet production-pull, intet `--prod`, ingen promotion og ingen flytning af eksisterende pilot-/produktionsdomæner.
+
+Det nye environment skal være beskyttet med ansvarlig reviewer og kun tillade beskyttet `main`. Hold `DGITA_DEPLOYMENT_ENABLED=false` og `DGITA_PREVIEW_ISOLATION_APPROVED=false`, indtil opsætningen nedenfor er verificeret:
+
+| Krav i preview | Kontrol i koden | Resterende miljøaccept |
+| --- | --- | --- |
+| Eget Vercel-projekt | `VERCEL_PROJECT_ID` skal matche previewinventaret; hentet `.vercel/project.json` skal matche både team og projekt | Opret projektet, begræns tokenadgang, slå automatiske Git-deployments fra |
+| Egne database- og filressourcer | Preview, eksisterende pilot og produktion skal have tre forskellige projekt-ID'er, databaseværter, Blob-store-ID'er og origins | Verificér ejerskab, region, private adgangsregler og at databasen kun indeholder syntetiske data |
+| Kontrolleret ressourceinventar | `DGITA_PREVIEW_RESOURCE_POLICY` kræver alle tre miljøers faktiske identifikatorer. Hentet previewdatabase, store og origin sammenholdes med inventaret | Brug `.github/preview-isolation.example.json` som struktur; erstat alle pladsholdere med verificerede identifikatorer. Ingen secrets i inventaret |
+| Egen testadgang og Blob OIDC | `DGITA_ENVIRONMENT=pilot`, eksplicit testlogin og syntetisk seed; eget testkodeord og approval-secret. `BLOB_STORE_ID` er påkrævet; `BLOB_READ_WRITE_TOKEN` afvises, da det ellers tilsidesætter store-ID i adapteren | Afprøv projektets OIDC-adgang til netop den private preview-store, egne secrets og seed på en tom database |
+| Ingen eksterne integrationer | Graph-, Entra-, fælleskommunale IAM-, scanner- og cron-værdier samt tilladte mailmodtagere afvises i denne syntetiske previewprofil | Integrationstest skal senere have en særskilt, reviewet profil med egne testtjenester; denne preview må ikke bruges som integrationsevidens |
+| Entydig kandidat | READY og Vercel-target `null` (preview), korrekt projekt, SHA, SHA-256 af buildoutput og workflow-run skal alle matche | Kør første beskyttede workflow, afprøv de tre brugerroller i browser og gem evidens uden auth-data |
+
+På GitHub environment `preview` sættes de ikke-hemmelige variabler `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DGITA_PREVIEW_RESOURCE_POLICY`, `DGITA_DEPLOYMENT_ENABLED` og `DGITA_PREVIEW_ISOLATION_APPROVED`. Secrets er et projektbegrænset `VERCEL_TOKEN` og eventuelt `VERCEL_AUTOMATION_BYPASS_SECRET`. CLI-token gives kun som miljøvariabel i de trin, der kræver det. App-secrets konfigureres i det nye Vercel-projekts **Preview**-miljø, og hentede miljøfiler slettes på runneren. Miljøfiler og buildoutput uploades aldrig som testartifacts.
+
+Appens runtimeværdi `pilot` betyder her syntetisk testadgang; den er ikke en binding til det eksisterende pilotprojekt. Preview skelnes gennem sit eget Vercel-projekt, target og verificerede ressourcer. Mangler et miljø i inventaret, stopper kontrollen; et manglende produktionsprojekt må ikke erstattes af et opdigtet ID. Ressourceinventaret er operatørens verificerede input, ikke en automatisk opdagelse af alle cloudressourcer. Det beviser heller ikke i sig selv, at en eksisterende database er uden persondata.
+
+Lokale tests kontrollerer afvisning af genbrugte ressourcer, forkerte targets, fejl i SHA/digest/run, integrationscredentials og ugyldige deployment-URL'er samt bevarelse af produktionsgates. **R15 er først miljøaccepteret efter en faktisk isoleret kørsel og browseraccept.** Koden til preview er klargjort; ingen cloudressourcer, credentials, godkendelsesflag eller deployment er oprettet/ændret af denne klargøring.
+
 ## Manuel Vercel-release
 
 `Manual Vercel release` kræver en fuld 40-tegn commit-SHA, miljøet `pilot` eller `production` og et eksplicit valg om promotion (standard: fra). Workflowet skal startes fra `main`. Guard-scriptet kræver beskyttet `main`, at SHA findes på denne branch, og at seneste push-CI på netop denne SHA samt `Required quality gate` er gennemført med succes. Det læser også de faktiske SARIF-resultater for CodeQL JS/TS og Actions på samme SHA og `main`: manglende eller ugyldig analyse, errors samt high/critical sikkerhedsfund stopper frigivelsen. Denne kontrol bruger `security-events: read` og blokerer også en gammel sårbar commit, selv om dens fund senere er rettet på hovedbranchen. Kilde, CI og analyser kontrolleres igen efter godkendelse før promotion.
@@ -127,6 +150,9 @@ Vercel-token, projekter, adskilte dataressourcer, miljøgodkendelser, migrations
 - [Gitleaks release 8.30.1](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
 - [actionlint release 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12)
 
+- [Vercel: preview-build er standard; production kræver særskilt flag](https://vercel.com/docs/cli/build)
+- [Vercel: pull af previewkonfiguration](https://vercel.com/docs/cli/pull)
+- [Vercel: deployment-target og metadata](https://vercel.com/docs/rest-api/deployments/get-a-deployment-by-id-or-url)
 - [Vercel: deploy, prebuilt og skip-domain](https://vercel.com/docs/cli/deploy)
 - [Vercel: staged production og promotion uden rebuild](https://vercel.com/docs/deployments/promoting-a-deployment)
 

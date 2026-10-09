@@ -1,6 +1,18 @@
 # DGITA - fortsættelse efter produktionsklargøring
 
-Fremtidigt arbejde pushes til `origin`: Parthee-Vijaya/DGITA_codereviewed. Det oprindelige DGITA-repo er bevaret som `upstream`; push ikke ændringer dertil. Grundklargøringen er flettet gennem PR #3/#16. K01–K12-kandidaten ligger i PR #17; kontrollér PR-status og eksakt SHA før videre arbejde. Se hovedbranchens historik og daterede rapporter for endelig SHA.
+Fremtidigt arbejde pushes til `origin`: Parthee-Vijaya/DGITA_codereviewed. Det oprindelige DGITA-repo er kun reference; push ikke ændringer dertil. Grundklargøringen er flettet gennem PR #3/#16/#17. Den verificerede hovedbranch ved start 9. oktober 2026 var `8930b3c745d42b0b950086ffaf0b60ed4659dab2`; kontrollér altid aktuel PR-status og SHA før videre arbejde.
+
+## Gennemførelsesplan · første leverance
+
+Følg [docs/implementation/README.md](docs/implementation/README.md) og den komplette [64-punktsplan](docs/implementation/plan.json). Første leverance omfatter korrekt afpublicering og indlæsning, intern infrastrukturbeskrivelse med vurderingshistorik, fælles felt-/uploadvalidering, fælles kontaktmail, to dependencyrettelser og en isoleret previewvej. Den eksisterende CSS, navigation og formularens ti trin er bevaret. Ingen onlinepilot eller eksterne miljøflag ændres af denne leverance.
+
+Migration 0007 er additiv. Historikken begynder med nye gemninger; den rekonstruerer ikke tidligere værdier. Almindelig drift kan ikke ændre eller slette historikken. Afklar den godkendte bevarings-/sletteproces under R25–R32 inden kommunal drift.
+
+Anden etape ligger på `feat/assignment-and-work-filters` oven på PR #18: stabile personvalg, katalogrelationer, arbejdsfiltre og en eksplicit vej til tilbagekaldelse af åbne lederanmodninger. Se docs/implementation/people-catalog-and-filters.md. F02/F03 har fortsat kilde-/procesaccept, og F23 afventer konkret rollevalg. Fortsæt med denne afklaring og derefter F11–F17. B01–B08 er stadig foreslåede kommunale beslutninger. De relevante produktionsregler kræver afklaring af identitet, egne sager, ledermandat, genindsendelse, krav, journal og bevaring. Lokal kodeverifikation lukker ikke disse acceptpunkter.
+
+Tredje etape ligger på `feat/case-corrections-and-ai-screening` oven på `feat/assignment-and-work-filters` (PR #19). Den tilføjer eksplicit retur med offentlig begrundelse/frister, terminalt afslag, bindende ledergodkendelse af aktuel version og manuel AI-screening med filtre/CSV. Se docs/implementation/correction-workflow.md og ai-screening.md. Der er ingen ny migration eller ændring af roller. Fortsæt herefter med F13/F14 og F05-kravgrundlaget; F15 kræver dette grundlag. F23 kræver stadig konkret rollevalg. Etaperne er reviewleverancer og må ikke regnes som flettet, deployet eller kommunalt accepteret alene ud fra dette dokument.
+
+Fjerde etape ligger på `feat/privacy-and-procurement-assessments` oven på den samlede `feat/plan-first-improvements` (PR #18). PR #20 er flettet i PR #19, som derefter er flettet i PR #18; de samlede kildefiler blev verificeret identiske med tredje etapes slutpunkt. Den tilføjer flere persondatakategorier, særskilt kontraktværdi/aftaleform og interne databeskyttelses-/indkøbsvurderinger med versionsbundet historik. Se docs/implementation/case-assessments.md, procurement-information.md og assessment-sources.md. F13 er teknisk implementeret til faglig accept; F14 er delvis, fordi autoritative tærskler, indkøbspolitik og overdragelse stadig skal fastlægges. Der kræves ingen ny migration. F05, F15 og F23 er fortsat åbne; ingen ny juridisk afslutningsregel aktiveres.
 
 ## Status og kildeorden
 
@@ -25,7 +37,7 @@ GitHub-miljøerne er oprettet med deployment slået fra. Aktivér dem først eft
 
 ## Særlige fortsættelsespunkter
 
-- Vercel har ved seneste metadatareview ingen særskilt previewkonfiguration. Det eksisterende releaseworkflow bruger production-target også ved valg af pilot. En ny preview skal have isolerede ressourcer og en eksplicit previewvej; den gamle pilot bevares.
+- Vercel har ved seneste metadatareview ingen særskilt previewkonfiguration. Det eksisterende releaseworkflow bruger production-target også ved valg af pilot. Den nye `preview-vercel.yml` har egen previewvej og kræver et godkendt register over isolerede ressourcer. Cloudopsætning og miljøaccept er fortsat åbne; den gamle pilot bevares.
 - Restorekopier får obligatorisk karantæne, og normal appopstart afvises. Ingen automatisk genaktivering.
 - Retention er en ren reviewberegning, ikke et slettejob. Backup-, servicemål- og kommunale acceptfelter forbliver ukendte indtil konkret evidens.
 - HTML-kvittering er versionsbundet; tagged PDF er en prototype. Gemte PDF-bytes omskrives ikke.

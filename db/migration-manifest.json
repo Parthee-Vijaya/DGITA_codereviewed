@@ -26,5 +26,9 @@
   {
     "id": "0006_production_boundaries",
     "checksum": "adb24f1f75868569e6a994a65f239c176567c35690f2b9c27d9bb05264f58e6e"
+  },
+  {
+    "id": "0007_dgita_review_history",
+    "checksum": "5950125c838f524e562314fd29505e849e87d35f9a0f98340d7cc21cd19aca29"
   }
 ]

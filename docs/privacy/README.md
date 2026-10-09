@@ -8,6 +8,7 @@ Fortegnelsen skelner mellem direkte identitet, personhenførbare metadata, fri t
 
 ## Implementerede begrænsninger
 
+- Konsulentvurderinger har [intern vurderingshistorik](review-history.md) fra nye gemninger efter migration 0007. Historik er særskilt fra brugerens aktivitet og kvittering; tidligere tabt historik rekonstrueres ikke.
 - Nye testdatabaser og formularfixtures bruger neutrale identiteter og `example.invalid`; historiske pilotdata bevares. Se [testdataprofilen](test-data.md).
 - Den eksisterende formularvalidering afviser ukendte inputfelter. Offentlige snapshotprojektioner kopierer kun kendte formular-/katalog-/bilagsfelter. Canarytesten verificerer, at injicerede interne oplysninger ikke følger med ud i denne browserpayload.
 - `features/privacy/operational-log.ts` er en typed og runtimevalideret tilladelsesliste for almindelige driftslogs. Ukendte fejlobjekter, getters, fritekst og ekstra felter kopieres ikke. Auth-fejlhåndteringen anvender denne logger. Schedulerens events har en kontrakt med afgrænsede tællere/varighed/køalder og booleske flags; integration af jobs kontrolleres separat.

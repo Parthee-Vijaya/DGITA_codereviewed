@@ -340,6 +340,10 @@ async function main() {
   assert.equal(fieldComment.payload.comment.fieldLabel, "Formål og ønsket effekt");
 
   const reviewer = await consultant.json("/api/auth/session");
+  const responsibleDirectory = await consultant.json("/api/workspace/responsible-people");
+  expectStatus(responsibleDirectory.response.status, 200, "hent ansvarlige", responsibleDirectory.payload);
+  const reviewPerson = responsibleDirectory.payload.people.find((person) => person.identifier === reviewer.payload.viewer.email);
+  assert.ok(reviewPerson, "reviewer must be selectable by stable identity");
   const reviewWorkspace = await consultant.json("/api/workspace");
   const loadedReview = reviewWorkspace.payload.workspace.approvals[caseNumber];
   const finalized = await consultant.json("/api/workspace", {
@@ -353,10 +357,12 @@ async function main() {
         approved: "Ja",
         date: new Date().toISOString().slice(0, 10),
         legalBasis: "GDPR",
-        responsible: reviewer.payload.viewer.displayName,
+        responsible: reviewPerson.name,
+        responsibleUserId: reviewPerson.id,
         hasAdditionalResponsible: "Nej",
         additionalResponsible: "",
-        itConsultant: "D-GITA E2E",
+        itConsultant: reviewPerson.name,
+        itConsultantUserId: reviewPerson.id,
         infrastructureChanges: "Nej",
         notes: `Afsluttet i E2E ${runId}`,
         internalComments: "Versionsbundet intern test",

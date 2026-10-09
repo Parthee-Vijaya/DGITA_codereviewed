@@ -1,0 +1,26 @@
+.options {
+  display: grid;
+  gap: 10px;
+}
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.option:has(input:checked) {
+  border-color: var(--forest);
+  background: var(--surface-subtle);
+}
+.option input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--forest);
+}
