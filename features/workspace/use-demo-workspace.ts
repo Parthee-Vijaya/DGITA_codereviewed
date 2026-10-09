@@ -22,8 +22,8 @@ type PortalWorkspace = {
 };
 
 const INITIAL_WORKSPACE: PortalWorkspace = {
-  content: DEFAULT_CONTENT,
-  images: DEFAULT_IMAGES,
+  content: [],
+  images: [],
   approvals: {},
   fieldComments: [],
 };
@@ -35,6 +35,8 @@ export function useDemoWorkspace(viewer: Actor) {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const viewerKey = JSON.stringify([viewer.tenantId, viewer.subject, viewer.role]);
+  const [loadedViewerKey, setLoadedViewerKey] = useState<string | null>(null);
   const requestRef = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -55,13 +57,14 @@ export function useDemoWorkspace(viewer: Actor) {
       }
       if (requestId !== requestRef.current) return;
       setWorkspace(payload.workspace);
+      setLoadedViewerKey(viewerKey);
       setError(null);
     } catch (reason) {
       if (requestId === requestRef.current) setError((reason as Error).message);
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
-  }, [router]);
+  }, [router, viewerKey]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void refresh(), 0);
@@ -192,6 +195,7 @@ export function useDemoWorkspace(viewer: Actor) {
 
   return {
     ...workspace,
+    ready: !loading && !error && loadedViewerKey === viewerKey,
     loading,
     error,
     refresh,

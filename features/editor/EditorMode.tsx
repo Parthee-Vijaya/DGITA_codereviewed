@@ -21,6 +21,8 @@ import {
 } from "react";
 
 import {
+  contentBody,
+  isContentVisible,
   isSafeContentUrl,
   type ContentEntry,
   type ImageEntry,
@@ -53,7 +55,9 @@ export function EditableText({
   insideInteractive?: boolean;
 }) {
   const entry = content.find((candidate) => candidate.id === contentId);
-  const value = entry ? (entry.published ? entry.body : "") : fallback;
+  const value = contentBody(content, contentId, fallback);
+
+  if (!editorMode && !isContentVisible(content, contentId)) return null;
 
   function activate(event?: MouseEvent<HTMLElement>) {
     if (editorMode && entry) {
@@ -304,7 +308,7 @@ export function EditorDrawer({
             <>
               <label>Administrativ titel<input value={draft.entry.title} onChange={(event) => setDraft({ kind: "content", entry: { ...draft.entry, title: event.target.value } })} /></label>
               <label>Tekst<textarea rows={8} value={draft.entry.body} onChange={(event) => setDraft({ kind: "content", entry: { ...draft.entry, body: event.target.value } })} /></label>
-              {draft.entry.category === "link" ? <label>Linkadresse<input value={draft.entry.url ?? ""} onChange={(event) => setDraft({ kind: "content", entry: { ...draft.entry, url: event.target.value } })} /></label> : null}
+              {draft.entry.id === "link.contact" ? <p>Kontaktlinket bruger den fælles e-mailadresse. Ret den under Portaltekster → Kontakt · e-mail.</p> : draft.entry.category === "link" ? <label>Linkadresse<input value={draft.entry.url ?? ""} onChange={(event) => setDraft({ kind: "content", entry: { ...draft.entry, url: event.target.value } })} /></label> : null}
               <label className="cms-publish"><input type="checkbox" checked={draft.entry.published} onChange={(event) => setDraft({ kind: "content", entry: { ...draft.entry, published: event.target.checked } })} /><span /> Publiceret</label>
             </>
           ) : (

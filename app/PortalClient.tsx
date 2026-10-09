@@ -100,6 +100,7 @@ import {
   defaultAreaForRole,
   filterCasesForViewer,
   isSafeContentUrl,
+  isContentVisible,
   resolveAccessibleCase,
   type Approval,
   type CaseRecord,
@@ -464,7 +465,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
         onOpenNotification={(notification) => void openNotification(notification)}
         editorMode={editorMode}
         onToggleEditor={() => {
-          if (workspace.loading || workspace.error) { showToast("Vent, til portalindholdet er hentet, før du aktiverer editoren."); return; }
+          if (!workspace.ready) { showToast("Vent, til portalindholdet er hentet, før du aktiverer editoren."); return; }
           setEditorSelection(null);
           setEditorMode((current) => !current);
           setProfileOpen(false);
@@ -475,7 +476,8 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
 
       <main id="main-content">
         {(view === "cases" || view === "consultant") && (!casesLoaded || casesError) ? <div className="page-width data-state" role={casesError ? "alert" : "status"}><Info size={22} /><div><strong>{casesError ? "Sagsoversigten kunne ikke opdateres" : "Henter dine sager…"}</strong><p>{casesError ?? "Vi kontrollerer din adgang og henter de seneste oplysninger."}</p></div>{casesError ? <button className="line-button" onClick={() => void reloadCases()}>Prøv igen</button> : null}</div> : null}
-        {view === "home" ? (
+        {["home", "knowledge", "admin"].includes(view) && !workspace.ready ? <div className="page-width data-state" role={workspace.error ? "alert" : "status"}><Info size={22} /><div><strong>{workspace.error ? "Portalindholdet kunne ikke hentes" : "Henter portalindhold…"}</strong><p>{workspace.error ?? "Vi henter de publicerede tekster og vejledninger."}</p></div>{workspace.error ? <button className="line-button" onClick={() => void workspace.refresh()}>Prøv igen</button> : null}</div> : null}
+        {view === "home" && workspace.ready ? (
           <HomeView
             role={role}
             content={workspace.content}
@@ -506,9 +508,9 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
               }
             }}
             guidance={{
-              intro: contentBody(workspace.content, "form.intro", "Spørgsmålene følger D-GITA-processen og tilpasses dine svar undervejs."),
-              catalog: contentBody(workspace.content, "form.catalog", "Resultatet viser samtidig, om systemet bruges i Kalundborg."),
-              marketResearch: contentBody(workspace.content, "form.market-research", "Har du undersøgt, hvilke løsninger der bedst matcher behov, pris og kvalitet?"),
+              intro: workspace.ready ? contentBody(workspace.content, "form.intro", "Spørgsmålene følger D-GITA-processen og tilpasses dine svar undervejs.") : "",
+              catalog: workspace.ready ? contentBody(workspace.content, "form.catalog", "Resultatet viser samtidig, om systemet bruges i Kalundborg.") : "",
+              marketResearch: workspace.ready ? contentBody(workspace.content, "form.market-research", "Har du undersøgt, hvilke løsninger der bedst matcher behov, pris og kvalitet?") : "",
             }}
             onSubmit={(_snapshot, result) => {
               showToast(result.mode === "correction" ? `Version ${result.versionNumber} er versionslåst og genindsendt sikkert.` : "Ansøgningen er versionslåst og indsendt sikkert.");
@@ -531,7 +533,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
             item={selectedCase}
             viewer={viewer}
             approval={workspace.approvals[selectedCase.id] ?? EMPTY_D_GITA_APPROVAL}
-            workspaceReady={!workspace.loading && !workspace.error}
+            workspaceReady={workspace.ready}
             onRetryWorkspace={() => void workspace.refresh()}
             fieldComments={workspace.fieldComments.filter((comment) => comment.caseId === selectedCase.id)}
             onBack={() => navigate(role === "user" ? "cases" : "consultant")}
@@ -581,7 +583,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
         {view === "detail" && !selectedCase ? (
           <AccessDenied onBack={() => navigate(defaultAreaForRole(role))} />
         ) : null}
-        {view === "knowledge" ? (
+        {view === "knowledge" && workspace.ready ? (
           <KnowledgeView
             content={workspace.content}
             images={workspace.images}
@@ -590,7 +592,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
             onEditImage={(entry) => setEditorSelection({ kind: "image", entry })}
           />
         ) : null}
-        {view === "admin" ? (
+        {view === "admin" && workspace.ready ? (
           <AdminView
             content={workspace.content}
             viewer={viewer}
@@ -651,6 +653,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
         <EditorToolbar
           active={editorMode}
           onToggle={() => {
+            if (!workspace.ready) { showToast("Vent, til portalindholdet er hentet, før du aktiverer editoren."); return; }
             setEditorSelection(null);
             setEditorMode((current) => !current);
           }}
@@ -664,7 +667,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
         onSaveContent={async (entry) => {
           try {
             const saved = await workspace.updateContent(entry, viewer);
-            if (saved) showToast(`“${entry.title}” er gemt og publiceret på siden.`);
+            if (saved) showToast(entry.published ? `“${entry.title}” er gemt og publiceret på siden.` : `“${entry.title}” er gemt og afpubliceret.`);
             return saved;
           } catch (reason) {
             showToast((reason as Error).message);
@@ -904,7 +907,8 @@ function HomeView({
   onNavigate: (view: View) => void;
 }) {
   const canCreate = capabilitiesFor(role).createApplications;
-  const localEmail = contentBody(content, "contact.local.email", "ckra@kalundborg.dk");
+  const localEmail = contactEmail(content);
+  const localName = contentBody(content, "contact.local.name", "Din lokale konsulent");
   return (
     <div className="home-page">
       <section className="editorial-hero">
@@ -915,7 +919,7 @@ function HomeView({
           <EditableText as="span" className="section-label" content={content} contentId="home.hero.eyebrow" fallback="Kalundborg Kommune · D-GITA" editorMode={editorMode} onEdit={onEdit} />
           <EditableText as="h1" content={content} contentId="home.hero.title" fallback="En god IT-anskaffelse starter med det rigtige behov." editorMode={editorMode} onEdit={onEdit} />
           <EditableText as="p" content={content} contentId="home.hero.body" fallback="Opret en ansøgning, eller se dine igangværende og historiske ansøgninger." editorMode={editorMode} onEdit={onEdit} />
-          <p className="hero-note"><Info size={17} /> <EditableText as="span" content={content} contentId="home.hero.note" fallback="Portalen bruges til køb under udbudsgrænsen." editorMode={editorMode} onEdit={onEdit} /></p>
+          {editorMode || isContentVisible(content, "home.hero.note") ? <p className="hero-note"><Info size={17} /> <EditableText as="span" content={content} contentId="home.hero.note" fallback="Portalen bruges til køb under udbudsgrænsen." editorMode={editorMode} onEdit={onEdit} /></p> : null}
           <div className="hero-actions">
             {canCreate ? <button className="solid-button" data-tour="primary-action" type="button" onClick={() => onNavigate("application")}>Opret ansøgning <ArrowRight size={18} /></button> : null}
             <button className={canCreate ? "line-button light" : "solid-button"} data-tour={canCreate ? undefined : "primary-action"} type="button" onClick={() => onNavigate(role === "user" ? "cases" : "consultant")}>
@@ -949,10 +953,10 @@ function HomeView({
           <EditableText as="h2" content={content} contentId="home.help.title" fallback="Få afklaring, før du udfylder ansøgningen." editorMode={editorMode} onEdit={onEdit} />
           <EditableText as="p" content={content} contentId="home.help.body" fallback="Er du i tvivl om din IT-anskaffelse, hjælper din lokale konsulent dig i gang." editorMode={editorMode} onEdit={onEdit} />
           <div className="contact-person">
-            <span>CK</span>
-            <div><EditableText as="small" content={content} contentId="contact.local.role" fallback="Din lokale D-GITA-konsulent" editorMode={editorMode} onEdit={onEdit} /><EditableText as="strong" content={content} contentId="contact.local.name" fallback="Casper Kjeldsen Ravn" editorMode={editorMode} onEdit={onEdit} /><a href={`mailto:${localEmail}`}><EditableText as="span" content={content} contentId="contact.local.email" fallback="ckra@kalundborg.dk" editorMode={editorMode} onEdit={onEdit} insideInteractive /></a></div>
+            <span>{personInitials(localName)}</span>
+            <div><EditableText as="small" content={content} contentId="contact.local.role" fallback="Din lokale D-GITA-konsulent" editorMode={editorMode} onEdit={onEdit} /><EditableText as="strong" content={content} contentId="contact.local.name" fallback="Din lokale konsulent" editorMode={editorMode} onEdit={onEdit} />{localEmail ? <a href={`mailto:${localEmail}`}><EditableText as="span" content={content} contentId="contact.local.email" fallback="" editorMode={editorMode} onEdit={onEdit} insideInteractive /></a> : editorMode ? <EditableText as="span" content={content} contentId="contact.local.email" fallback="" editorMode={editorMode} onEdit={onEdit} /> : null}</div>
           </div>
-          <a className="solid-button dark" href={`mailto:${localEmail}?subject=Ønske%20om%20D-GITA-formøde`}>Book et formøde <ArrowRight size={18} /></a>
+          {localEmail ? <a className="solid-button dark" href={`mailto:${localEmail}?subject=Ønske%20om%20D-GITA-formøde`}>Book et formøde <ArrowRight size={18} /></a> : null}
         </div>
       </section>
 
@@ -975,7 +979,13 @@ function ProcessStep({ number, content, titleId, bodyId, title, text, editorMode
   return <article className="process-step"><span>{number}</span><EditableText as="h3" content={content} contentId={titleId} fallback={title} editorMode={editorMode} onEdit={onEdit} /><EditableText as="p" content={content} contentId={bodyId} fallback={text} editorMode={editorMode} onEdit={onEdit} /></article>;
 }
 
+function contactEmail(content: ContentEntry[]) {
+  const email = contentBody(content, "contact.local.email", "").trim();
+  return /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/u.test(email) ? email : "";
+}
+
 function ResourceLink({ content, titleId, bodyId, title, text, editorMode, onEdit, onClick }: { content: ContentEntry[]; titleId: string; bodyId: string; title: string; text: string; editorMode: boolean; onEdit: (entry: ContentEntry) => void; onClick: () => void }) {
+  if (!editorMode && !isContentVisible(content, titleId)) return null;
   return <button className="resource-link" type="button" onClick={onClick}><span><EditableText as="strong" content={content} contentId={titleId} fallback={title} editorMode={editorMode} onEdit={onEdit} insideInteractive /><EditableText as="small" content={content} contentId={bodyId} fallback={text} editorMode={editorMode} onEdit={onEdit} insideInteractive /></span><ArrowRight size={19} /></button>;
 }
 
@@ -1138,7 +1148,9 @@ function KnowledgeView({
   );
   const guidance = searchResults.filter((result) => result.item.category === "form_help").map((result) => result.item);
   const faqs = searchResults.filter((result) => result.item.category === "faq").map((result) => result.item);
-  const links = published.filter((entry) => entry.category === "link");
+  const links = published.filter((entry) => entry.category === "link")
+    .map((entry) => entry.id === "link.contact" ? { ...entry, url: contactEmail(content) ? `mailto:${contactEmail(content)}` : "" } : entry)
+    .filter((entry) => Boolean(entry.url));
   const processor = published.filter((entry) => entry.category === "data_processor");
   const hasSearchResults = guidance.length > 0 || faqs.length > 0;
   const fuzzyMatch = query.trim() && searchResults.some((result) => result.matchKind === "fuzzy");
@@ -1162,7 +1174,7 @@ function KnowledgeView({
 
       <div className="knowledge-grid knowledge-bottom-grid"><section className="plain-section knowledge-section"><div className="plain-heading"><EditableText as="span" className="section-label dark" content={content} contentId="knowledge.processor.eyebrow" fallback="Krav og dokumentation" editorMode={editorMode} onEdit={onEdit} /><EditableText as="h2" content={content} contentId="knowledge.processor.title" fallback="Databehandlerkrav" editorMode={editorMode} onEdit={onEdit} /></div>{processor.map((entry) => <div className="cms-item-shell" key={entry.id}><CollectionEditButton entry={entry} editorMode={editorMode} onEdit={onEdit} /><article className="knowledge-card"><ShieldCheck size={19} /><div><h3>{entry.title}</h3><p>{entry.body}</p></div></article></div>)}</section><section className="plain-section knowledge-section"><div className="plain-heading"><EditableText as="span" className="section-label dark" content={content} contentId="knowledge.links.eyebrow" fallback="Generelle og lokale genveje" editorMode={editorMode} onEdit={onEdit} /><EditableText as="h2" content={content} contentId="knowledge.links.title" fallback="Nyttige links" editorMode={editorMode} onEdit={onEdit} /></div><div className="knowledge-links">{links.map((entry) => entry.url && isSafeContentUrl(entry.url) ? <div className="cms-item-shell" key={entry.id}><CollectionEditButton entry={entry} editorMode={editorMode} onEdit={onEdit} /><a href={entry.url} target={entry.url.startsWith("https://") ? "_blank" : undefined} rel={entry.url.startsWith("https://") ? "noreferrer" : undefined}><Link2 size={18} /><span><strong>{entry.title}</strong><small>{entry.body}</small></span><ExternalLink size={16} /></a></div> : null)}</div></section></div>
 
-      <section className="knowledge-contact"><div><EditableText as="span" className="section-label" content={content} contentId="knowledge.contact.eyebrow" fallback="Stadig i tvivl?" editorMode={editorMode} onEdit={onEdit} /><EditableText as="h2" content={content} contentId="knowledge.contact.title" fallback="Tag D-GITA med fra begyndelsen." editorMode={editorMode} onEdit={onEdit} /><EditableText as="p" content={content} contentId="knowledge.contact.body" fallback="Fortæl kort, hvad du har brug for hjælp til — fx at finde et system, skaffe kontrakt eller dokumentation eller komme i gang med din første ansøgning." editorMode={editorMode} onEdit={onEdit} /></div><a className="solid-button" href="mailto:ckra@kalundborg.dk?subject=Ønske%20om%20D-GITA-formøde">Book et formøde <ArrowRight size={18} /></a></section>
+      <section className="knowledge-contact"><div><EditableText as="span" className="section-label" content={content} contentId="knowledge.contact.eyebrow" fallback="Stadig i tvivl?" editorMode={editorMode} onEdit={onEdit} /><EditableText as="h2" content={content} contentId="knowledge.contact.title" fallback="Tag D-GITA med fra begyndelsen." editorMode={editorMode} onEdit={onEdit} /><EditableText as="p" content={content} contentId="knowledge.contact.body" fallback="Fortæl kort, hvad du har brug for hjælp til — fx at finde et system, skaffe kontrakt eller dokumentation eller komme i gang med din første ansøgning." editorMode={editorMode} onEdit={onEdit} /></div>{contactEmail(content) ? <a className="solid-button" href={`mailto:${contactEmail(content)}?subject=Ønske%20om%20D-GITA-formøde`}>Book et formøde <ArrowRight size={18} /></a> : null}</section>
     </div>
   </div>;
 }
@@ -1395,7 +1407,7 @@ function applicationSnapshotSections(snapshot: ApplicationFormState) {
     { title: "Databehandleraftale", rows: [{ label: "Databehandleraftale", value: yesNo(snapshot.hasDpa) }, { label: "Kontrakt", value: yesNo(snapshot.hasContract) }, { label: "DPA-bilag", value: files("data-processing-agreement") }, { label: "Kontraktbilag", value: files("contract") }] },
     { title: "Implementering", rows: [{ label: "Start", value: formatCaseDate(snapshot.startDate) }, { label: "Slut", value: formatCaseDate(snapshot.endDate) }, { label: "Antal brugere", value: snapshot.implementationUsers }, { label: "Ressourcer", value: snapshot.implementationResources }, { label: "Milepæle", value: list(snapshot.milestones) }] },
     { title: "IT-krav", rows: [{ label: "Arkitekturtegning", value: yesNo(snapshot.hasArchitecture) }, { label: "Arkitekturbilag", value: files("architecture") }, { label: "Leverandørtjekliste", value: yesNo(snapshot.hasSupplierChecklist) }, { label: "Tjeklistebilag", value: files("supplier-checklist") }, { label: "Journaliseret i ESDH", value: yesNo(snapshot.checklistJournalized) }] },
-    { title: "Øvrige", rows: [{ label: "Godkendende chef", value: snapshot.approvingLeader }, { label: "Bemærkninger", value: snapshot.remarks }, { label: "Samtykke", value: snapshot.consent ? "Ja" : "Nej" }] },
+    { title: "Øvrige", rows: [{ label: "Godkendende chef", value: snapshot.approvingLeader }, { label: "Bemærkninger", value: snapshot.remarks }, { label: "Bekræftelse af oplysninger", value: snapshot.consent ? "Ja" : "Nej" }] },
   ];
 }
 
@@ -1416,6 +1428,8 @@ function YesNoControl({ value, onChange }: { value: "" | "Ja" | "Nej"; onChange:
 
 function DgitaApprovalPanel({ value, onSave, lockedReason }: { lockedReason: string | null; value: DgitaApproval; onSave: (value: DgitaApproval) => Promise<boolean> }) {
   const [draft, setDraft] = useState<DgitaApproval>(() => structuredClone(value));
+  const [infrastructureError, setInfrastructureError] = useState("");
+  const infrastructureRef = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
   const [baseline, setBaseline] = useState(() => JSON.stringify(value));
   const dirty = JSON.stringify(draft) !== baseline;
@@ -1427,6 +1441,12 @@ function DgitaApprovalPanel({ value, onSave, lockedReason }: { lockedReason: str
 
   async function save() {
     if (saving) return;
+    if (draft.infrastructureChanges === "Ja" && !draft.infrastructureDescription?.trim()) {
+      setInfrastructureError("Beskriv ændringerne i infrastrukturen.");
+      infrastructureRef.current?.focus();
+      return;
+    }
+    setInfrastructureError("");
     setSaving(true);
     try {
       if (await onSave(draft)) { setBaseline(JSON.stringify(draft)); clearGuard(); }
@@ -1435,10 +1455,11 @@ function DgitaApprovalPanel({ value, onSave, lockedReason }: { lockedReason: str
 
   function update<K extends keyof DgitaApproval>(field: K, next: DgitaApproval[K]) {
     if (saving) return;
-    setDraft((current) => ({ ...current, [field]: next }));
+    if (field === "infrastructureDescription" || field === "infrastructureChanges") setInfrastructureError("");
+    setDraft((current) => ({ ...current, [field]: next, ...(field === "infrastructureChanges" && next !== "Ja" ? { infrastructureDescription: "" } : {}) }));
   }
 
-  return <div className="dgita-review-layout"><section className="plain-section dgita-review"><div className="plain-heading"><span className="section-label dark">Internt arbejdsområde</span><h2>D-GITA-godkendelse</h2><button className="solid-button" type="button" disabled={saving || Boolean(lockedReason)} onClick={() => void save()}><Save size={17} /> {saving ? "Gemmer…" : "Gem D-GITA-felter"}</button></div><div className="internal-notice"><LockKeyhole size={18} /><p>Dette område er kun tilgængeligt for D-GITA-konsulenter og administratorer. Interne kommentarer vises aldrig for anmoderen eller i PDF-kvitteringen.</p></div>{lockedReason ? <p className="review-lock-note" role="status"><LockKeyhole size={16} /> {lockedReason}</p> : null}<fieldset className="review-fields" disabled={saving || Boolean(lockedReason)}><Question title="D-GITA felt: Er ansøgningen godkendt?"><YesNoControl value={draft.approved} onChange={(next) => update("approved", next)} /></Question><Question title="D-GITA felt: Dato"><input className="clean-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} /></Question><Question title="D-GITA felt: Relevant sikkerheds- og regelramme" hint="Valget angiver en ramme, ikke det konkrete behandlingsgrundlag. Afklar hjemmel og krav med kommunens ansvarlige."><label className="clean-select review-select"><select value={draft.legalBasis} onChange={(event) => update("legalBasis", event.target.value as DgitaApproval["legalBasis"])}><option value="">Vælg ramme</option>{D_GITA_FRAMEWORKS.map((basis) => <option key={basis}>{basis}</option>)}</select><ChevronDown size={16} /></label></Question><Question title="D-GITA felt: D-GITA ansvarlig" hint="Skriv her hvem der er ansvarlig for behandling af formularen."><input className="clean-input" value={draft.responsible} onChange={(event) => update("responsible", event.target.value)} placeholder="Søg efter person" /></Question><Question title="D-GITA felt: Er der flere D-GITA ansvarlige?"><YesNoControl value={draft.hasAdditionalResponsible} onChange={(next) => update("hasAdditionalResponsible", next)} /></Question>{draft.hasAdditionalResponsible === "Ja" ? <Question title="Hvis ja, angiv næste D-GITA ansvarlige"><input className="clean-input" value={draft.additionalResponsible} onChange={(event) => update("additionalResponsible", event.target.value)} placeholder="Angiv en eller flere personer" /></Question> : null}<Question title="D-GITA felt: IT-konsulent" hint="Vælg den person som bliver koblet på løsningen, som en teknisk ansvarlig fra IT-afdelingen."><input className="clean-input" value={draft.itConsultant} onChange={(event) => update("itConsultant", event.target.value)} placeholder="Søg efter person" /></Question><Question title="D-GITA felt: Medfører systemet ændringer i den eksisterende infrastruktur?"><YesNoControl value={draft.infrastructureChanges} onChange={(next) => update("infrastructureChanges", next)} /></Question><Question title="D-GITA felt: Bemærkninger"><textarea className="clean-input" rows={4} value={draft.notes} onChange={(event) => update("notes", event.target.value)} /></Question><Question title="D-GITA felt: Interne kommentarer" hint="Kommentarer mellem D-GITA konsulenter. Feltet er skjult for anmoder og medtages ikke i den PDF, der genereres ved endelig godkendelse."><textarea className="clean-input internal-comment-input" rows={5} value={draft.internalComments} onChange={(event) => update("internalComments", event.target.value)} /></Question><Question title="D-GITA felt: Fase" hint="Beskriver hvilken fase ansøgningen er i."><label className="clean-select review-select"><select value={draft.phase} onChange={(event) => update("phase", event.target.value as DgitaApproval["phase"])}>{D_GITA_PHASES.map((phase) => <option key={phase}>{phase}</option>)}</select><ChevronDown size={16} /></label></Question></fieldset></section><aside className="review-source-note"><ShieldCheck size={23} /><span className="section-label dark">Kildematch</span><h3>Felter fra den nuværende løsning</h3><p>Godkendelsesfelterne og hjælpeteksterne er kortlagt fra Power Pages-formularen “D-GITA-Godkendelse”.</p><ul><li><Check size={14} /> Betinget ekstra ansvarlig</li><li><Check size={14} /> Ramme: NSIS, NIS2 eller GDPR</li><li><Check size={14} /> Intern kommentar adskilt fra ansøger</li><li><Check size={14} /> Fase og infrastrukturbeslutning</li></ul></aside></div>;
+  return <div className="dgita-review-layout"><section className="plain-section dgita-review"><div className="plain-heading"><span className="section-label dark">Internt arbejdsområde</span><h2>D-GITA-godkendelse</h2><button className="solid-button" type="button" disabled={saving || Boolean(lockedReason)} onClick={() => void save()}><Save size={17} /> {saving ? "Gemmer…" : "Gem D-GITA-felter"}</button></div><div className="internal-notice"><LockKeyhole size={18} /><p>Dette område er kun tilgængeligt for D-GITA-konsulenter og administratorer. Interne kommentarer vises aldrig for anmoderen eller i PDF-kvitteringen.</p></div>{lockedReason ? <p className="review-lock-note" role="status"><LockKeyhole size={16} /> {lockedReason}</p> : null}<fieldset className="review-fields" disabled={saving || Boolean(lockedReason)}><Question title="D-GITA felt: Er ansøgningen godkendt?"><YesNoControl value={draft.approved} onChange={(next) => update("approved", next)} /></Question><Question title="D-GITA felt: Dato"><input className="clean-input" type="date" value={draft.date} onChange={(event) => update("date", event.target.value)} /></Question><Question title="D-GITA felt: Relevant sikkerheds- og regelramme" hint="Valget angiver en ramme, ikke det konkrete behandlingsgrundlag. Afklar hjemmel og krav med kommunens ansvarlige."><label className="clean-select review-select"><select value={draft.legalBasis} onChange={(event) => update("legalBasis", event.target.value as DgitaApproval["legalBasis"])}><option value="">Vælg ramme</option>{D_GITA_FRAMEWORKS.map((basis) => <option key={basis}>{basis}</option>)}</select><ChevronDown size={16} /></label></Question><Question title="D-GITA felt: D-GITA ansvarlig" hint="Skriv her hvem der er ansvarlig for behandling af formularen."><input className="clean-input" value={draft.responsible} onChange={(event) => update("responsible", event.target.value)} placeholder="Søg efter person" /></Question><Question title="D-GITA felt: Er der flere D-GITA ansvarlige?"><YesNoControl value={draft.hasAdditionalResponsible} onChange={(next) => update("hasAdditionalResponsible", next)} /></Question>{draft.hasAdditionalResponsible === "Ja" ? <Question title="Hvis ja, angiv næste D-GITA ansvarlige"><input className="clean-input" value={draft.additionalResponsible} onChange={(event) => update("additionalResponsible", event.target.value)} placeholder="Angiv en eller flere personer" /></Question> : null}<Question title="D-GITA felt: IT-konsulent" hint="Vælg den person som bliver koblet på løsningen, som en teknisk ansvarlig fra IT-afdelingen."><input className="clean-input" value={draft.itConsultant} onChange={(event) => update("itConsultant", event.target.value)} placeholder="Søg efter person" /></Question><Question title="D-GITA felt: Medfører systemet ændringer i den eksisterende infrastruktur?"><YesNoControl value={draft.infrastructureChanges} onChange={(next) => update("infrastructureChanges", next)} /></Question>{draft.infrastructureChanges === "Ja" ? <Question title="Beskriv ændringerne i infrastrukturen" hint="Beskriv fx integrationer, netværk eller adgang. Oplysningerne er interne og indgår ikke i brugerens kvittering."><textarea ref={infrastructureRef} className="clean-input" rows={4} maxLength={8000} aria-required="true" aria-invalid={infrastructureError ? true : undefined} aria-describedby={infrastructureError ? "infrastructure-description-error" : undefined} value={draft.infrastructureDescription ?? ""} onChange={(event) => update("infrastructureDescription", event.target.value)} />{infrastructureError ? <p className="field-error" id="infrastructure-description-error" role="alert">{infrastructureError}</p> : null}</Question> : null}<Question title="D-GITA felt: Bemærkninger"><textarea className="clean-input" rows={4} value={draft.notes} onChange={(event) => update("notes", event.target.value)} /></Question><Question title="D-GITA felt: Interne kommentarer" hint="Kommentarer mellem D-GITA konsulenter. Feltet er skjult for anmoder og medtages ikke i den PDF, der genereres ved endelig godkendelse."><textarea className="clean-input internal-comment-input" rows={5} value={draft.internalComments} onChange={(event) => update("internalComments", event.target.value)} /></Question><Question title="D-GITA felt: Fase" hint="Beskriver hvilken fase ansøgningen er i."><label className="clean-select review-select"><select value={draft.phase} onChange={(event) => update("phase", event.target.value as DgitaApproval["phase"])}>{D_GITA_PHASES.map((phase) => <option key={phase}>{phase}</option>)}</select><ChevronDown size={16} /></label></Question></fieldset></section><aside className="review-source-note"><ShieldCheck size={23} /><span className="section-label dark">Kildematch</span><h3>Felter fra den nuværende løsning</h3><p>Godkendelsesfelterne og hjælpeteksterne er kortlagt fra Power Pages-formularen “D-GITA-Godkendelse”.</p><ul><li><Check size={14} /> Betinget ekstra ansvarlig</li><li><Check size={14} /> Ramme: NSIS, NIS2 eller GDPR</li><li><Check size={14} /> Intern kommentar adskilt fra ansøger</li><li><Check size={14} /> Fase og infrastrukturbeslutning</li></ul></aside></div>;
 }
 
 function FileList({ caseId }: { caseId: string }) {
@@ -1645,7 +1666,7 @@ function ContentEditorCard({
     }
   }
 
-  return <article className="content-editor-card"><div className="content-editor-meta"><span>{entry.location}</span><code>{entry.id}</code></div><label>Titel<input className="clean-input" value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label><label>Tekst<textarea className="clean-input" rows={4} value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} /></label>{entry.category === "link" ? <label>Linkadresse<input className={cx("clean-input", urlError && "input-error")} value={draft.url ?? ""} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} />{urlError ? <small className="field-error">{urlError}</small> : null}</label> : null}<div className="content-editor-actions"><label className="publish-toggle"><input type="checkbox" checked={draft.published} onChange={(event) => setDraft((current) => ({ ...current, published: event.target.checked }))} /><span /> Publiceret</label><div><button className="quiet-danger" type="button" disabled={removing || saving} onClick={() => void remove()}><Trash2 size={16} /> {removing ? "Fjerner…" : "Fjern"}</button><button className="solid-button" type="button" disabled={saving || removing} onClick={() => void save()}><Save size={16} /> {saving ? "Gemmer…" : "Gem"}</button></div></div>{entry.updatedAt ? <small className="content-updated">Senest ændret {new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.updatedAt))}{entry.updatedBy ? ` af ${entry.updatedBy}` : ""}</small> : null}</article>;
+  return <article className="content-editor-card"><div className="content-editor-meta"><span>{entry.location}</span><code>{entry.id}</code></div><label>Titel<input className="clean-input" value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label><label>Tekst<textarea className="clean-input" rows={4} value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} /></label>{entry.id === "link.contact" ? <p>Kontaktlinket bruger den fælles e-mailadresse. Ret den under Portaltekster → Kontakt · e-mail.</p> : entry.category === "link" ? <label>Linkadresse<input className={cx("clean-input", urlError && "input-error")} value={draft.url ?? ""} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} />{urlError ? <small className="field-error">{urlError}</small> : null}</label> : null}<div className="content-editor-actions"><label className="publish-toggle"><input type="checkbox" checked={draft.published} onChange={(event) => setDraft((current) => ({ ...current, published: event.target.checked }))} /><span /> Publiceret</label><div><button className="quiet-danger" type="button" disabled={removing || saving} onClick={() => void remove()}><Trash2 size={16} /> {removing ? "Fjerner…" : "Fjern"}</button><button className="solid-button" type="button" disabled={saving || removing} onClick={() => void save()}><Save size={16} /> {saving ? "Gemmer…" : "Gem"}</button></div></div>{entry.updatedAt ? <small className="content-updated">Senest ændret {new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.updatedAt))}{entry.updatedBy ? ` af ${entry.updatedBy}` : ""}</small> : null}</article>;
 }
 
 function Integration({ icon: Icon, title, detail, status, tone }: { icon: LucideIcon; title: string; detail: string; status: string; tone: "healthy" | "waiting" }) {

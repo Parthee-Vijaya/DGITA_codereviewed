@@ -86,6 +86,11 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     YES_NO_OR_EMPTY,
     "Valget for infrastrukturændringer er ugyldigt.",
   );
+  const infrastructureDescription = boundedString(
+    input.infrastructureDescription ?? "",
+    "Beskrivelse af infrastrukturændringer",
+    8_000,
+  ).trim();
   const notes = boundedString(input.notes, "Bemærkninger", 8_000);
   const internalComments = boundedString(
     input.internalComments,
@@ -103,6 +108,9 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
       "Angiv mindst én yderligere D-GITA-ansvarlig.",
     );
   }
+  if (infrastructureChanges === "Ja" && !infrastructureDescription) {
+    throw new WorkspaceInputError(422, "Beskriv ændringerne i infrastrukturen.");
+  }
 
   return normalizeDgitaApproval({
     approved: approved as DgitaApproval["approved"],
@@ -115,6 +123,7 @@ export function normalizeDgitaApprovalInput(value: unknown): DgitaApproval {
     itConsultant,
     infrastructureChanges:
       infrastructureChanges as DgitaApproval["infrastructureChanges"],
+    infrastructureDescription,
     notes,
     internalComments,
     phase: phase as DgitaApproval["phase"],

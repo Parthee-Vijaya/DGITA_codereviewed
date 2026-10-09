@@ -311,6 +311,7 @@ export type DgitaApproval = {
   additionalResponsible: string;
   itConsultant: string;
   infrastructureChanges: "" | "Ja" | "Nej";
+  infrastructureDescription: string;
   notes: string;
   internalComments: string;
   phase: (typeof D_GITA_PHASES)[number];
@@ -327,6 +328,7 @@ export const EMPTY_D_GITA_APPROVAL: DgitaApproval = {
   additionalResponsible: "",
   itConsultant: "",
   infrastructureChanges: "",
+  infrastructureDescription: "",
   notes: "",
   internalComments: "",
   phase: "Kladde",
@@ -337,6 +339,10 @@ export function normalizeDgitaApproval(value: DgitaApproval): DgitaApproval {
     ...value,
     additionalResponsible:
       value.hasAdditionalResponsible === "Ja" ? value.additionalResponsible : "",
+    infrastructureDescription:
+      value.infrastructureChanges === "Ja" && typeof value.infrastructureDescription === "string"
+        ? value.infrastructureDescription.trim()
+        : "",
   };
 }
 
@@ -687,7 +693,7 @@ export const DEFAULT_CONTENT: ContentEntry[] = [
     id: "faq.leader-not-visible",
     category: "faq",
     title: "Hvorfor er lederen ikke synlig under Mine ansøgninger?",
-    body: "Lederen vises først i overblikket, når ansøgningen er indsendt, og adviseringen er oprettet. I den nuværende løsning kan der gå cirka 3–5 minutter efter “Gem og indsend”. En gemt kladde udløser ikke lederadviseringen.",
+    body: "Lederadviseringen oprettes ved indsendelse. Levering afhænger af mailkøen. En gemt kladde udløser ikke lederadvisering.",
     location: "Vejledning / FAQ",
     published: true,
   },
@@ -841,6 +847,12 @@ export function contentBody(entries: ContentEntry[], id: string, fallback: strin
   const entry = entries.find((candidate) => candidate.id === id);
   if (!entry) return fallback;
   return entry.published ? entry.body : "";
+}
+
+/** Missing records retain built-in content; an explicit unpublished record does not. */
+export function isContentVisible(entries: ContentEntry[], id: string) {
+  const entry = entries.find((candidate) => candidate.id === id);
+  return entry ? entry.published : true;
 }
 
 export function isSafeContentUrl(value: string) {

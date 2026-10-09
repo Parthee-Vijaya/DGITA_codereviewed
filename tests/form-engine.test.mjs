@@ -6,6 +6,7 @@ import {
   createAttachmentDraft,
   demoApplicationState,
   getFinanceTotal,
+  getUploadPolicy,
   getStepErrors,
   getStepWarnings,
   initialApplicationState,
@@ -149,7 +150,7 @@ test("filpolitik håndhæver type og 25 MB", () => {
   );
   assert.match(
     validateUpload("risk-assessment", { name: "risiko.exe", size: 250_000, type: "" }) ?? "",
-    /PDF, DOCX eller XLSX/,
+    /PDF, DOC, DOCX, XLS, XLSX/,
   );
   assert.match(
     validateUpload("architecture", {
@@ -270,4 +271,67 @@ test("katalogsøgning er accent- og case-insensitiv og prioriterer Kalundborg", 
   const result = searchCatalog(catalog, "økonomi");
   assert.equal(result.length, 2);
   assert.equal(result[0].usedInKalundborg, true);
+});
+
+
+test("påkrævet tekst og lister kan ikke opfyldes med mellemrum", () => {
+  for (const [field, step] of [["manualSystemName", 0], ["contactPerson", 0], ["dataOwner", 1], ["purpose", 3], ["benefits", 4], ["implementationResources", 6]]) {
+    const errors = getStepErrors(state({ knownSystem: "nej", [field]: " \t\n " }), step);
+    assert.ok(errors.some((error) => error.field === (field === "manualSystemName" ? "manualSystem" : field)), field);
+  }
+  assert.ok(getStepErrors(state({ crossDepartments: [" ", "\t"] }), 3).some((error) => error.field === "crossDepartments"));
+  assert.ok(getStepErrors(state({ hasBudget: "ja", budgetAmount: " " }), 4).some((error) => error.field === "budgetAmount"));
+});
+
+test("valg kontrolleres mod UI-valgene, og skjulte svar blokerer ikke", () => {
+  for (const [field, step] of [["acquisitionMethod", 2], ["dataClassification", 5], ["employeeAccess", 5], ["implementationUsers", 6]]) {
+    assert.ok(getStepErrors(state({ personalData: "ja", [field]: "Ukendt valg" }), step).some((error) => error.field === field), field);
+  }
+  assert.equal(getStepErrors(state({ personalData: "nej", dataClassification: "Gammelt svar" }), 5).some((error) => error.field === "dataClassification"), false);
+  assert.equal(getStepErrors(state({ employeeAccess: "" }), 5).some((error) => error.field === "employeeAccess"), false);
+});
+
+test("datoer skal være reelle kalenderdatoer, også i direkte API-input", () => {
+  for (const value of ["2026-02-29", "2026-04-31", "2026-13-01", "01-10-2026", "2026-1-01", "0000-01-01", "2026-10-01T12:00:00Z"]) {
+    assert.ok(getStepErrors(state({ startDate: value }), 6).some((error) => error.field === "startDate"), value);
+  }
+  assert.equal(getStepErrors(state({ startDate: "2028-02-29", endDate: "2028-02-29" }), 6).length, 0);
+});
+
+test("CVR og links valideres kun, når det relevante felt er udfyldt og synligt", () => {
+  for (const field of ["supplierCvr", "rightsHolderCvr"]) {
+    assert.ok(getStepErrors(state({ knownSystem: "nej", [field]: "1234567X" }), 0).some((error) => error.field === field));
+    for (const value of ["", " ", "12345678", "12 34 56 78"]) {
+      assert.equal(getStepErrors(state({ knownSystem: "nej", [field]: value }), 0).some((error) => error.field === field), false);
+    }
+    assert.equal(getStepErrors(state({ knownSystem: "ja", [field]: "historisk værdi" }), 0).some((error) => error.field === field), false);
+  }
+  for (const [field, step] of [["descriptionUrl", 0], ["esdhContractUrl", 1], ["esdhDpaUrl", 1]]) {
+    for (const value of ["javascript:alert(1)", "ikke et link", "ftp://example.invalid", "https://user:password@example.invalid"]) {
+      assert.ok(getStepErrors(state({ knownSystem: "nej", [field]: value }), step).some((error) => error.field === field), `${field}: ${value}`);
+    }
+    for (const value of ["", " https://esdh.example.invalid/sag/123 ", "http://intranet/sag/123"]) {
+      assert.equal(getStepErrors(state({ knownSystem: "nej", [field]: value }), step).some((error) => error.field === field), false);
+    }
+  }
+});
+
+test("gratis anskaffelse og nul kroner er fortsat gyldigt", () => {
+  const free = state({ acquisitionMethod: "Gratis", hasBudget: "ja", budgetAmount: "0", oneTimeCost: "0,00", yearlyCost: "0", otherCost: "0" });
+  assert.equal(getStepErrors(free, 2).length, 0);
+  assert.equal(getStepErrors(free, 4).length, 0);
+  assert.equal(getFinanceTotal(free), 0);
+  assert.match(getStepErrors(state({ oneTimeCost: "-1" }), 4)[0].message, /0 kr. eller derover/);
+});
+
+test("filvalg og serverpolitik bruger samme tilladte udvidelser", () => {
+  for (const kind of Object.keys(initialApplicationState.attachments)) {
+    const policy = getUploadPolicy(kind);
+    assert.deepEqual(policy.accept.split(","), policy.extensions.map((extension) => `.${extension}`));
+    for (const extension of ["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg", "exe", "svg"]) {
+      assert.equal(validateUpload(kind, { name: `bilag.${extension}`, size: 10, type: "" }) === null, policy.extensions.includes(extension), `${kind}: ${extension}`);
+    }
+  }
+  assert.match(validateUpload("contract", { name: "bad\n.pdf", size: 10, type: "" }), /Filnavnet/);
+  assert.match(validateUpload("contract", { name: "bilag.pdf", size: Number.NaN, type: "" }), /størrelse/);
 });

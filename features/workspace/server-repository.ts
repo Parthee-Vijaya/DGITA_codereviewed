@@ -60,7 +60,8 @@ type ApplicationRow = {
 type StoredContentRow = {
   key: string;
   content_type: string;
-  value_json: string;
+  status: string;
+  value_json: string | null;
 };
 
 type StoredApprovalRow = {
@@ -169,22 +170,49 @@ export async function listCasesForActor(actor: PortalActor): Promise<CaseRecord[
   return result.results.map(toCaseRecord);
 }
 
-export async function getWorkspaceForActor(actor: PortalActor) {
-  const DB = await preparePortalData();
-  const userId = await resolveActorUserId(DB, actor);
+export async function listWorkspaceContentForActor(
+  DB: D1Database,
+  actor: Pick<PortalActor, "tenantId" | "role">,
+) {
   const contentStatement = actor.role === "admin"
     ? DB.prepare(
-        `SELECT key, content_type, value_json FROM portal_content_entries
+        `SELECT key, content_type, status, value_json FROM portal_content_entries
          WHERE tenant_id = ? AND content_type IN ('content', 'image')
          ORDER BY created_at, key`,
       ).bind(actor.tenantId)
     : DB.prepare(
-        `SELECT key, content_type, value_json FROM portal_content_entries
-         WHERE tenant_id = ? AND status = 'published'
-           AND content_type IN ('content', 'image')
+        `SELECT key, content_type, status,
+           CASE WHEN status = 'published' THEN value_json ELSE NULL END AS value_json
+         FROM portal_content_entries
+         WHERE tenant_id = ?
+           AND (content_type = 'content' OR (content_type = 'image' AND status = 'published'))
          ORDER BY created_at, key`,
       ).bind(actor.tenantId);
   const contentRows = (await contentStatement.all<StoredContentRow>()).results;
+
+  return {
+    content: contentRows
+      .filter((row) => row.content_type === "content")
+      .flatMap((row): ContentEntry[] => {
+        // A tombstone suppresses built-in fallback without exposing draft text or metadata.
+        const hidden: ContentEntry = {
+          id: row.key, category: "portal_text", title: "", body: "", location: "", published: false,
+        };
+        if (actor.role !== "admin" && row.status !== "published") return [hidden];
+        const entries = row.value_json ? parseEntry<ContentEntry>(row.value_json) : [];
+        if (actor.role !== "admin" && entries.some((entry) => !entry.published)) return [hidden];
+        return entries.map((entry) => ({ ...entry, id: row.key, published: row.status === "published" }));
+      }),
+    images: contentRows
+      .filter((row) => row.content_type === "image")
+      .flatMap((row) => row.value_json ? parseEntry<ImageEntry>(row.value_json) : []),
+  };
+}
+
+export async function getWorkspaceForActor(actor: PortalActor) {
+  const DB = await preparePortalData();
+  const userId = await resolveActorUserId(DB, actor);
+  const content = await listWorkspaceContentForActor(DB, actor);
 
   const accessClause = actor.role === "user" ? "AND a.owner_user_id = ?" : "";
   const accessBindings = actor.role === "user"
@@ -227,12 +255,7 @@ export async function getWorkspaceForActor(actor: PortalActor) {
   }
 
   return {
-    content: contentRows
-      .filter((row) => row.content_type === "content")
-      .flatMap((row) => parseEntry<ContentEntry>(row.value_json)),
-    images: contentRows
-      .filter((row) => row.content_type === "image")
-      .flatMap((row) => parseEntry<ImageEntry>(row.value_json)),
+    ...content,
     approvals,
     fieldComments: commentResult.results.map((row) => ({
       id: row.id,
@@ -482,6 +505,41 @@ export async function getPortalImageForActor(actor: PortalActor, imageId: string
   return { row, bytes };
 }
 
+/** Internal server-side history; deliberately absent from workspace, receipt and public activity payloads. */
+export async function listApprovalHistoryForActor(actor: PortalActor, caseNumberValue: unknown) {
+  if (actor.role !== "consultant" && actor.role !== "admin") {
+    throw new PortalAccessError(403, "Kun D-GITA kan læse den interne vurderingshistorik.");
+  }
+  const caseNumber = normalizeWorkspaceCaseId(caseNumberValue);
+  const DB = await preparePortalData();
+  await resolveActorUserId(DB, actor);
+  const application = await accessibleApplication(DB, actor, caseNumber);
+  const result = await DB.prepare(`
+    SELECT id, application_version_id, application_revision, reviewer_user_id,
+           reviewer_subject, internal_fields_json, created_at
+    FROM portal_dgita_review_history
+    WHERE tenant_id = ? AND application_id = ?
+    ORDER BY application_revision, id
+  `).bind(actor.tenantId, application.id).all<{
+    id: string;
+    application_version_id: string | null;
+    application_revision: number;
+    reviewer_user_id: string;
+    reviewer_subject: string;
+    internal_fields_json: string;
+    created_at: string;
+  }>();
+  return result.results.map((row) => ({
+    id: row.id,
+    applicationVersionId: row.application_version_id,
+    applicationRevision: row.application_revision,
+    reviewerUserId: row.reviewer_user_id,
+    reviewerSubject: row.reviewer_subject,
+    approval: parseJson<DgitaApproval>(row.internal_fields_json),
+    createdAt: row.created_at,
+  }));
+}
+
 export async function saveApprovalForActor(
   actor: PortalActor,
   caseNumberValue: unknown,
@@ -554,6 +612,7 @@ export async function saveApprovalForActor(
         ? "in_review"
         : "pending";
   const auditId = crypto.randomUUID();
+  const historyId = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [
     DB.prepare(`
       UPDATE portal_applications
@@ -585,7 +644,7 @@ export async function saveApprovalForActor(
          status, internal_fields_json, decision_comment, created_at, updated_at,
          decided_at)
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      WHERE EXISTS (
+      WHERE changes() = 1 AND EXISTS (
         SELECT 1 FROM portal_applications application
         WHERE application.id = ? AND application.tenant_id = ?
           AND application.row_version = ? AND application.updated_at = ?
@@ -619,14 +678,30 @@ export async function saveApprovalForActor(
       lifecycle.phase,
     ),
     DB.prepare(`
+      INSERT INTO portal_dgita_review_history
+        (id, tenant_id, application_id, application_version_id, application_revision,
+         reviewer_user_id, reviewer_subject, internal_fields_json, created_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE changes() = 1
+    `).bind(
+      historyId,
+      actor.tenantId,
+      application.id,
+      application.current_version_id,
+      application.row_version + 1,
+      userId,
+      actor.subject,
+      JSON.stringify(normalized),
+      now,
+    ),
+    DB.prepare(`
       INSERT INTO portal_audit_events
         (id, tenant_id, application_id, actor_user_id, actor_subject, event_type,
          entity_type, entity_id, payload_json, ip_hash, occurred_at)
       SELECT ?, ?, ?, ?, ?, 'dgita.review.updated', 'application', ?, ?, NULL, ?
       WHERE EXISTS (
-        SELECT 1 FROM portal_dgita_approvals approval
-        WHERE approval.tenant_id = ? AND approval.application_id = ?
-          AND approval.updated_at = ? AND approval.reviewer_user_id = ?
+        SELECT 1 FROM portal_dgita_review_history history
+        WHERE history.id = ? AND history.tenant_id = ? AND history.application_id = ?
       )
     `).bind(
       auditId,
@@ -641,10 +716,9 @@ export async function saveApprovalForActor(
         applicationVersionId: application.current_version_id,
       }),
       now,
+      historyId,
       actor.tenantId,
       application.id,
-      now,
-      userId,
     ),
   ];
 
@@ -662,7 +736,8 @@ export async function saveApprovalForActor(
           (id, tenant_id, application_id, actor_user_id, actor_subject, event_type,
            entity_type, entity_id, payload_json, ip_hash, occurred_at)
         SELECT ?, ?, ?, ?, ?, 'application.closed', 'application', ?, ?, NULL, ?
-        WHERE EXISTS (
+        WHERE EXISTS (SELECT 1 FROM portal_dgita_review_history WHERE id = ?)
+          AND EXISTS (
           SELECT 1 FROM portal_applications application
           WHERE application.id = ? AND application.tenant_id = ?
             AND application.status = 'closed' AND application.closed_at = ?
@@ -679,6 +754,7 @@ export async function saveApprovalForActor(
           applicationVersionId: application.current_version_id,
         }),
         now,
+        historyId,
         application.id,
         actor.tenantId,
         now,
@@ -747,7 +823,9 @@ export async function saveApprovalForActor(
   const results = await DB.batch(statements);
   if (
     Number(results[0]?.meta.changes ?? 0) !== 1 ||
-    Number(results[1]?.meta.changes ?? 0) !== 1
+    Number(results[1]?.meta.changes ?? 0) !== 1 ||
+    Number(results[2]?.meta.changes ?? 0) !== 1 ||
+    Number(results[3]?.meta.changes ?? 0) !== 1
   ) {
     throw new PortalAccessError(
       409,

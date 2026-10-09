@@ -134,6 +134,40 @@ export type FieldError = {
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
+export const ACQUISITION_METHODS = [
+  "DIGIT udbud/aftale", "Direkte tildeling", "Gratis", "KOMBIT/KL/Offentligt projekt", "SKI-aftale",
+] as const;
+export const DATA_CLASSIFICATIONS = [
+  "1. Almindelige personoplysninger", "2. Følsomme personoplysninger", "3. Fortrolige oplysninger", "4. CPR data",
+] as const;
+export const USER_COUNT_OPTIONS = ["0-9", "10-49", "50-99", "100-499", "500-100000"] as const;
+
+const UPLOAD_MIME_TYPES = {
+  pdf: ["application/pdf"],
+  doc: ["application/msword"],
+  docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  xls: ["application/vnd.ms-excel"],
+  xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  png: ["image/png"],
+  jpg: ["image/jpeg"],
+  jpeg: ["image/jpeg"],
+} satisfies Record<string, string[]>;
+type UploadExtension = keyof typeof UPLOAD_MIME_TYPES;
+const DOCUMENT_EXTENSIONS: readonly UploadExtension[] = ["pdf", "doc", "docx", "xls", "xlsx"];
+const ALL_UPLOAD_EXTENSIONS: readonly UploadExtension[] = [...DOCUMENT_EXTENSIONS, "png", "jpg", "jpeg"];
+
+/** The picker, visible guidance and server validation share this policy. */
+export function getUploadPolicy(kind: UploadKind) {
+  const extensions = kind === "risk-assessment" ? DOCUMENT_EXTENSIONS : ALL_UPLOAD_EXTENSIONS;
+  const formats = extensions.map((extension) => extension.toUpperCase()).join(", ");
+  return {
+    extensions,
+    accept: extensions.map((extension) => `.${extension}`).join(","),
+    guidance: `${formats} · maks. ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB`,
+    invalidTypeMessage: `Vælg en fil af typen ${formats}.`,
+  };
+}
+
 export const FORM_RULES: FormRule[] = [
   {
     id: "replacement-system",
@@ -469,8 +503,8 @@ function required(field: string, value: unknown, message: string): FieldError | 
   const empty =
     value === null ||
     value === undefined ||
-    value === "" ||
-    (Array.isArray(value) && value.length === 0);
+    (typeof value === "string" && value.trim() === "") ||
+    (Array.isArray(value) && (value.length === 0 || value.every((item) => typeof item === "string" && item.trim() === "")));
   return empty ? { field, message, severity: "error" } : null;
 }
 
@@ -485,6 +519,37 @@ function visibleRequired(
 
 function compact(errors: Array<FieldError | null>) {
   return errors.filter((error): error is FieldError => error !== null);
+}
+
+function choiceError(field: string, value: string, options: readonly string[], message: string, mandatory = true): FieldError | null {
+  if (!mandatory && !value.trim()) return null;
+  return options.includes(value) ? null : { field, message, severity: "error" };
+}
+
+function urlError(field: string, value: string): FieldError | null {
+  if (!value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (["http:", "https:"].includes(url.protocol) && url.hostname && !url.username && !url.password) return null;
+  } catch { /* Present the same actionable error for malformed URLs. */ }
+  return { field, message: "Angiv et gyldigt link, der starter med https:// eller http://, uden brugernavn og adgangskode.", severity: "error" };
+}
+
+function cvrError(field: string, value: string): FieldError | null {
+  if (!value.trim() || /^\d{8}$/u.test(value.replace(/\s/gu, ""))) return null;
+  return { field, message: "CVR-nummeret skal indeholde 8 cifre.", severity: "error" };
+}
+
+function isCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value) || value.startsWith("0000-")) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function dateError(field: string, value: string, label: string): FieldError | null {
+  return required(field, value, `Angiv ${label}.`) ?? (isCalendarDate(value) ? null : {
+    field, message: `Angiv en gyldig ${label}.`, severity: "error",
+  });
 }
 
 export function getStepErrors(state: ApplicationFormState, step: number): FieldError[] {
@@ -508,6 +573,11 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
         ),
         required("contactPerson", state.contactPerson, "Angiv en kontaktperson."),
         required("department", state.department, "Angiv center eller afdeling."),
+        ...(isFieldVisible("manualSystem", state) ? [
+          urlError("descriptionUrl", state.descriptionUrl),
+          cvrError("supplierCvr", state.supplierCvr),
+          cvrError("rightsHolderCvr", state.rightsHolderCvr),
+        ] : []),
       ]);
     case 1:
       return compact([
@@ -521,10 +591,12 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
               "Angiv ansvarlig afdeling eller enhed.",
             )
           : null,
+        urlError("esdhContractUrl", state.esdhContractUrl),
+        urlError("esdhDpaUrl", state.esdhDpaUrl),
       ]);
     case 2:
       return compact([
-        required("acquisitionMethod", state.acquisitionMethod, "Vælg anskaffelsesform."),
+        choiceError("acquisitionMethod", state.acquisitionMethod, ACQUISITION_METHODS, "Vælg en anskaffelsesform fra listen."),
         visibleRequired(
           state,
           "marketResearchSystems",
@@ -586,7 +658,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
         if (value && parseDanishAmount(value) === null) {
           errors.push({
             field,
-            message: "Beløbet skal være et gyldigt positivt tal.",
+            message: "Angiv et gyldigt beløb på 0 kr. eller derover.",
             severity: "error",
           });
         }
@@ -595,12 +667,10 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
     }
     case 5:
       return compact([
-        visibleRequired(
-          state,
-          "dataClassification",
-          state.dataClassification,
-          "Vælg dataklassifikation.",
-        ),
+        isFieldVisible("dataClassification", state)
+          ? choiceError("dataClassification", state.dataClassification, DATA_CLASSIFICATIONS, "Vælg en dataklassifikation fra listen.")
+          : null,
+        choiceError("employeeAccess", state.employeeAccess, USER_COUNT_OPTIONS, "Vælg antal medarbejdere fra listen.", false),
         visibleRequired(
           state,
           "data-processing-agreement",
@@ -623,11 +693,11 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           state.implementationResources,
           "Beskriv ressourcetrækket.",
         ),
-        required("startDate", state.startDate, "Angiv startdato."),
-        required("endDate", state.endDate, "Angiv slutdato."),
-        required("implementationUsers", state.implementationUsers, "Vælg antal brugere."),
+        dateError("startDate", state.startDate, "startdato"),
+        dateError("endDate", state.endDate, "slutdato"),
+        choiceError("implementationUsers", state.implementationUsers, USER_COUNT_OPTIONS, "Vælg antal brugere fra listen."),
       ]);
-      if (state.startDate && state.endDate && state.endDate < state.startDate) {
+      if (isCalendarDate(state.startDate) && isCalendarDate(state.endDate) && state.endDate < state.startDate) {
         errors.push({
           field: "endDate",
           message: "Slutdatoen må ikke ligge før startdatoen.",
@@ -756,29 +826,15 @@ export function validateUpload(
   kind: UploadKind,
   file: { name: string; size: number; type: string },
 ): string | null {
+  if (!file.name.trim() || file.name.trim().length > 255 || /[\r\n\0]/u.test(file.name)) return "Filnavnet er ugyldigt.";
+  if (!Number.isSafeInteger(file.size)) return "Filens størrelse er ugyldig.";
   if (file.size > MAX_UPLOAD_BYTES) return "Filen må højst fylde 25 MB.";
   if (file.size <= 0) return "Filen er tom.";
 
-  const extension = file.name.toLowerCase().split(".").pop() ?? "";
-  const allowedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg"]);
-  const documentOnly = new Set(["pdf", "doc", "docx", "xls", "xlsx"]);
-  const allowed = kind === "risk-assessment" ? documentOnly : allowedExtensions;
-  if (!allowed.has(extension)) {
-    return kind === "risk-assessment"
-      ? "Risikovurderingen skal være PDF, DOCX eller XLSX."
-      : "Filtypen understøttes ikke.";
-  }
-  const allowedMimeTypes: Record<string, string[]> = {
-    pdf: ["application/pdf"],
-    doc: ["application/msword"],
-    docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
-    xls: ["application/vnd.ms-excel"],
-    xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
-    png: ["image/png"],
-    jpg: ["image/jpeg"],
-    jpeg: ["image/jpeg"],
-  };
-  if (file.type && !allowedMimeTypes[extension]?.includes(file.type.toLowerCase())) {
+  const extension = (file.name.trim().toLowerCase().split(".").pop() ?? "") as UploadExtension;
+  const policy = getUploadPolicy(kind);
+  if (!policy.extensions.includes(extension)) return policy.invalidTypeMessage;
+  if (file.type.trim() && !UPLOAD_MIME_TYPES[extension]?.includes(file.type.trim().toLowerCase())) {
     return "Filens indholdstype passer ikke til filnavnet.";
   }
   return null;

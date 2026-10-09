@@ -1,0 +1,1063 @@
+{
+  "date": "2026-10-09",
+  "baseline_sha": "8930b3c745d42b0b950086ffaf0b60ed4659dab2",
+  "ux_constraint": "Bevar eksisterende farver, typografi, navigation og trin. Små forbedringer skal have funktionel og visuel kontrol.",
+  "scope": "40 restopgaver + 24 sammenligningsfund. Intet punkt er kommunalt accepteret alene ved lokal test.",
+  "tasks": [
+    {
+      "id": "R01",
+      "title": "Vælg platform og anvendelsesramme",
+      "package": "W01",
+      "priority": "P0",
+      "action": "Beslut runtime, hosting, region, driftsmodel, datakategorier og omfanget af næste pilot. Afklar Vercel eller anden platform. Azure eller Hetzner kræver et særskilt implementerings- og testforløb; de er ikke leveret som produktionsopsætning. Den nuværende identitetsopsætning binder én Entra-tenant til én portaltenant; vælg separate instanser eller en særskilt udviklet model for flere kommuner.",
+      "acceptance": "Godkendt arkitektur- og miljøbeslutning med ressourceejerskab, begrænsninger og integrationsliste. Omfang og acceptansvar er registreret.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R02",
+      "title": "Udpeg ejere og uafhængig frigiver",
+      "package": "W01",
+      "priority": "P0",
+      "action": "Udpeg navngivne ansvarlige for system, IAM, data, sikkerhed, drift, tilgængelighed og journal. Udpeg en anden menneskelig kodereviewer og en frigiver med aftalt mandat. Aftal stedfortræder og kontrol af egne ændringer. Aftal også ejerskab og support af repositoryet.",
+      "acceptance": "Rolle- og mandatliste er accepteret. Den anden reviewer kan gennemføre review, og releasebeskyttelsen håndhæver den besluttede adskillelse.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R03",
+      "title": "Etablér et isoleret testmiljø",
+      "package": "W01",
+      "priority": "P0",
+      "action": "Opret særskilt projekt eller entydigt adskilt miljø med egen database, privat fillager, secrets og syntetiske data. Gennemgå arvede pilotidentiteter før ny offentlig eksponering. Registrér den gamle pilots deployment og aliaser før og efter.",
+      "acceptance": "Miljøtesten viser adskilte ressourcer og ingen adgang til produktion. Den gamle pilot er bevaret. Produktionskonfiguration afviser testlogin og automatisk testdataoprettelse. Før ny offentlig eksponering er en frisk syntetisk database eller eksplicit besluttet neutralisering af arvede identiteter verificeret; den gamle pilot ændres kun ved særskilt overgangsbeslutning.",
+      "original_dependencies": [
+        "R01"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R04",
+      "title": "Fastlæg secrets og offentlig adgang",
+      "package": "W01",
+      "priority": "P0",
+      "action": "Aftal sikker opbevaring, mindst nødvendige rettigheder, rotation, udløbsalarmer og nødtilbagekaldelse af secrets. Konfigurér betroet offentlig origin, domæne og TLS, sikre cookies, previewbeskyttelse og adgangskode til en offentlig testpilot. Rotation af approval-secret alene tilbagekalder ikke eksisterende links; øvelsen skal anvende de nødvendige revoke-funktioner.",
+      "acceptance": "Manglende eller forkert konfiguration afvises. Origin-, cookie- og adgangsprøver består i miljøet, og en kontrolleret secretrotation er dokumenteret uden værdier i logs eller repository.",
+      "original_dependencies": [
+        "R01",
+        "R03"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R05",
+      "title": "Afprøv kommunens rigtige identitet",
+      "package": "W03",
+      "priority": "P1",
+      "action": "Tilslut kommunens Entra-app og testkonti. Afprøv MFA-politik, tilladte tenants, roller, oprettelse og afgang, ændret rolle, inaktivitet og maksimal sessionstid. Kontrollér aktive sessioner ved tilbagekaldelse og negative tenant- og ejergrænser. Entra-afgang alene afslutter ikke en portalsession; vælg og øv en manuel procedure med servicemål eller autoritativ synkronisering.",
+      "acceptance": "Tilladte brugere gennemfører relevante forløb. Forkert tenant, rolle, ophørt bruger og tilbagekaldt session afvises. IAM-ejeren accepterer tidsgrænser og livscyklus.",
+      "original_dependencies": [
+        "R02",
+        "R03",
+        "R04"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R06",
+      "title": "Beslut hvordan lederen identificeres",
+      "package": "W03",
+      "priority": "P0",
+      "action": "Beslut om ledergodkendelse skal kræve login, eller om tidsbegrænsede bearerlinks og PDF via mail accepteres. Anbefalingen er autentificeret godkendelse i produktion. Hvis valgt, implementér loginvarianten og binding til lederens identitet uden at svække versions- eller tilbagekaldelseskontrol.",
+      "acceptance": "Beslutningen og restrisikoen er dokumenteret. Den valgte variant består prøver for videresendt, udløbet og tilbagekaldt link, forkert leder, rolleændring og gentaget beslutning.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R07",
+      "title": "Gennemfør uafhængig sikkerhedstest",
+      "package": "W08",
+      "priority": "P1",
+      "action": "Aftal testomfang for tenant- og ejergrænser, sessioner, godkendelseslinks, upload, direkte fillinks, administratorfunktioner og misbrug af offentlige endpoints. Afprøv også begrænsning af belastende eller gentagne kald ud fra risikovurderingen. Medtag editor og gemt XSS, CSRF, proxykonfiguration og cloudrettigheder.",
+      "acceptance": "Reviewrapport og relevante penetrationstests foreligger på kandidaten. Kritiske og høje fund er lukket og gentestet efter den gældende releasepolitik; øvrige fund har ejer og beslutning.",
+      "original_dependencies": [
+        "R03",
+        "R05",
+        "R09",
+        "R10",
+        "R11"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R08",
+      "title": "Luk den resterende værktøjsgæld",
+      "package": "W01",
+      "priority": "P0",
+      "action": "Gennemgå åbne dependencyopdateringer enkeltvis. Luk eller erstat de berørte braces-afhængigheder i udviklings- og deploymentværktøjer med kompatibilitetsbevis. Fjern den midlertidige Worker-konsoladapter, når en verificeret upstreamrettelse gør det muligt.",
+      "acceptance": "Runtimeaudit er fortsat uden fund. De 9 undtagne udviklingsnoder og 21 deployværktøjsnoder er håndteret eller konkret genreviewet før udløb 4. november 2026. Ingen stiltiende forlængelse; udløbet undtagelse blokerer.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Delvist implementeret",
+      "note": "To nye runtimefund rettet. Braces-undtagelser består til 4. november 2026; ingen upstreamfix eller forlænget frist.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R09",
+      "title": "Afprøv privat fillager fra browseren",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Tilslut rigtigt privat objektlager. Afprøv browserens presign, PUT og complete med CORS, størrelsesgrænser, checksums og udløbstid. Test download, slettede eller ændrede objekter samt adgang på tværs af ejer og kommune.",
+      "acceptance": "Hele upload- og downloadforløbet består med faktisk provider. Anonyme, udløbne og uvedkommende kald afvises; private bytes og versionsbinding er kontrolleret.",
+      "original_dependencies": [
+        "R03",
+        "R04"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R10",
+      "title": "Tilslut en godkendt malwaretjeneste",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Tilslut den valgte scanner og fastlæg testkorpus, driftsansvar og datahåndtering. Prøv ren, inficeret, krypteret og ikke-understøttet fil samt fejl, timeout og utilgængelig tjeneste gennem det faktiske uploadforløb.",
+      "acceptance": "Sikkerhedsejeren accepterer resultaterne. Fejl eller manglende godkendt scanning frigiver aldrig bilaget, og relevante hændelser ses i målinger og alarmer.",
+      "original_dependencies": [
+        "R03",
+        "R26"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R11",
+      "title": "Accepter rigtig maillevering",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Afgræns Graph-adgangen til den godkendte afsenderpostkasse. Afprøv hele godkenderflowet med aftalte testmodtagere, faktisk levering, attachments og fejl. Test tilbagekaldelse, versioner og afstemning af uklar leveringsstatus. Beslut også om PDF-vedhæftning kan erstattes af en minimal besked med autoriseret portalhenvisning.",
+      "acceptance": "Tilladt postkasse leverer, og anden postkasse afvises. Uafklaret levering genafsendes ikke blindt. Modtagelse, dataminimering og driftsprocedure er accepteret. Operatøren kan afstemme timeout og hængende køposter mod udbyderen før en kontrolleret genafsendelse.",
+      "original_dependencies": [
+        "R03",
+        "R06",
+        "R26"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R12",
+      "title": "Fastlæg og afprøv scheduler og kø",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Vælg jobinterval, kapacitet og mål for mailens ventetid. Vercels daglige cron er ikke accepteret som responsiv mailservice. Konfigurér en egnet løsning og afprøv maskinidentitet, overlap, timeout, backoff og oprydning af afbrudte uploads.",
+      "acceptance": "Faktiske jobkørsler og køalder måles. Overlap giver ikke dobbelte beslutninger; jobstop og manglende ticks opdages. Ukendt levering og genforsøg håndteres som aftalt.",
+      "original_dependencies": [
+        "R01",
+        "R11"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R13",
+      "title": "Fortsæt opdelingen af store moduler",
+      "package": "W01",
+      "priority": "P2",
+      "action": "Prioritér de målte komplekse funktioner og adskil især formularens state og API-kald fra visning. Vurder resterende ansvar i PortalClient og backend. Bevar den allerede gennemførte opdeling af uploads og pilotseed; ændr ét afgrænset ansvar ad gangen.",
+      "acceptance": "Hver ændring har review og bevarede tenant-, versions-, CAS- og mailtests. Kompleksitet og importgrænser vurderes med samme målemetode; flyttede linjer tæller ikke alene som lavere kompleksitet.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R14",
+      "title": "Udvid test af de udækkede risikogrene",
+      "package": "W01",
+      "priority": "P2",
+      "action": "Brug den målte delvise dækning til at prioritere providerfejl, samtidighed, tabte svar, versionsskift og øvrige udækkede sikkerhedsgrene. Tilføj hele browserforløb for sagsbehandler og administrator, hvor den nuværende lokale browserpakke ikke dækker.",
+      "acceptance": "Risikobaseret testliste og målte resultater foreligger. Nye tests fanger konkrete fejltilstande. Ingen global dækningsprocent hævdes på baggrund af et målt udsnit.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "I gang",
+      "note": "Nye enheds-, database-, API- og browserprøver for første leverance; samlet brancheret testdækning udestår.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R15",
+      "title": "Byg en entydig vej til preview",
+      "package": "W01",
+      "priority": "P0",
+      "action": "Implementér en eksplicit previewvej med entydigt projektvalg og kontrol af isolerede ressourcer. Det eksisterende Vercel-workflow vælger production selv ved valget pilot. Bind build, lockfil, runtime og artefaktdigest til kandidatens SHA.",
+      "acceptance": "Preview bruger ikke production-pull, --prod, promotion eller gamle pilotbindinger. Test viser afvisning af forkert target. Deployment-id, uforanderlig URL og artefaktdigest kan spores til den testede kilde.",
+      "original_dependencies": [
+        "R01"
+      ],
+      "input_requirements": [],
+      "status": "Kode implementeret; miljøaccept mangler",
+      "note": "Fast isoleret previewvej og afvisningsprøver. Ressourceinventar, adgangsopsætning og første faktiske preview er endnu ikke accepteret.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R16",
+      "title": "Øv promotion og tilbageførsel",
+      "package": "W08",
+      "priority": "P1",
+      "action": "Gennemfør staged release, smoke-test og tilbageførsel af det konkrete artefakt i et isoleret miljø. Afprøv datakompatibilitet og migrationsfejl. Først efter samlet accept aktiveres den besluttede produktionsfrigivelse. Luk automatiske promotionveje uden om godkendelsen.",
+      "acceptance": "Samme testede artefakt kan frigives og tilbageføres med kontrolleret dataadfærd. Reviewer, resultater og beslutning er registreret; godkendelsesflag bruges ikke til at omgå manglende beviser.",
+      "original_dependencies": [
+        "R02",
+        "R03",
+        "R15",
+        "R17",
+        "R19"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R17",
+      "title": "Planlæg overgang fra eksisterende data",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Afklar om pilotdata skal videreføres. Sammenlign schema, ledger, triggers, fremmednøgler og objektbindinger på en autoriseret isoleret kopi. Kortlæg gamle bilag uden checksum. Lav en eksplicit, reviewet migrerings- eller baselineprocedure.",
+      "acceptance": "Idempotente migrationer og datakomplethed er dokumenteret på den relevante kopi. Ingen automatisk ledgergodkendelse eller ændring af den eksisterende pilot; eventuel overgang har særskilt beslutning.",
+      "original_dependencies": [
+        "R01",
+        "R03",
+        "R25"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R18",
+      "title": "Etablér backup med aftalte mål",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Fastlæg accepteret datatab og gendannelsestid, RPO og RTO. Etablér konsistent backup af database og private filer i adskilt lager med adgang, kryptering, opbevaring og uafhængigt integritetsbevis. Tilføj en faktisk kilde til backupstatus.",
+      "acceptance": "Backupjobs kører på valgt platform, og fejl opdages. DB og filer kan knyttes til samme konsistente sagsgrundlag. Aftalte mål, adgang og lageradskillelse er dokumenteret.",
+      "original_dependencies": [
+        "R01",
+        "R03",
+        "R26"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R19",
+      "title": "Udfør en samlet gendannelsesøvelse",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Byg den platformspecifikke gendannelsesvej og øv restore i et isoleret miljø. Verificér sager, bilag, kvitteringer, versions- og auditspor med hashes. Prøv manglende og beskadigede objekter samt afbrudt restore. Den lokale syntetiske CLI er ikke en cloudbackupadapter.",
+      "acceptance": "Observeret datatab og varighed opfylder de accepterede mål. Datakomplethed er målt. Gamle sessioner, links og mail er i karantæne, og der sker ingen utilsigtet afsendelse.",
+      "original_dependencies": [
+        "R17",
+        "R18"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R20",
+      "title": "Beskriv og afprøv sikker genåbning",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Udarbejd en særskilt procedure for kontrol og genåbning efter restore. Brug isolerede storageplaceringer og afstem mail, sessioner, links og leverandørstatus. Fastlæg hvem der må ophæve karantæne, og hvordan ny adgang etableres. Etablér og øv en vedligeholdelsesspærre for trafik, nye skriverier og cron/mail under migration og hændelser.",
+      "acceptance": "En reviewet øvelse viser korrekt genåbning uden genaktivering af gamle credentials, dobbelte mails eller adgang til det oprindelige fillager. Beslutning og tilbagerulningsmulighed er registreret.",
+      "original_dependencies": [
+        "R19",
+        "R05",
+        "R11"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R21",
+      "title": "Ret resterende felter og afprøv alle roller",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Ret de statisk identificerede felter i sagsbehandlerdelen: tekstnavn på fasefilter, vedvarende labels på statusmail og kommentarer samt forbindelse til hjælpetekster. Afprøv derefter hele anmoder-, leder-, sagsbehandler- og administratorforløbet med tastatur og aftalt skærmlæser. Håndtér også sessionsudløb under indtastning med forståeligt varsel, gemmestatus og tilbagevenden til gemt kladde uden at forlænge sessionen med passive polls.",
+      "acceptance": "VoiceOver eller NVDA med navngiven browser og version gennemfører aftalte fulde forløb. Navn, rolle, værdi, fejl og status annonceres korrekt. Fund, rettelser og gentest registreres pr. forløb.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "I gang",
+      "note": "Nye fejl har tilgængelige navne og fokus; hele kommunens rolleforløb/skærmlæseraccept udestår.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R22",
+      "title": "Test faktisk zoom og visuelle behov",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Afprøv browserens faktiske zoom, tekstforstørrelse, reflow, kontrast og synligt fokus på hele det valgte scope. Medtag lange tekster, valideringsfejl, timeout, afvisning, rettelse og fejl i eksterne tjenester. De eksisterende 320 CSS-pixelprøver er forberedende evidens.",
+      "acceptance": "Manuelle resultater knyttes til kriterier og sider. Ingen skjulte felter, utilgængelige handlinger eller fokus bag faste elementer. Automatisk og manuel evidens fremgår hver for sig.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R23",
+      "title": "Færdiggør den rigtige produktions PDF",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Vælg et egnet PDF-værktøj og ret produktionsforløbet for struktur, tags, sprog, læserækkefølge, links og fonte. Håndtér det faste kommunenavn, opslag i mutable profilnavne og erstatning af ikke-Latin1-tegn. Bind indholdet til den historiske sagsversion. Bevar allerede gemte PDF-bytes.",
+      "acceptance": "Lange og flersidede dokumenter med relevante navne og tegn består værktøjs- og skærmlæserprøver. HTML og PDF viser samme version og beslutning. Produktions-PDF er fagligt accepteret; prototypen alene tæller ikke. Dokumentér validatorens navn, version og valgte PDF-profil; Tagged yes alene er utilstrækkeligt.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R24",
+      "title": "Gennemfør brugeraccept og dokumentér scope",
+      "package": "W08",
+      "priority": "P1",
+      "action": "Lad repræsentative brugere afprøve hele sagsgangen, rettelser, afslag, godkendelse og sagsbehandling. Afklar relevante web- og dokumentkrav samt offentlig tilgængelighedserklæring og kontaktvej. Registrér kendte begrænsninger konkret.",
+      "acceptance": "Procesejer og tilgængelighedsansvarlig accepterer de aftalte forløb og dokumenter. Relevante erklæringer, hjælpetekster og supportvej er ajourført efter faktisk test.",
+      "original_dependencies": [
+        "R05",
+        "R21",
+        "R22",
+        "R23"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R25",
+      "title": "Godkend formål felter og datagrundlag",
+      "package": "W04",
+      "priority": "P0",
+      "action": "Gennemgå feltinventaret mod formål og nødvendighed. Fastlæg datakategorier, behandlingsgrundlag og fortegnelse samt behov for konsekvensanalyse. Gennemfør den nødvendige vurdering før reelle data anvendes. Ret derefter overflødige felter og dataflow i koden. Medtag publiceret CMS-indhold og eksterne billed- og linktjenesters modtagelse af requestmetadata.",
+      "acceptance": "Kommunens beslutninger og eventuelle konsekvensanalyse er dokumenteret. Inventar og faktisk kode stemmer overens. Et frameworkvalg i UI bruges ikke som automatisk behandlingsgrundlag.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R26",
+      "title": "Afklar aftaler dataplacering og exit",
+      "package": "W06",
+      "priority": "P0",
+      "action": "Gennemgå hosting, database, filer, scanner, mail, logs, backup og support. Afklar databehandlerforhold, underleverandører, regioner, overførsler, supportadgang, sikkerhedsvilkår og ophør. Afklar rettigheder og praktisk mulighed for eksport og overtagelse.",
+      "acceptance": "Leverandør- og dataflowoversigt samt relevante aftaler og risikobeslutninger er godkendt. Exitforløb beskriver udlevering, sletning og dokumentation uden at forudsætte en valgt leverandør.",
+      "original_dependencies": [
+        "R01"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R27",
+      "title": "Gør information og rettighedsforløb brugbare",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Udarbejd korrekt information om behandlingen og en kontaktvej. Beskriv modtagelse, identitetskontrol og håndtering af relevante anmodninger om indsigt, rettelse, begrænsning eller sletning. Understøt processen i kode eller en kontrolleret manuel arbejdsgang efter behov.",
+      "acceptance": "Et syntetisk forløb kan gennemføres og auditeres uden at ændre historiske beslutninger forkert eller omgå bevaringskrav. Tekster og ansvar er accepteret.",
+      "original_dependencies": [
+        "R25",
+        "R29",
+        "R30"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R28",
+      "title": "Kontrollér logs og eksterne kopier",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Fastlæg adgang og opbevaring for applikationslogs, platformlogs, audit, fejlrapporter, CI-evidens, mailkopier og backup. Kontrollér faktisk opsamling med syntetiske canaries, så sagsindhold, tokens og rå providerfejl ikke lækker gennem andre lag.",
+      "acceptance": "Log- og kopipolitik er godkendt. Miljøtest dokumenterer tilladte felter og fravær af de valgte canaries. Revisionsspor bevares med særskilt beskyttelse og dokumenteret retention.",
+      "original_dependencies": [
+        "R03",
+        "R25",
+        "R26"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R29",
+      "title": "Vælg den autoritative journal",
+      "package": "W06",
+      "priority": "P0",
+      "action": "Beslut hvilke oplysninger og dokumenter der er autoritative i DGITA, og hvad der skal journaliseres i ESDH eller andet system. Fastlæg metadata, sagsnøgler, beslutninger, kvitteringer, bilag og revisionsspor samt tidspunkt for journalisering.",
+      "acceptance": "En godkendt journal- og arkitekturplan angiver systemansvar, datasæt, metadata og grænser. DGITA-eksport kaldes ikke journalisering uden en accepteret modtageproces.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R30",
+      "title": "Vedtag bevaring kassation og hold",
+      "package": "W06",
+      "priority": "P0",
+      "action": "Fastlæg kategoriopdelte frister, starttidspunkter, bevaring, kassation og bevaringsstop. Aftal autoritative kilder, godkendelsesproces og kopier i mail, PDF og backup. Afstem databeskyttelse og arkivforpligtelser. Testens eksempelregel på 30 dage er ikke en vedtaget frist.",
+      "acceptance": "Versioneret og godkendt matrix med undtagelser, ansvar og reviewdato foreligger. Ingen fysisk sletning aktiveres alene på grundlag af den lokale dry-run.",
+      "original_dependencies": [
+        "R25",
+        "R29"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R31",
+      "title": "Forbind bevaringsberegningen med autoritative data",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Byg en autoriseret serveradapter til aktuelle sagsversioner, klassifikation, vedtaget politik og bevaringsstop. Auditér ændringer og genkontrollér forudsætninger ved handling. Implementér kun arkivering eller sletning, hvis den godkendte proces kræver det og har særskilt bemyndigelse.",
+      "acceptance": "Dry-run matcher de autoritative kilder. Ukendt, udløbet eller modstridende grundlag blokerer. Den valgte driftsproces er afprøvet; destruktive handlinger har særskilt adgang, kontrol og godkendelse.",
+      "original_dependencies": [
+        "R29",
+        "R30"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R32",
+      "title": "Afprøv kvitteret journal og arkiveksport",
+      "package": "W06",
+      "priority": "P1",
+      "action": "Implementér den besluttede integration eller kontrollerede eksport. Medtag metadata, versioner, beslutninger, kvitteringer, bilag og nødvendigt auditspor. Håndtér gentagne afleveringer, fejl, delvis modtagelse og afstemning.",
+      "acceptance": "Modtageren kvitterer for komplette og korrekte sager. Afstemning og genkørsel skaber ikke dubletter eller tab. Journal- og arkivansvarlige accepterer format og proces.",
+      "original_dependencies": [
+        "R29",
+        "R30",
+        "R09",
+        "R23"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R33",
+      "title": "Tilslut ekstern overvågning og vagt",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Tilslut uafhængig monitor og rigtig alarmmodtager. Fastlæg grænser for køalder, manglende jobs, scannerfejl, readiness, backup og secretudløb. Afprøv også at app, database eller scheduler er helt nede, hvor appen ikke selv kan sende alarm.",
+      "acceptance": "En kontrolleret alarm når vagt og bliver kvitteret og eskaleret som aftalt. Manglende signal opdages eksternt. Ukendt backup- eller jobstatus fremstilles ikke som grøn.",
+      "original_dependencies": [
+        "R02",
+        "R03",
+        "R12",
+        "R18",
+        "R28"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R34",
+      "title": "Mål kapacitet og leverandørsvigt",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Fastlæg realistisk belastning og servicemål. Mål sagsforløb, upload, scanner, database og mail under forventet samtidighed. Afprøv timeout, kvoter, rate limits og leverandørnedbrud med aftalt testmandat.",
+      "acceptance": "Resultaterne viser svartider, køalder, fejl og kontrolleret genoptagelse mod accepterede mål. Den lokale prøve med 50 syntetiske job bruges ikke som garanti for providerkapacitet.",
+      "original_dependencies": [
+        "R09",
+        "R10",
+        "R11",
+        "R12",
+        "R33"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R35",
+      "title": "Gennemfør en fælles hændelsesøvelse",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Gennemfør det forberedte øvelsesmanuskript med syntetisk hændelse eller leverandørsvigt. Øv detektion, vurdering, begrænsning, bevissikring, intern kommunikation, relevante eksterne underretninger, gendannelse og læring.",
+      "acceptance": "Tidslinje, rollehandlinger og beslutninger er dokumenteret. Afvigelser har ejer og frist, og kritiske procesfejl er rettet og gentestet. Øvelsesplan alene tæller ikke som gennemførelse.",
+      "original_dependencies": [
+        "R02",
+        "R33",
+        "R38"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R36",
+      "title": "Gennemfør driftsoverdragelse og oplæring",
+      "package": "W08",
+      "priority": "P1",
+      "action": "Saml driftsvejledning, support, vagt, eskalation, serviceaftale, leverandørkontakter og ændringsprocedure. Oplær de relevante brugerroller og operatører i fejl, tilbagekaldelse, uklar maillevering og håndtering af restorekarantæne. Øv eksisterende APIer til tilbagekaldelse med autoriserede operatører; byg kun ekstra administrations-UI, hvis processen kræver det.",
+      "acceptance": "Modtagende drift demonstrerer de centrale rutiner. Navngivne ansvarlige accepterer overdragelsen, anvendelsesgrænsen og eventuelle godkendte restrisici.",
+      "original_dependencies": [
+        "R18",
+        "R20",
+        "R24",
+        "R33",
+        "R34",
+        "R35"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R37",
+      "title": "Forankr kontrollerne i sikkerhedsledelsen",
+      "package": "W07",
+      "priority": "P1",
+      "action": "Placér DGITA i det relevante ISMS-scope. Gennemgå risici, kontrolvalg, kontrolansvar, reviewdatoer og leverandører med det eksisterende kontrolregister. Fastlæg opfølgning, intern evaluering og ledelsesaccept samt eventuelt certificeringsmål som særskilt beslutning.",
+      "acceptance": "Udpegede ejere har accepteret kontrollerne. Risikobehandling og mindst én faktisk procesgennemgang er dokumenteret. Kode og test kan spores til kontrol og ansvar. [S4]",
+      "original_dependencies": [
+        "R02"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R38",
+      "title": "Afklar NIS2 ansvar og hændelsesvej",
+      "package": "W07",
+      "priority": "P0",
+      "action": "Fastlæg den relevante enhed og DGITAs placering i kommunens NIS2-arbejde. Afklar kompetent myndighed, leverandøransvar, kriterier for væsentlige hændelser samt gældende rapporteringsveje og frister. Forankr processen og uddannelsesbehov hos ledelse og drift.",
+      "acceptance": "Scope- og ansvarsbeslutning samt hændelsesprocedure er accepteret af de ansvarlige. Proceduren kan anvendes i R35. Der udledes ingen NIS2-efterlevelse alene fra testpakken. [S5]",
+      "original_dependencies": [
+        "R01",
+        "R02"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R39",
+      "title": "Ajourfør dokumentation og saml acceptbeviser",
+      "package": "W01",
+      "priority": "P1",
+      "action": "Ret docs/ci-cd.md, så den lukkede esbuild-undtagelse ikke står som åben, og Next- og browserdækning fremgår. Saml derefter beviser for alle 18 miljøscenarier med præcis SHA, artefakt, miljø, tidspunkt, udfører, reviewer og beslutning. Bevar historiske rapporter som historik. Afstem også ældre driftsafsnit om sessioner, restore, fixtures og alarmer samt inventarets HTML-reference. Gem redigerede beviser i godkendt varigt lager med adgang og opbevaringsfrist; CI-artefakternes korte retention er ikke i sig selv tilstrækkelig.",
+      "acceptance": "Aktuelle dokumenter svarer til kode og policy. Alle obligatoriske scenarier har reviewet miljøevidens på den endelige kandidat; lokale resultater udfylder ikke automatisk ekstern accept. Kontrolregisterets ejer- og acceptfelter samt evidensschema opdateres efter review; generatoren må fortsat ikke automatisk opgradere U.",
+      "original_dependencies": [
+        "R02"
+      ],
+      "input_requirements": [],
+      "status": "I gang",
+      "note": "Planstatus og reproducerbare testbeviser samles løbende; miljø- og frigivelsesbeviser udestår.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "R40",
+      "title": "Træf frigivelsesbeslutning og følg op",
+      "package": "W08",
+      "priority": "P1",
+      "action": "Gennemgå de syv produktionskrav enkeltvis, afslut eller beslut hver restopgave og godkend den præcise kandidat. Planlæg første driftsopfølgning med målinger, adgangsreview, dependencies, restore- og hændelsesøvelser. Opdatér scoren kun ved ny vurderet evidens. Udpeg ansvar for advisories, CodeQL, private sårbarhedsrapporter og manuelt fastlåste værktøjsversioner.",
+      "acceptance": "Navngiven frigiver og systemejer har accepteret alle obligatoriske forhold. Ingen alvorlige uafklarede fund. Drift følger aftalte intervaller; senere niveau 5 kræver gentagen dokumenteret drift.",
+      "original_dependencies": [
+        "R16",
+        "R24",
+        "R32",
+        "R36",
+        "R37",
+        "R38",
+        "R39"
+      ],
+      "input_requirements": [
+        "M4: konkret releasegodkendelse",
+        "Aftalt driftsopfølgning gennemført; 7 og 30 dage er forslag, ikke vedtaget frist"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F01",
+      "title": "Beskrivelse af infrastrukturændringer",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Tilføj betinget beskrivelse, som gemmes sammen med konsulentvurderingen. Afklar synlighed i brugerens afgørelse.",
+      "acceptance": "Ja kræver en beskrivelse; Nej rydder skjult svar; feltet følger version og historik, og kun aftalt indhold indgår i kvitteringen.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Implementeret; afventer samlet review",
+      "note": "Betinget internt felt, validering og versions-/revisionshistorik. Tidligere overskrevet historik genskabes ikke. Kommunal synlighedsaccept udestår.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F02",
+      "title": "Person- og afdelingsopslag samt flere ansvarlige",
+      "package": "W03",
+      "priority": "P1",
+      "action": "Indfør kommuneafgrænset opslag med stabile person-/enheds-ID’er, multivalg og en aftalt procedure for fratrådte personer. Hold godkenderautorisation adskilt fra et almindeligt personopslag.",
+      "acceptance": "Samme navn kan ikke forveksle to personer; inaktive personer kan ikke nytilknyttes; flere ansvarlige gemmes separat; rettigheder testes på tværs af kommuner.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F03",
+      "title": "KITOS-opslag ved erstatning og tilkøb",
+      "package": "W03",
+      "priority": "P2",
+      "action": "Genbrug katalogvalg for erstatning og tilkøb; vis datakildens dato og aftal opdateringsansvar. Bevar en begrundet mulighed for et system uden katalogpost.",
+      "acceptance": "Relationen gemmes med katalog-ID; forældede poster håndteres; skift af system rydder irrelevante oplysninger; brugeren kan se udtrækkets aktualitet.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F04",
+      "title": "Hjælpehenvendelser før en ansøgning",
+      "package": "W05",
+      "priority": "P1",
+      "action": "Byg et enkelt henvendelsesflow med kvittering, kommunal modtager, ansvarlig, status og mulighed for senere at knytte en ansøgning til henvendelsen.",
+      "acceptance": "Brugeren får et henvendelsesnummer; konsulenten kan tage ejerskab; dubletklik giver én henvendelse; mailfejl er synlige; opbevaring er besluttet.",
+      "original_dependencies": [],
+      "input_requirements": [
+        "R11/R12: faktisk maillevering, fejlvisning og jobafvikling før miljøaccept ved M3",
+        "R30: accepteret bevaringsregel for hjælpesager"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F05",
+      "title": "Struktureret katalog over databehandlerkrav",
+      "package": "W05",
+      "priority": "P1",
+      "action": "Opret krav med ID, version, faglig kilde, ansvarlig, status og anvendelsesområde. Understøt først manuel vurdering pr. krav med begrundelse og dokumentreference.",
+      "acceptance": "En sag bevarer den kravversion, den blev vurderet efter; udkast og testkrav bruges ikke i behandling; kriterier og resultater kan eksporteres.",
+      "original_dependencies": [],
+      "input_requirements": [
+        "R25: accepteret datagrundlag; versioneret kravkatalog leveres til F15 under parallelt arbejde"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F06",
+      "title": "AI-assisteret gennemgang af databehandleraftaler",
+      "package": "W06",
+      "priority": "P2",
+      "action": "Byg kun efter aftalt behov og godkendt databehandling. Vis kravvise fund med præcise dokumenthenvisninger, model-/kravversion og menneskelig stillingtagen.",
+      "acceptance": "Kvaliteten måles på et godkendt testsæt; et AI-resultat kan ikke godkende en sag; fejl og utilgængelig analyse er tydelige; dokumenter sendes kun til den godkendte tjeneste.",
+      "original_dependencies": [
+        "F05"
+      ],
+      "input_requirements": [
+        "F05: versioneret kravkatalog og manuel vurdering",
+        "R25/R26: godkendt databehandling og modeltjeneste",
+        "R09/R10: kontrolleret lager og scanning før dokumenter sendes til AI"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F07",
+      "title": "Redigerbare felttitler, feltkrav og fejlbeskeder",
+      "package": "W05",
+      "priority": "P2",
+      "action": "Gør relevante formularlabels og fejlbeskeder redigerbare. Beslut om feltkrav skal forblive kodeadministrerede eller kunne konfigureres. Ved konfiguration: versionsstyr regelsæt, prøv ændringer før publicering, og håndhæv samme regler på serveren.",
+      "acceptance": "En ændring kan ikke omgå servervalidering; gamle sager vurderes efter kendt regelsæt; der findes forhåndsvisning, historik og gendannelse.",
+      "original_dependencies": [],
+      "input_requirements": [
+        "F22/F23: ens valideringsgrundlag og accepteret redaktørmandat før aktivering af konfiguration"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F08",
+      "title": "Kommunal redaktør og fælles kontra lokale links",
+      "package": "W05",
+      "priority": "P2",
+      "action": "Indfør en eksplicit kommunal redaktørrettighed eller fasthold adminansvar som et bevidst valg. Gør kontakt, tjekliste og risikovejledning til samlede lokale indstillinger.",
+      "acceptance": "En lokal redaktør kan kun ændre egen kommunes indhold; fælles indhold har sin egen ejer; alle genveje bruger de samme godkendte adresser.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F09",
+      "title": "FAQ-rækkefølge og placering",
+      "package": "W05",
+      "priority": "P2",
+      "action": "Gør FAQ til strukturerede spørgsmål med rækkefølge og udvalgte visningssteder; undgå at vedligeholde samme svar flere steder.",
+      "acceptance": "Admin kan tilføje, omordne og placere et spørgsmål; en ændring slår ens igennem på valgte sider; afpublicering virker.",
+      "original_dependencies": [
+        "F18"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F10",
+      "title": "Konsulentens arbejdsfiltre",
+      "package": "W05",
+      "priority": "P2",
+      "action": "Tilføj Afventer leder, Mangler oplysninger, Ufordelte og Mine sager med klare definitioner; lad kombinerede filtre gælde både liste og eksport.",
+      "acceptance": "Filtre giver korrekte resultater i tests; nul-resultater er forståelige; liste og eksport matcher; ingen andre kommuners sager returneres.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F11",
+      "title": "Konsulenten skal kunne bede om rettelser",
+      "package": "W04",
+      "priority": "P1",
+      "action": "Skeln mellem Bed om oplysninger og Afvis endeligt. Angiv mangler og frist, og lad brugeren genindsende en ny version.",
+      "acceptance": "Rettelsesflow bevarer gamle versioner og kommentarer; det afgøres hvilke ændringer der kræver ny ledergodkendelse; en endelig afvisning er en særskilt handling.",
+      "original_dependencies": [],
+      "input_requirements": [
+        "R06/F12: aftalt identitets- og versionsmodel før accept af hele retur- og genindsendelsesforløbet"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F12",
+      "title": "Entydig regel for ledergodkendelse før afslutning",
+      "package": "W04",
+      "priority": "P1",
+      "action": "Kræv godkendt lederbeslutning for den aktuelle version før endelig godkendelse, eller indfør en eksplicit dokumenteret undtagelsesregel.",
+      "acceptance": "Ingen anmodning, udløbet link og tidligere versions godkendelse kan ikke føre til endelig accept; undtagelser har begrundelse, rettighed og revisionsspor.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F13",
+      "title": "Databeskyttelsesvurdering med konkret hjemmel",
+      "package": "W04",
+      "priority": "P1",
+      "action": "Adskil behandlingsgrundlag, dataansvarsrelation, sikkerhedsrammer og datakategorier. Begrund DBA-behov og screening for konsekvensanalyse; tillad flere datakategorier.",
+      "acceptance": "Faglig ansvarlig kan dokumentere konkret hjemmel og relation; almindelige og følsomme data kan registreres samtidigt; rammen alene bliver aldrig en juridisk godkendelse.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F14",
+      "title": "Aftaleværdi og vej til indkøbsfunktionen",
+      "package": "W04",
+      "priority": "P1",
+      "action": "Bevar førsteårsbudget som særskilt tal. Tilføj oplysninger til vurdering af samlet kontraktværdi, optioner og aftaleform; send tvivl og relevante anskaffelser til indkøb.",
+      "acceptance": "Førsteårsbeløb vises tydeligt som sådan; gældende tærskler har kilde og gyldighed; indkøb dokumenterer procedurevalget; systemet giver ikke automatisk juridisk grønt lys ud fra ét beløb.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F15",
+      "title": "Risikovurdering og særskilt juridisk DBA-accept",
+      "package": "W04",
+      "priority": "P1",
+      "action": "Få proceskravet bekræftet og modeller vurdering, ansvarlig, dato, dokumentversion og beslutning. Skeln mellem at et dokument findes og at det er accepteret.",
+      "acceptance": "Relevante sager kan ikke afsluttes positivt uden de nødvendige vurderinger eller en autoriseret begrundet undtagelse; afslag kræver ikke godkendte aftaler.",
+      "original_dependencies": [
+        "F05",
+        "F12",
+        "F13"
+      ],
+      "input_requirements": [
+        "F05: versioneret kravgrundlag før accept af den juridiske vurdering",
+        "R25: nødvendige felter og behandlingsgrundlag accepteret"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F16",
+      "title": "Underskrift og overdragelse til drift/kontraktstyring",
+      "package": "W04",
+      "priority": "P1",
+      "action": "Registrer hvem der skal underskrive, dokumentation for underskrevet version og overdragelse til navngiven system-/kontraktejer. Genbrug ESDH/KITOS som autoritative steder, hvor relevant.",
+      "acceptance": "D-GITA-godkendelse kan ikke forveksles med underskrevet kontrakt eller idriftsættelse; modtager, journalreference og opfølgningsansvar fremgår.",
+      "original_dependencies": [
+        "F12",
+        "F15"
+      ],
+      "input_requirements": [
+        "F15: aftalt faglig beslutningsmodel før accept af underskrift og overdragelse"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F17",
+      "title": "Screening af anskaffelser med AI",
+      "package": "W04",
+      "priority": "P2",
+      "action": "Tilføj AI: Ja/Nej/Ved ikke med anvendelsesformål og link til den aktuelle lokale vurdering. Faglige ansvarlige fastlægger hvilke yderligere oplysninger og godkendelser der kræves.",
+      "acceptance": "AI-sager kan findes og sendes til rette vurdering; Ved ikke giver rådgivning; en AI-markering er ikke lig med gennemført juridisk klassifikation.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F18",
+      "title": "Afpublicering skal faktisk skjule CMS-indhold",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Skeln mellem manglende indhold og bevidst afpubliceret indhold, uden at sende selve den skjulte tekst til brugeren.",
+      "acceptance": "Publiceret → afpubliceret skjuler tekst og relevante genveje for bruger/konsulent; ny session og genindlæsning ændrer ikke resultatet; admin kan forhåndsvise og genpublicere.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Implementeret; afventer samlet review",
+      "note": "Skjulte CMS-markører, ingen skjult tekst i brugerpayload, readiness, genveje og genpublicering testet.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F19",
+      "title": "Ret vejledning, kontaktlinks og statusløfter",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Brug faktisk mail-/godkendelsesstatus og én kommunekontakt. Ret Samtykke til Bekræftelse af oplysninger, og kontroller risiko-, tjekliste-, DBA- og kommunelinks.",
+      "acceptance": "Alle hjælpelinks går til korrekt kommunalt indhold; tekster beskriver leveret funktion; forsinkelse og fejl har klare beskeder; ingen udokumenterede tidsløfter.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Delvist implementeret",
+      "note": "Fælles kontaktadresse, tydelig redaktørvejledning, faktabekræftelse og neutral standardtekst. Eksisterende redaktionelle tekster/kommunelinks kræver indholdsaccept; de overskrives ikke.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F20",
+      "title": "Genveje til nyheder og kommuneinformation",
+      "package": "W05",
+      "priority": "P3",
+      "action": "Lad genvejene lande på præcist indhold. Vis kun nyheder, når der er publicerede ændringer med dato, og brug et konfigurerbart kommunelink.",
+      "acceptance": "Kortets løfte matcher destinationen; tomt nyhedsindhold giver ikke en vildledende genvej.",
+      "original_dependencies": [
+        "F08",
+        "F18"
+      ],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F21",
+      "title": "Milepæle og to forskellige brugerantal",
+      "package": "W03",
+      "priority": "P2",
+      "action": "Tilbyd definerede milepæle med mulighed for egne. Afklar om brugerfelterne dækker samme population; saml dem eller forklar forskellen og eventuel sammenhæng.",
+      "acceptance": "Milepæle gemmes med stabile værdier; brugeren forstår begge antal; kun reelle modsigelser udløser advarsel.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F22",
+      "title": "Ensartet validering og filvejledning",
+      "package": "W02",
+      "priority": "P1",
+      "action": "Trim påkrævet tekst, valider relevante valg/datoer/CVR/URL efter feltets betydning, og saml uploadtyper og vejledning i én definition. Gratis anskaffelser skal fortsat kunne angives.",
+      "acceptance": "Direkte API-kald og formular har samme relevante regler; blanke mellemrum afvises; nul behandles som aftalt; filvalg, tekst og server accepterer samme filtyper.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Implementeret; afventer samlet review",
+      "note": "Fælles input- og uploadregler; ufærdige kladder og gratis anskaffelser bevaret.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F23",
+      "title": "Bevidst rollemodel for admin og konsulent",
+      "package": "W03",
+      "priority": "P1",
+      "action": "Beslut kommunal admin kontra eventuel fælles driftsadmin, og om samme person skal kunne være anmoder og konsulent. Adskil tildeling, godkenderret og indholdsredaktør.",
+      "acceptance": "En godkendt rettighedsmatrix har negative tests for bruger, konsulent og admin i mindst to kommuner; egenbehandling og eventuelle undtagelser er eksplicitte.",
+      "original_dependencies": [],
+      "input_requirements": [],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    },
+    {
+      "id": "F24",
+      "title": "Paritetsprøve og flytning af eksisterende sager",
+      "package": "W08",
+      "priority": "P1",
+      "action": "Planlæg kontrolleret accept med testkonti og syntetiske sager. Lav mapping af gamle sagsnumre, ansvarlige, dokumenter, kommentarer, status og godkendelseshistorik før en overgang.",
+      "acceptance": "Bruger → leder → konsulent → rettelse → afslutning er prøvet; intern tekst er skjult; filer og journalreferencer stemmer; import kan afstemmes og gentages uden dubletter.",
+      "original_dependencies": [
+        "F11",
+        "F12",
+        "F15",
+        "F23"
+      ],
+      "input_requirements": [
+        "R17/R18/R19: afstemt migration og gennemført gendannelsesprøve",
+        "R23/R32: accepteret PDF og kvitteret journalaflevering",
+        "Historisk status må ikke danne manglende godkendelser"
+      ],
+      "status": "Planlagt",
+      "note": "Ikke udført i første leverance.",
+      "named_owner": "Ikke udpeget",
+      "accepted_by": null
+    }
+  ]
+}

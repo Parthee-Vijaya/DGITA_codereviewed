@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "reviewed_at": "2026-10-05",
+  "reviewed_at": "2026-10-09",
   "status": "Teknisk feltfortegnelse; kommunal nødvendighed/hjemmel/retention/accept U",
   "scope": "Applikationsformularens topniveau og deklarerede DB-kolonner; JSON-understruktur beskrevet særskilt. Ingen inspektion af live persondata.",
   "decision_legend": {
@@ -167,7 +167,7 @@
   "nested_structures": {
     "selectedSystem": "Katalog: id, name, supplier, rightsHolder, source, usedInKalundborg, optional localSystemId/localStatus/kitosStatus. Identifikatorer og fritekst kan være personhenførbare i kontekst.",
     "attachments": "Fem dokumenttyper; id, kind, name, size, type, status, valgfri error. Server accepterer ikke browsermetadata som bevis for storage, ejer eller scan.",
-    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel.",
+    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/infrastructureDescription/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel. Vurderingshistorik gemmer samme interne snapshot uden offentlig projektion.",
     "payload_json": "Eventbestemt revisionspayload; individuelt flow og autoriseret projektion, ikke generel log.",
     "attachments_json": "Mailbilagsreferencer/metadata; privat dokumentkopi kan indgå i transporten.",
     "roles_snapshot_json": "Historisk sessionkontekst; aktuelle roller kontrolleres fra DB."
@@ -818,6 +818,30 @@
       "retention_decision": "U",
       "necessity_acceptance": "U",
       "owner_proposal": "Systemejer + dataansvarlig; drift for tekniske TTL-er"
+    },
+    {
+      "table": "portal_dgita_review_history",
+      "purpose": "Uforanderlige snapshots fra nye konsulentgemninger, knyttet til sagens revision, version, behandler og tidspunkt. Ingen rekonstrueret historik.",
+      "flow": "internal-review",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "application_id",
+          "application_version_id",
+          "application_revision",
+          "created_at"
+        ],
+        "direct-or-linked-personal": [
+          "reviewer_user_id",
+          "reviewer_subject"
+        ],
+        "unstructured-potential-personal": [
+          "internal_fields_json"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U"
     }
   ],
   "flows": {
