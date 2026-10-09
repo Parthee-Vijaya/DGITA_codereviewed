@@ -8,7 +8,9 @@ Følg [docs/implementation/README.md](docs/implementation/README.md) og den komp
 
 Migration 0007 er additiv. Historikken begynder med nye gemninger; den rekonstruerer ikke tidligere værdier. Almindelig drift kan ikke ændre eller slette historikken. Afklar den godkendte bevarings-/sletteproces under R25–R32 inden kommunal drift.
 
-Fortsæt med F02/F03/F10/F23 og derefter F11–F17. B01–B08 er stadig foreslåede kommunale beslutninger. De relevante produktionsregler kræver afklaring af identitet, egne sager, ledermandat, genindsendelse, krav, journal og bevaring. Lokal kodeverifikation lukker ikke disse acceptpunkter.
+Anden etape ligger på `feat/assignment-and-work-filters` oven på PR #18: stabile personvalg, katalogrelationer, arbejdsfiltre og en eksplicit vej til tilbagekaldelse af åbne lederanmodninger. Se docs/implementation/people-catalog-and-filters.md. F02/F03 har fortsat kilde-/procesaccept, og F23 afventer konkret rollevalg. Fortsæt med denne afklaring og derefter F11–F17. B01–B08 er stadig foreslåede kommunale beslutninger. De relevante produktionsregler kræver afklaring af identitet, egne sager, ledermandat, genindsendelse, krav, journal og bevaring. Lokal kodeverifikation lukker ikke disse acceptpunkter.
+
+Tredje etape ligger på `feat/case-corrections-and-ai-screening` oven på `feat/assignment-and-work-filters` (PR #19). Den tilføjer eksplicit retur med offentlig begrundelse/frister, terminalt afslag, bindende ledergodkendelse af aktuel version og manuel AI-screening med filtre/CSV. Se docs/implementation/correction-workflow.md og ai-screening.md. Der er ingen ny migration eller ændring af roller. Fortsæt herefter med F13/F14 og F05-kravgrundlaget; F15 kræver dette grundlag. F23 kræver stadig konkret rollevalg. Etaperne er reviewleverancer og må ikke regnes som flettet, deployet eller kommunalt accepteret alene ud fra dette dokument.
 
 ## Status og kildeorden
 

@@ -55,9 +55,23 @@ export const LEGACY_DEMO_VIEWERS: Record<WorkspaceRole, WorkspaceViewer> = {
 export type Phase = "Kladde" | "Indsendt" | "Under behandling" | "Afsluttet";
 export type Approval = "Ikke startet" | "Afventer" | "Godkendt" | "Afvist";
 
+export type InformationRequest = {
+  reason: string;
+  dueDate: string;
+  requestedAt: string;
+  applicationVersionId: string;
+  revision: number;
+};
+
 export type CaseRecord = {
   id: string;
   status?: string;
+  currentVersionId?: string | null;
+  revision?: number;
+  informationRequest?: InformationRequest | null;
+  aiUsage?: "" | "ja" | "nej" | "ved-ikke";
+  hasCurrentLeaderApproval?: boolean;
+  finalDecision?: { outcome: "approved" | "rejected"; reason: string; decidedAt: string } | null;
   tenantId: string;
   ownerSubject: string;
   ownerEmail: string;
@@ -66,11 +80,17 @@ export type CaseRecord = {
   created: string;
   changed: string;
   consultant: string;
+  assignedConsultantUserId?: string | null;
+  assignedConsultantSubject?: string | null;
+  assignedConsultantProvider?: string | null;
   applicant: string;
   municipality: string;
   leader: string;
   approval: Approval;
   receiptAvailable?: boolean;
+  awaitingLeader?: boolean;
+  leaderReviewLocked?: boolean;
+  openLeaderApprovalRequestId?: string | null;
 };
 
 const partheepanOwner = {
@@ -307,9 +327,12 @@ export type DgitaApproval = {
   /** Historical wire/storage key. A framework selection, not an Article 6/9 legal basis. */
   legalBasis: "" | (typeof D_GITA_FRAMEWORKS)[number];
   responsible: string;
+  responsibleUserId: string;
   hasAdditionalResponsible: "" | "Ja" | "Nej";
   additionalResponsible: string;
+  additionalResponsibleUserIds: string[];
   itConsultant: string;
+  itConsultantUserId: string;
   infrastructureChanges: "" | "Ja" | "Nej";
   infrastructureDescription: string;
   notes: string;
@@ -324,9 +347,12 @@ export const EMPTY_D_GITA_APPROVAL: DgitaApproval = {
   date: "",
   legalBasis: "",
   responsible: "",
+  responsibleUserId: "",
   hasAdditionalResponsible: "",
   additionalResponsible: "",
+  additionalResponsibleUserIds: [],
   itConsultant: "",
+  itConsultantUserId: "",
   infrastructureChanges: "",
   infrastructureDescription: "",
   notes: "",
@@ -337,6 +363,10 @@ export const EMPTY_D_GITA_APPROVAL: DgitaApproval = {
 export function normalizeDgitaApproval(value: DgitaApproval): DgitaApproval {
   return {
     ...value,
+    responsibleUserId: typeof value.responsibleUserId === "string" ? value.responsibleUserId : "",
+    itConsultantUserId: typeof value.itConsultantUserId === "string" ? value.itConsultantUserId : "",
+    additionalResponsibleUserIds: value.hasAdditionalResponsible === "Ja" && Array.isArray(value.additionalResponsibleUserIds)
+      ? [...new Set(value.additionalResponsibleUserIds)] : [],
     additionalResponsible:
       value.hasAdditionalResponsible === "Ja" ? value.additionalResponsible : "",
     infrastructureDescription:

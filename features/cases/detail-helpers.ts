@@ -1,3 +1,6 @@
+import { isCatalogRelation } from "../application/state-validation";
+import { isAiUsage } from "../application/ai-screening";
+import type { CatalogRelation } from "../catalog/relations";
 import type {
   ApplicationFormState,
   AttachmentDraft,
@@ -75,7 +78,7 @@ export function normalizeApplicationSnapshotJson(
   const base = baseState as unknown as Record<string, unknown>;
 
   for (const [key, baseValue] of Object.entries(base)) {
-    if (key === "attachments" || key === "selectedSystem" || key === "schemaVersion") {
+    if (key === "attachments" || key === "selectedSystem" || key === "schemaVersion" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation") {
       continue;
     }
     const candidate = value[key];
@@ -87,6 +90,13 @@ export function normalizeApplicationSnapshotJson(
   normalized.schemaVersion = "dgita-v1";
   normalized.selectedSystem = normalizeSelectedSystem(value.selectedSystem);
   normalized.attachments = normalizeAttachments(value.attachments);
+  // Additive relation fields are absent from legacy versions. Project null in
+  // memory without inventing an id or rewriting any historical snapshot bytes.
+  normalized.replacementCatalogRelation = normalizeCatalogRelation(value.replacementCatalogRelation);
+  normalized.relatedCatalogRelation = normalizeCatalogRelation(value.relatedCatalogRelation);
+  // Missing legacy screening stays unanswered in this read projection. Never
+  // infer No or write this default back into immutable historical versions.
+  normalized.aiUsage = isAiUsage(value.aiUsage) ? value.aiUsage : "";
 
   if (value.schemaVersion !== "dgita-v1") {
     const legacy = isRecord(value._demo) ? value._demo : null;
@@ -126,6 +136,10 @@ export function withSafeDraftAttachments(
     });
   }
   return { ...snapshot, attachments } satisfies ApplicationFormState;
+}
+
+function normalizeCatalogRelation(value: unknown): CatalogRelation | null {
+  return value && isCatalogRelation(value) ? { ...value } : null;
 }
 
 function normalizeSelectedSystem(value: unknown): SelectedCatalogSystem | null {
@@ -231,7 +245,7 @@ function neutralApplicationState(baseState: ApplicationFormState) {
       neutral[key] = "dgita-v1";
     } else if (key === "attachments") {
       neutral[key] = emptyAttachments();
-    } else if (key === "selectedSystem") {
+    } else if (key === "selectedSystem" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation") {
       neutral[key] = null;
     } else if (key === "acquisitionType") {
       neutral[key] = "nyanskaffelse";
