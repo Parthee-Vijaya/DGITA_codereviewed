@@ -71,10 +71,17 @@
         "budgetAmount",
         "oneTimeCost",
         "yearlyCost",
-        "otherCost"
+        "otherCost",
+        "contractValueStatus",
+        "estimatedContractValueExVat",
+        "contractDurationMonths",
+        "contractOptionsDescription",
+        "contractValueNote",
+        "contractCoverage",
+        "agreementReference"
       ],
-      "purpose": "Anskaffelsens budget og omkostninger; kontekst knyttet til sag/ejer.",
-      "category": "case-linked",
+      "purpose": "Førsteårsbudget og særskilt samlet kontraktværdi inklusive optioner/forlængelser ekskl. moms, aftaleform og begrundelse. Fritekst og referencer kan rumme persondata; undgå personcases.",
+      "category": "unstructured-potential-personal",
       "source": "Browserformular eller historisk snapshot; servervalideres før lagring.",
       "storage": [
         "portal_applications.draft_state_json",
@@ -151,7 +158,8 @@
         "checklistJournalized",
         "consent",
         "replacementCatalogRelation",
-        "relatedCatalogRelation"
+        "relatedCatalogRelation",
+        "personalDataCategories"
       ],
       "purpose": "Katalogreference, risikospørgsmål, tidsplan og formularbekræftelse; consent er ikke i sig selv et GDPR-samtykke.",
       "category": "case-linked",
@@ -187,7 +195,7 @@
   "nested_structures": {
     "selectedSystem": "Katalog: id, name, supplier, rightsHolder, source, usedInKalundborg, optional localSystemId/localStatus/kitosStatus. Identifikatorer og fritekst kan være personhenførbare i kontekst.",
     "attachments": "Fem dokumenttyper; id, kind, name, size, type, status, valgfri error. Server accepterer ikke browsermetadata som bevis for storage, ejer eller scan.",
-    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/infrastructureDescription/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel. Vurderingshistorik gemmer samme interne snapshot uden offentlig projektion. Ansvar gemmes desuden som responsibleUserId, additionalResponsibleUserIds og itConsultantUserId; navnefelterne er læsbare snapshots. Personopslag er kommuneafgrænset til aktive konsulenter/admins og giver ikke approver-mandat.",
+    "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/infrastructureDescription/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel. Vurderingshistorik gemmer samme interne snapshot uden offentlig projektion. Ansvar gemmes desuden som responsibleUserId, additionalResponsibleUserIds og itConsultantUserId; navnefelterne er læsbare snapshots. Personopslag er kommuneafgrænset til aktive konsulenter/admins og giver ikke approver-mandat. Valgfrie privacyAssessment og procurementAssessment indeholder dokumentationsstatus, konkrete faglige begrundelser og dokumentreferencer. Privacy har processingBasis/controllerRelation/relationReason/dpaNeed/dpaReason/dpiaScreening/dpiaReason/reference; procurement har procedure/rationale/reference/ruleCheckedOn. Serveren tilføjer recordedBy (bruger-id), recordedByName, recordedAt og applicationVersionId ved indholdsændringer. Kun konsulent/admin kan se felterne; de kopieres ikke til brugerprojektion, CSV eller kvittering. Dokumenteret er ikke juridisk godkendt. Nye versioner arver ikke tidligere vurdering.",
     "payload_json": "Eventbestemt revisionspayload; individuelt flow og autoriseret projektion, ikke generel log.",
     "attachments_json": "Mailbilagsreferencer/metadata; privat dokumentkopi kan indgå i transporten.",
     "roles_snapshot_json": "Historisk sessionkontekst; aktuelle roller kontrolleres fra DB.",

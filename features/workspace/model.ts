@@ -1,3 +1,9 @@
+import {
+  normalizePrivacyAssessment, normalizeProcurementAssessment,
+  type PrivacyAssessment, type ProcurementAssessment,
+} from "./case-assessments";
+export type { PrivacyAssessment, ProcurementAssessment, AssessmentStatus } from "./case-assessments";
+
 export const WORKSPACE_ROLES = ["user", "consultant", "admin"] as const;
 
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
@@ -326,6 +332,9 @@ export type DgitaApproval = {
   date: string;
   /** Historical wire/storage key. A framework selection, not an Article 6/9 legal basis. */
   legalBasis: "" | (typeof D_GITA_FRAMEWORKS)[number];
+  /** Internal version-specific documentation; independent of the framework and final decision. */
+  privacyAssessment?: PrivacyAssessment;
+  procurementAssessment?: ProcurementAssessment;
   responsible: string;
   responsibleUserId: string;
   hasAdditionalResponsible: "" | "Ja" | "Nej";
@@ -363,6 +372,8 @@ export const EMPTY_D_GITA_APPROVAL: DgitaApproval = {
 export function normalizeDgitaApproval(value: DgitaApproval): DgitaApproval {
   return {
     ...value,
+    ...(value.privacyAssessment !== undefined ? { privacyAssessment: normalizePrivacyAssessment(value.privacyAssessment) } : {}),
+    ...(value.procurementAssessment !== undefined ? { procurementAssessment: normalizeProcurementAssessment(value.procurementAssessment) } : {}),
     responsibleUserId: typeof value.responsibleUserId === "string" ? value.responsibleUserId : "",
     itConsultantUserId: typeof value.itConsultantUserId === "string" ? value.itConsultantUserId : "",
     additionalResponsibleUserIds: value.hasAdditionalResponsible === "Ja" && Array.isArray(value.additionalResponsibleUserIds)
@@ -393,7 +404,7 @@ export const COMMENTABLE_APPLICATION_FIELDS = [
   { id: "purpose", label: "Formål og ønsket effekt" },
   { id: "users", label: "Antal brugere" },
   { id: "personal-data", label: "Personoplysninger" },
-  { id: "finance", label: "Samlet finansiering" },
+  { id: "finance", label: "Omkostninger i første år" },
 ] as const;
 
 export type ContentCategory =

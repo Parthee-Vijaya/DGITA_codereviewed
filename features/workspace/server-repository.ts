@@ -29,6 +29,7 @@ import { permitsDemoSeed, readRuntimeEnvironment } from "../runtime/environment"
 import { canonicalizeResponsiblePeople, listResponsiblePeople } from "./responsible-directory";
 import { committedLeaderApprovalSql, informationRequestEventId, publicInformationRequest } from "../cases/workflow-policy";
 import { approvalMandateSql } from "../approval/mandate";
+import { recordCaseAssessmentChanges } from "./case-assessments";
 
 export type PortalActor = {
   userId?: string;
@@ -797,6 +798,8 @@ async function saveApprovalWithDecision(
   }
   const normalized: DgitaApproval = {
     ...identities.approval,
+    ...recordCaseAssessmentChanges(identities.approval, normalizeDgitaApproval(previous),
+      { userId, displayName: actor.displayName }, application.current_version_id, now),
     revision: application.row_version + 1,
     updatedAt: now,
     updatedBy: actor.displayName,

@@ -36,8 +36,14 @@ Etape 3 dækkes af `tests/correction-workflow.test.mjs`, `features/application/a
 
 Før/efter-billeder og lokale logfiler ligger i checkoutets ignorerede `work/implementation/` og `work/ci/`. De er lokale QA-beviser, ikke produktionsdata. Visuel kontrol omfatter brugerforside, formular, konsulent, administration og mobil. Uændret CSS alene er ikke tilstrækkeligt bevis for bevaret UX; indlæsning, validering, gemning og genindlæsning testes også.
 
+## Fjerde etape
+
+F13/F14 udvider eksisterende trin og konsulentfanen med persondatakategorier, separat kontraktværdi og to interne vurderinger. Begrundelser og referencer kræves, når vurderingen markeres Dokumenteret. Dette er dokumentationsstatus; den giver ingen juridisk godkendelse. Førsteårsbudget og eksisterende dataklassifikation bevares. Manglende historiske svar udfyldes ikke automatisk.
+
+Se [formular og kontraktværdi](procurement-information.md), [vurderingsmodel](case-assessments.md) og [officielle kilder](assessment-sources.md). Testene `case-assessments.test.mjs`, `procurement.test.mjs`, `assessment-projections.test.mjs` samt browserprøverne `case-assessments.spec.ts` og `procurement-information.spec.ts` kontrollerer dokumentation, versionsskift, privathed, brugerflow og tilgængelighed.
+
 ## Næste leverance
 
-Fortsæt med F13/F14: konkret databeskyttelsesvurdering og aftaleværdi/indkøbsvej. Indhent samtidig det autoritative F05-kravgrundlag før F15 kan accepteres. F23-procesvalget og den resterende person-/organisationskilde under F02 skal fortsat afklares. Udbyg konkrete delresultater i parallelle pakker; en hel pakke skal ikke være færdig, før en anden starter.
+Indhent faglig accept af F13 og det autoritative F05-kravgrundlag før F15 kan accepteres. F14 kræver fortsat gældende tærskler med gyldighed, kommunal indkøbspolitik og en godkendt overdragelse til indkøbsfunktionen. F23-procesvalget og den resterende person-/organisationskilde under F02 skal fortsat afklares. Udbyg konkrete delresultater i parallelle pakker; en hel pakke skal ikke være færdig, før en anden starter.
 
 B01–B08 i den godkendte gennemførelsesplan er anbefalinger, ikke allerede vedtagne kommunale regler. Fastlæg især platform/identitet, egne sager, ledermandat, genindsendelsesregler, juridiske krav, journal og bevaring før berørte produktionsregler aktiveres. AI-analyse forbliver en særskilt leverance med målt kvalitet og menneskelig beslutning. Navngiv menneskelige ejere og uafhængig frigiver før kalender og driftsaccept fastlåses.

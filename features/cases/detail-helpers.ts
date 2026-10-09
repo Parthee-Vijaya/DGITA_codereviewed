@@ -1,4 +1,5 @@
 import { isCatalogRelation } from "../application/state-validation";
+import { isPersonalDataCategories, isContractValueStatus, isContractCoverage, PROCUREMENT_TEXT_LIMITS, normalizeProcurementChanges } from "../application/procurement";
 import { isAiUsage } from "../application/ai-screening";
 import type { CatalogRelation } from "../catalog/relations";
 import type {
@@ -97,6 +98,12 @@ export function normalizeApplicationSnapshotJson(
   // Missing legacy screening stays unanswered in this read projection. Never
   // infer No or write this default back into immutable historical versions.
   normalized.aiUsage = isAiUsage(value.aiUsage) ? value.aiUsage : "";
+  normalized.personalDataCategories = isPersonalDataCategories(value.personalDataCategories) ? [...value.personalDataCategories] : [];
+  normalized.contractValueStatus = isContractValueStatus(value.contractValueStatus) ? value.contractValueStatus : "";
+  normalized.contractCoverage = isContractCoverage(value.contractCoverage) ? value.contractCoverage : "";
+  for (const [field, limit] of Object.entries(PROCUREMENT_TEXT_LIMITS)) {
+    target[field] = typeof value[field] === "string" && value[field].length <= limit ? value[field] : "";
+  }
 
   if (value.schemaVersion !== "dgita-v1") {
     const legacy = isRecord(value._demo) ? value._demo : null;
@@ -108,7 +115,7 @@ export function normalizeApplicationSnapshotJson(
     }
   }
 
-  return normalized;
+  return normalizeProcurementChanges(normalized);
 }
 
 export type SafeDraftAttachment = {

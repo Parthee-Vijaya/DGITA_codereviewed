@@ -153,3 +153,53 @@ test("API rejects forged AI answer types and prunes hidden details for No", asyn
   assert.equal(Object.hasOwn(snapshot, "aiPurpose"), false);
   assert.equal(Object.hasOwn(snapshot, "aiAssessmentUrl"), false);
 });
+
+test("API saves legacy procurement drafts but requires explicit new answers before submission", async () => {
+  const { PROCUREMENT_FIELDS } = await import("./procurement.ts");
+  const draft = state();
+  for (const key of [...PROCUREMENT_FIELDS, "personalDataCategories"]) delete draft[key];
+  const id = crypto.randomUUID();
+  const saved = await post({ id, draft, status: "draft" });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const rejected = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(rejected.status, 422, JSON.stringify(rejected.body));
+  assert.deepEqual(rejected.body.errors, getAllErrors(draft));
+  assert.deepEqual(rejected.body.errors.map((error) => error.field), ["contractValueStatus", "contractCoverage", "personalDataCategories"]);
+  assert.equal(await DB.prepare("SELECT COUNT(*) AS n FROM portal_application_versions WHERE application_id = ?").bind(id).first("n"), 0);
+});
+
+test("API validates procurement with the same engine and freezes explicit estimates and multiple categories", async () => {
+  const draft = state({ estimatedContractValueExVat: "1,234.56", contractDurationMonths: "1201", contractOptionsDescription: "", contractValueNote: "", contractCoverage: "existing-agreement", agreementReference: "", personalDataCategories: [] });
+  const id = crypto.randomUUID();
+  const saved = await post({ id, draft, status: "draft" });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const rejected = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(rejected.status, 422, JSON.stringify(rejected.body));
+  assert.deepEqual(rejected.body.errors, getAllErrors(draft));
+  Object.assign(draft, { estimatedContractValueExVat: "725.000,00", contractDurationMonths: "36", contractOptionsDescription: "Ingen", contractValueNote: "Etablering og 36 måneders drift ekskl. moms.", agreementReference: "Journal 2026-123 / aftale A", personalDataCategories: ["ordinary", "special", "criminal", "national-id"] });
+  const submitted = await post({ id, draft, status: "submitted", expectedRowVersion: saved.body.rowVersion });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+  const serialized = await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json");
+  const snapshot = JSON.parse(serialized);
+  for (const field of ["estimatedContractValueExVat", "contractDurationMonths", "contractOptionsDescription", "contractValueNote", "agreementReference", "personalDataCategories"]) assert.deepEqual(snapshot[field], draft[field]);
+  assert.equal(submitted.body.status, "submitted");
+  assert.equal(Object.hasOwn(snapshot, "procurementApproved"), false);
+  const mutation = await post({ id, draft: { ...draft, estimatedContractValueExVat: "0" }, status: "draft", expectedRowVersion: submitted.body.rowVersion });
+  assert.equal(mutation.status, 409);
+  assert.equal(await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json"), serialized);
+});
+
+test("API accepts declared procurement uncertainty, strips hidden data and rejects malformed additive fields", async () => {
+  for (const invalid of [{ contractValueStatus: "approved" }, { contractCoverage: {} }, { estimatedContractValueExVat: 100 }, { contractValueNote: "x".repeat(4001) }, { personalDataCategories: ["ordinary", "ordinary"] }, { personalDataCategories: ["unknown"] }]) {
+    const result = await post({ id: crypto.randomUUID(), draft: state(invalid), status: "draft" });
+    assert.equal(result.status, 400, JSON.stringify(result.body));
+  }
+  const draft = state({ contractValueStatus: "needs-clarification", contractCoverage: "needs-clarification", estimatedContractValueExVat: "-1", agreementReference: "hidden", personalData: "nej", personalDataCategories: ["special", "national-id"] });
+  const id = crypto.randomUUID();
+  const submitted = await post({ id, draft, status: "submitted" });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+  const snapshot = JSON.parse(await DB.prepare("SELECT snapshot_json FROM portal_application_versions WHERE application_id = ?").bind(id).first("snapshot_json"));
+  for (const field of ["estimatedContractValueExVat", "contractDurationMonths", "contractOptionsDescription", "contractValueNote", "agreementReference", "personalDataCategories"]) assert.equal(Object.hasOwn(snapshot, field), false, field);
+  assert.equal(snapshot.contractValueStatus, "needs-clarification");
+  assert.equal(snapshot.contractCoverage, "needs-clarification");
+});

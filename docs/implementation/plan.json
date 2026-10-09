@@ -876,8 +876,8 @@
       "acceptance": "Faglig ansvarlig kan dokumentere konkret hjemmel og relation; almindelige og følsomme data kan registreres samtidigt; rammen alene bliver aldrig en juridisk godkendelse.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Implementeret i kode; faglig accept udestår",
+      "note": "Etape 4: flere persondatakategorier, særskilt konkret behandlingsgrundlag, dataansvar, begrundet DBA-behov og DPIA-screening. Interne versionsbundne vurderinger kræver dokumentation ved status Dokumenteret og får serverfastsat behandler/tidspunkt. Ingen automatisk juridisk godkendelse. Kommunal hjemmel-, proces- og faglig accept udestår.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },
@@ -890,8 +890,8 @@
       "acceptance": "Førsteårsbeløb vises tydeligt som sådan; gældende tærskler har kilde og gyldighed; indkøb dokumenterer procedurevalget; systemet giver ikke automatisk juridisk grønt lys ud fra ét beløb.",
       "original_dependencies": [],
       "input_requirements": [],
-      "status": "Planlagt",
-      "note": "Ikke udført i første leverance.",
+      "status": "Delvist implementeret; indkøbsaccept udestår",
+      "note": "Etape 4: førsteårsbudget adskilt fra samlet kontraktværdi ekskl. moms med optioner, aftaleform og reference. Manuel intern procedurevurdering med begrundelse, kilde og kontrol-dato. Uafklaret er et eksplicit svar. Autoritative tærskler/gyldighed, kommunal indkøbspolitik, ansvar og konkret overdragelse til indkøb udestår; ingen automatisk beløbsafgørelse.",
       "named_owner": "Ikke udpeget",
       "accepted_by": null
     },

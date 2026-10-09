@@ -2,6 +2,8 @@ import { relationError, type CatalogRelation, type RelationField } from "../cata
 import { SYNTHETIC_APPROVERS } from "../workspace/model";
 import { AI_USAGE_OPTIONS, hasAiScreeningDetails, isSafeAiAssessmentUrl, MAX_AI_PURPOSE_LENGTH, type AiUsage } from "./ai-screening";
 
+import { getProcurementErrors, isPersonalDataCategories, PROCUREMENT_ESTIMATE_FIELDS, type PersonalDataCategory, type ContractValueStatus, type ContractCoverage } from "./procurement";
+
 export type YesNo = "ja" | "nej";
 
 export type UploadKind =
@@ -99,6 +101,13 @@ export type ApplicationFormState = {
   yearlyCost: string;
   otherCost: string;
   benefits: string;
+  contractValueStatus?: ContractValueStatus;
+  estimatedContractValueExVat?: string;
+  contractDurationMonths?: string;
+  contractOptionsDescription?: string;
+  contractValueNote?: string;
+  contractCoverage?: ContractCoverage;
+  agreementReference?: string;
   // Additive fields: an absent legacy answer is never interpreted as No.
   aiUsage?: AiUsage;
   aiPurpose?: string;
@@ -106,6 +115,7 @@ export type ApplicationFormState = {
   hasRiskAssessment: YesNo;
   needsRiskHelp: YesNo;
   personalData: YesNo;
+  personalDataCategories?: PersonalDataCategory[];
   hasDpa: YesNo;
   hasContract: YesNo;
   hasSupplierChecklist: YesNo;
@@ -342,12 +352,20 @@ export const initialApplicationState: ApplicationFormState = {
   yearlyCost: "",
   otherCost: "",
   benefits: "",
+  contractValueStatus: "",
+  estimatedContractValueExVat: "",
+  contractDurationMonths: "",
+  contractOptionsDescription: "",
+  contractValueNote: "",
+  contractCoverage: "",
+  agreementReference: "",
   aiUsage: "",
   aiPurpose: "",
   aiAssessmentUrl: "",
   hasRiskAssessment: "nej",
   needsRiskHelp: "nej",
   personalData: "nej",
+  personalDataCategories: [],
   hasDpa: "nej",
   hasContract: "nej",
   hasSupplierChecklist: "nej",
@@ -458,6 +476,14 @@ export const legacyDemoApplicationState: ApplicationFormState = {
 /** New test forms use non-deliverable, neutral identities. Historical snapshots are unchanged. */
 export const demoApplicationState: ApplicationFormState = {
   ...structuredClone(legacyDemoApplicationState),
+  personalDataCategories: ["ordinary"],
+  contractValueStatus: "estimated",
+  estimatedContractValueExVat: "600,00",
+  contractDurationMonths: "36",
+  contractOptionsDescription: "En forlængelse på 12 måneder er medregnet.",
+  contractValueNote: "Syntetisk eksempel: 100 kr. etablering, 4 års drift à 100 kr. samt 100 kr. øvrige omkostninger.",
+  contractCoverage: "new-contract",
+  agreementReference: "",
   aiUsage: "nej",
   aiPurpose: "",
   aiAssessmentUrl: "",
@@ -499,6 +525,13 @@ export function isFieldVisible(field: string, state: ApplicationFormState) {
       return state.crossCutting === "ja";
     case "budgetAmount":
       return state.hasBudget === "ja";
+    case "estimatedContractValueExVat":
+    case "contractDurationMonths":
+    case "contractOptionsDescription":
+    case "contractValueNote":
+      return state.contractValueStatus === "estimated";
+    case "agreementReference":
+      return state.contractCoverage === "existing-agreement";
     case "riskHelp":
       return state.hasRiskAssessment === "nej";
     case "aiPurpose":
@@ -508,6 +541,7 @@ export function isFieldVisible(field: string, state: ApplicationFormState) {
       return state.hasRiskAssessment === "ja";
     case "dpaQuestion":
     case "dataClassification":
+    case "personalDataCategories":
       return state.personalData === "ja";
     case "data-processing-agreement":
       return state.personalData === "ja" && state.hasDpa === "ja";
@@ -665,6 +699,7 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           "Angiv det eksisterende budgetbeløb.",
         ),
         required("benefits", state.benefits, "Beskriv gevinsten."),
+        ...getProcurementErrors(state),
       ]);
       const amountFields: Array<[string, string]> = [
         ["budgetAmount", state.budgetAmount],
@@ -696,6 +731,9 @@ export function getStepErrors(state: ApplicationFormState, step: number): FieldE
           : null,
         isFieldVisible("dataClassification", state)
           ? choiceError("dataClassification", state.dataClassification, DATA_CLASSIFICATIONS, "Vælg en dataklassifikation fra listen.")
+          : null,
+        state.personalData === "ja" && (!isPersonalDataCategories(state.personalDataCategories) || state.personalDataCategories.length === 0)
+          ? { field: "personalDataCategories", message: "Vælg mindst én kategori af personoplysninger. Flere kan være relevante.", severity: "error" }
           : null,
         choiceError("employeeAccess", state.employeeAccess, USER_COUNT_OPTIONS, "Vælg antal medarbejdere fra listen.", false),
         visibleRequired(
@@ -791,6 +829,9 @@ export function normalizeApprovingLeader(state: ApplicationFormState) {
 
 export function getStepWarnings(state: ApplicationFormState, step: number): FieldError[] {
   const warnings: FieldError[] = [];
+  if (step === 4 && (state.contractValueStatus === "needs-clarification" || state.contractCoverage === "needs-clarification")) {
+    warnings.push({ field: "contractValueStatus", message: "Afklar kontraktværdi og aftaleform med kommunens indkøbsansvarlige. D-GITA kan registrere den efterfølgende vurdering på sagen.", severity: "warning" });
+  }
   if (step === 5 && hasAiScreeningDetails(state.aiUsage)) {
     warnings.push({
       field: "aiUsage",
@@ -906,6 +947,9 @@ export function pruneHiddenAnswers(state: ApplicationFormState) {
     "crossDepartments",
     "budgetAmount",
     "dataClassification",
+    "personalDataCategories",
+    ...PROCUREMENT_ESTIMATE_FIELDS,
+    "agreementReference",
     "riskHelp",
     "aiPurpose",
     "aiAssessmentUrl",
