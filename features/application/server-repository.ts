@@ -18,6 +18,7 @@ export {
 } from "./upload-repository";
 
 import { getPersistenceBindings } from "../../db/persistence";
+import { attemptQueuedApplicationAttachmentDeletion, cleanupDeletedApplicationAttachments } from "./attachment-deletion";
 import type { ServerActor } from "../auth/types";
 import {
   getAllErrors,
@@ -414,9 +415,6 @@ export async function submitApplication(
       .flat()
       .map((attachment) => attachment.id),
   );
-  const hiddenAttachments = attachments.filter(
-    (attachment) => !includedAttachmentIds.has(attachment.id),
-  );
   const readyAttachments = attachments
     .filter(
       (attachment) =>
@@ -575,7 +573,7 @@ export async function submitApplication(
     : "";
   submissionStatements.push(DB.prepare(`
     UPDATE portal_attachments
-    SET status = 'deleted', deleted_at = ?
+    SET status = 'deleting', deleted_at = ?
     WHERE tenant_id = ? AND application_id = ?
       AND application_version_id IS NULL AND status = 'ready'
       ${includedAttachmentFilter}
@@ -694,12 +692,7 @@ export async function submitApplication(
     );
   }
 
-  if (hiddenAttachments.length > 0) {
-    const { FILES } = await getPersistenceBindings();
-    await Promise.allSettled(
-      hiddenAttachments.map((attachment) => FILES.delete(attachment.storage_key)),
-    );
-  }
+  await cleanupDeletedApplicationAttachments(10).catch(() => undefined);
 
   return {
     id,
@@ -776,7 +769,10 @@ async function initializeCorrectionAttachments(
     const safeName = attachment.original_name
       .replace(/[^a-zA-Z0-9._-]+/g, "_")
       .slice(-140) || "document";
-    const pathname = `tenants/${actor.tenantId}/applications/${application.id}/corrections/${versionId}/${id}/${safeName}`;
+    // Logical copy IDs are idempotent; physical attempt locators must never
+    // be reused by a slow initializer after an earlier copy was deleted.
+    const copyAttemptId = crypto.randomUUID();
+    const pathname = `tenants/${actor.tenantId}/applications/${application.id}/corrections/${versionId}/${id}/${copyAttemptId}/${safeName}`;
     const copiedBytes = await stored.arrayBuffer();
     const scanStatus = await scanUploadBytes(new Uint8Array(copiedBytes), attachment.checksum_sha256);
     const copied = await FILES.put(pathname, copiedBytes, {
@@ -791,7 +787,7 @@ async function initializeCorrectionAttachments(
         sourceVersionId: versionId,
       },
     });
-    await DB.prepare(`
+    const registerCopy = DB.prepare(`
       INSERT OR IGNORE INTO portal_attachments
         (id, tenant_id, application_id, application_version_id, owner_user_id,
          kind, original_name, size_bytes, content_type, storage_key,
@@ -815,7 +811,33 @@ async function initializeCorrectionAttachments(
       now,
       application.id,
       versionId,
-    ).run();
+    );
+    const queueUnreferencedCopy = DB.prepare(`
+      INSERT OR IGNORE INTO portal_attachments
+        (id, tenant_id, application_id, application_version_id, owner_user_id,
+         kind, original_name, size_bytes, content_type, storage_key,
+         checksum_sha256, status, scan_status, uploaded_by_user_id,
+         created_at, immutable_at, deleted_at)
+      SELECT ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'deleting', ?, ?, ?, NULL, ?
+      WHERE NOT EXISTS (SELECT 1 FROM portal_attachments WHERE storage_key = ?)
+    `).bind(
+      copyAttemptId, actor.tenantId, application.id, application.owner_user_id,
+      attachment.kind, attachment.original_name, attachment.size_bytes,
+      attachment.content_type, copied.key, attachment.checksum_sha256,
+      scanStatus, actor.userId, now, now, copied.key,
+    );
+    try {
+      await DB.batch([registerCopy, queueUnreferencedCopy]);
+    } catch (error) {
+      // The guarded insert reconciles against authoritative state, including
+      // a committed batch whose reply was lost. Never delete a referenced copy.
+      try {
+        await queueUnreferencedCopy.run();
+        await attemptQueuedApplicationAttachmentDeletion(actor.tenantId, copyAttemptId);
+      } catch { /* Uncertain database state must preserve the object. */ }
+      throw error;
+    }
+    await attemptQueuedApplicationAttachmentDeletion(actor.tenantId, copyAttemptId);
   }
 
   await DB.prepare(`
