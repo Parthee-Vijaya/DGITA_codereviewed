@@ -30,9 +30,11 @@ Real isolated libSQL database with synthetic users; external FILES adapter simul
 - [x] Host-independent scheduler and failure visibility.
 - [x] Full verification and two-axis review.
 - [x] Vercel deployment verified.
-- [ ] Commit and push verified.
+- [x] Initial commit and push verified (d8e7ca9023d0ef85fa3143348fffd8278923823b).
 
-## Verification record before commit
+## Initial delivery verification record
+
+After the first push, GitHub reported two new dependency advisories, confirmed by npm audit and the repository's existing audit policy. Update source-map-js 1.2.1 → 1.2.2 within its existing ranges; force sharp 0.35.5 because Miniflare pins vulnerable 0.35.4 while Next permits the patched release. These address https://github.com/advisories/GHSA-68fv-2mgg-jv7q and https://github.com/advisories/GHSA-wq5f-xc86-pv6w. Do not expand audit exceptions. Verify native PNG/SVG decoding and resizing, audit policy, both builds and runtime flows; redeploy the final source before committing/pushing this follow-up.
 
 370/370 tests, lint, typecheck, code-health, whitespace checks, Vinext build and Next build passed. Ten deletion regressions include storage outages, acknowledgement loss, audit rollback, concurrent removal/copying, correction registration rollback and committed-batch lost reply. Both isolated full lifecycle HTTP suites and the production configuration suite passed on Node 24.19.0 from a private clean verification snapshot of this source. External provider contracts used synthetic HTTP fixtures, not live services.
 
