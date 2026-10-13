@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isSafeNotificationId } from "./id";
 
 export type PortalNotification = {
   id: string;
@@ -168,7 +169,7 @@ export function usePortalNotifications(viewerKey: string) {
   }, [viewerKey]);
 
   const markRead = useCallback(async (id: string) => {
-    if (!isUuid(id)) return false;
+    if (!isSafeNotificationId(id)) return false;
     return mutateReadState({ id });
   }, [mutateReadState]);
 
@@ -261,8 +262,4 @@ function isAbortError(value: unknown) {
     (value instanceof DOMException && value.name === "AbortError") ||
     (value instanceof Error && value.name === "AbortError")
   );
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f-]{36}$/i.test(value);
 }

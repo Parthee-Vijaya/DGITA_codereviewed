@@ -29,6 +29,8 @@ type ProviderErrorBody = {
   };
 };
 
+const MAX_GRAPH_JSON_BYTES = 64 * 1024;
+
 /**
  * Server-side transport for Microsoft Graph's v1.0 sendMail action.
  *
@@ -61,9 +63,10 @@ export class MicrosoftGraphMailTransport implements MailTransport {
     // A rejected guard is preserved for the outbox's cancellation handling.
     await options?.beforeSend?.();
 
-    let response: Response;
+    let knownResponse: Response | undefined;
+    let result: { response: Response; providerCode: string | null };
     try {
-      response = await fetchWithTimeout(
+      result = await fetchWithTimeout(
         this.fetch,
         endpoint,
         {
@@ -77,30 +80,28 @@ export class MicrosoftGraphMailTransport implements MailTransport {
         },
         this.config.timeoutMs,
         "send",
+        async (response) => {
+          knownResponse = response;
+          if (response.status === 401) this.cachedToken = null;
+          return {
+            response,
+            providerCode: response.status === 202 ? null : await providerErrorCode(response),
+          };
+        },
       );
     } catch (error) {
+      // Once Graph has rejected the request, a stalled diagnostic body must
+      // not turn that known HTTP outcome into an ambiguous send timeout.
+      if (knownResponse && knownResponse.status !== 202) {
+        throw graphSendError(knownResponse, null, this.now());
+      }
       if (error instanceof GraphMailError) throw error;
       throw networkError("send", error);
     }
 
+    const { response, providerCode } = result;
     if (response.status !== 202) {
-      if (response.status === 401) this.cachedToken = null;
-      const providerCode = await providerErrorCode(response);
-      throw new GraphMailError(
-        "GRAPH_SEND_ERROR",
-        "Microsoft Graph afviste mailen.",
-        {
-          stage: "send",
-          status: response.status,
-          retryable: isRetryableStatus(response.status),
-          requestId: response.headers.get("request-id"),
-          providerCode,
-          retryAfterMs: retryAfterMilliseconds(
-            response.headers.get("retry-after"),
-            this.now(),
-          ),
-        },
-      );
+      throw graphSendError(response, providerCode, this.now());
     }
 
     return {
@@ -135,9 +136,9 @@ export class MicrosoftGraphMailTransport implements MailTransport {
       scope: this.config.graphScope,
     });
 
-    let response: Response;
+    let tokenResult: { response: Response; result: TokenResponse | null };
     try {
-      response = await fetchWithTimeout(
+      tokenResult = await fetchWithTimeout(
         this.fetch,
         endpoint,
         {
@@ -150,13 +151,14 @@ export class MicrosoftGraphMailTransport implements MailTransport {
         },
         this.config.timeoutMs,
         "token",
+        async (response) => ({ response, result: await safeJson<TokenResponse>(response) }),
       );
     } catch (error) {
       if (error instanceof GraphMailError) throw error;
       throw networkError("token", error);
     }
 
-    const result = await safeJson<TokenResponse>(response);
+    const { response, result } = tokenResult;
     if (!response.ok) {
       throw new GraphMailError(
         "GRAPH_AUTHENTICATION_ERROR",
@@ -220,12 +222,13 @@ export function graphPayload(mail: OutgoingMail) {
   };
 }
 
-async function fetchWithTimeout(
+async function fetchWithTimeout<T>(
   fetcher: FetchLike,
   input: string,
   init: RequestInit,
   timeoutMs: number,
   stage: "token" | "send",
+  consume: (response: Response) => Promise<T>,
 ) {
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -243,7 +246,7 @@ async function fetchWithTimeout(
 
   try {
     return await Promise.race([
-      fetcher(input, { ...init, signal: controller.signal }),
+      fetcher(input, { ...init, signal: controller.signal }).then(consume),
       timeout,
     ]);
   } catch (error) {
@@ -346,16 +349,49 @@ function networkError(stage: "token" | "send", cause: unknown) {
 }
 
 async function safeJson<T>(response: Response): Promise<T | null> {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
   try {
-    return (await response.json()) as T;
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_GRAPH_JSON_BYTES) {
+        void reader.cancel().catch(() => undefined);
+        return null;
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder().decode(bytes)) as T;
   } catch {
     return null;
+  } finally {
+    reader.releaseLock();
   }
 }
 
 async function providerErrorCode(response: Response) {
   const result = await safeJson<ProviderErrorBody>(response);
   return typeof result?.error?.code === "string" ? result.error.code : null;
+}
+
+function graphSendError(response: Response, providerCode: string | null, now: number) {
+  return new GraphMailError("GRAPH_SEND_ERROR", "Microsoft Graph afviste mailen.", {
+    stage: "send",
+    status: response.status,
+    retryable: isRetryableStatus(response.status),
+    requestId: response.headers.get("request-id"),
+    providerCode,
+    retryAfterMs: retryAfterMilliseconds(response.headers.get("retry-after"), now),
+  });
 }
 
 function isRetryableStatus(status: number) {
