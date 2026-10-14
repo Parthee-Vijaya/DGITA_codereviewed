@@ -40,6 +40,32 @@ import { assertAttachmentScanAllowed, scanUploadBytes } from "./malware-scan";
 import { deploymentStage, readRuntimeEnvironment } from "../runtime/environment";
 import { newCaseNumber } from "./case-number";
 import { informationRequestEventId, publicInformationRequest } from "../cases/workflow-policy";
+import { isApplicationKleSelection } from "./kle-selection";
+import { permitsKlePreview } from "../system-usage/preview-policy";
+import { previewKleProvider } from "../kle/provider";
+
+/** Every write checks the real request boundary and the immutable published data. */
+async function canonicalApplicationKleState(actor: ServerActor, state: ApplicationFormState, requestUrl?: string): Promise<ApplicationFormState> {
+  if (state.kleSelection === null || state.kleSelection === undefined) return { ...state, kleSelection: null };
+  const environment = await readRuntimeEnvironment();
+  if (actor.provider !== "dev" || !permitsKlePreview(environment, requestUrl ?? "")) {
+    throw new ApplicationRepositoryError(422, "KLE-eksempeldata kan kun gemmes i den lokale afprøvning.");
+  }
+  const selection = state.kleSelection;
+  if (!isApplicationKleSelection(selection)) throw new ApplicationRepositoryError(422, "KLE-valget har et ugyldigt format.");
+  const catalog = previewKleProvider.catalog;
+  if (selection.source.id !== catalog.source.id || selection.source.version !== catalog.source.version ||
+      selection.source.kind !== catalog.source.kind || selection.source.label !== catalog.source.label) {
+    throw new ApplicationRepositoryError(422, "KLE-kilden er ændret. Søg og vælg KLE-emnerne igen.");
+  }
+  const entries = selection.entries.map((selected) => {
+    const entry = catalog.entries.find((candidate) => candidate.uuid === selected.uuid && candidate.code === selected.code);
+    if (!entry || entry.retired || entry.title !== selected.title) throw new ApplicationRepositoryError(422, "Et KLE-emne er ændret eller udgået. Søg og vælg emnet igen.");
+    return { uuid: entry.uuid, code: entry.code, title: entry.title };
+  });
+  const { id, version, label, kind } = catalog.source;
+  return { ...state, kleSelection: { schemaVersion: 1, source: { id, version, label, kind }, entries } };
+}
 
 type AttachmentRow = {
   id: string;
@@ -188,9 +214,11 @@ export async function saveApplicationDraft(
   id: string,
   state: ApplicationFormState,
   expectedRowVersion?: number | null,
+  requestUrl?: string,
 ) {
   assertCanCreate(actor);
   assertApplicationId(id);
+  state = await canonicalApplicationKleState(actor, state, requestUrl);
   try { state = canonicalCatalogSelection(state); }
   catch (error) { throw new ApplicationRepositoryError(422, (error as Error).message); }
   const serialized = JSON.stringify(state);
@@ -357,9 +385,11 @@ export async function submitApplication(
   id: string,
   state: ApplicationFormState,
   expectedRowVersion?: number | null,
+  requestUrl?: string,
 ) {
   assertCanCreate(actor);
   assertApplicationId(id);
+  state = await canonicalApplicationKleState(actor, state, requestUrl);
   if (JSON.stringify(state).length > 600_000) {
     throw new ApplicationRepositoryError(413, "Ansøgningen er for stor.");
   }
@@ -367,7 +397,7 @@ export async function submitApplication(
   let row = await findApplicationById(DB, id);
   const createdForSubmission = row === null;
   if (!row) {
-    await saveApplicationDraft(actor, id, state, expectedRowVersion);
+    await saveApplicationDraft(actor, id, state, expectedRowVersion, requestUrl);
     row = await findApplicationById(DB, id);
   }
   if (!row) throw new ApplicationRepositoryError(404, "Kladden findes ikke.");

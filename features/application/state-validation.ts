@@ -1,6 +1,7 @@
 import { PROCUREMENT_FIELDS, PROCUREMENT_TEXT_LIMITS, isPersonalDataCategories, isContractValueStatus, isContractCoverage } from "./procurement";
 import type { CatalogRelation } from "../catalog/relations";
 import { AI_SCREENING_FIELDS, isAiUsage, MAX_AI_PURPOSE_LENGTH, MAX_AI_ASSESSMENT_URL_LENGTH } from "./ai-screening";
+import { isApplicationKleSelection } from "./kle-selection";
 import {
   initialApplicationState,
   type ApplicationFormState,
@@ -37,7 +38,7 @@ const UPLOAD_KINDS: UploadKind[] = [
 ];
 
 const RELATION_KEYS = ["replacementCatalogRelation", "relatedCatalogRelation"] as const;
-const OPTIONAL_KEYS = new Set<string>([...RELATION_KEYS, ...AI_SCREENING_FIELDS, ...PROCUREMENT_FIELDS, "personalDataCategories"]);
+const OPTIONAL_KEYS = new Set<string>([...RELATION_KEYS, ...AI_SCREENING_FIELDS, ...PROCUREMENT_FIELDS, "personalDataCategories", "kleSelection"]);
 const APPLICATION_STATE_KEYS = Object.keys(initialApplicationState);
 const CATALOG_REQUIRED_KEYS = [
   "id",
@@ -60,6 +61,7 @@ export function isApplicationFormState(value: unknown): value is ApplicationForm
   if (!isRecord(value) || !hasOnlyKeys(value, APPLICATION_STATE_KEYS)) return false;
   if (!APPLICATION_STATE_KEYS.filter((key) => !OPTIONAL_KEYS.has(key)).every((key) => Object.hasOwn(value, key))) return false;
   if (!RELATION_KEYS.every((key) => isCatalogRelation(value[key]))) return false;
+  if (Object.hasOwn(value, "kleSelection") && value.kleSelection !== null && !isApplicationKleSelection(value.kleSelection)) return false;
   if (Object.hasOwn(value, "aiUsage") && !isAiUsage(value.aiUsage)) return false;
   for (const [field, limit] of [["aiPurpose", MAX_AI_PURPOSE_LENGTH], ["aiAssessmentUrl", MAX_AI_ASSESSMENT_URL_LENGTH]] as const) {
     if (Object.hasOwn(value, field) && (typeof value[field] !== "string" || value[field].length > limit)) return false;
@@ -84,6 +86,7 @@ export function isApplicationFormState(value: unknown): value is ApplicationForm
       AI_SCREENING_FIELDS.includes(key as typeof AI_SCREENING_FIELDS[number]) ||
       PROCUREMENT_FIELDS.includes(key as typeof PROCUREMENT_FIELDS[number]) ||
       key === "personalDataCategories" ||
+      key === "kleSelection" ||
       key === "schemaVersion" ||
       key === "selectedSystem" ||
       key === "attachments" ||

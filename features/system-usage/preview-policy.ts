@@ -18,3 +18,9 @@ export function assertKlePreview(environment: RuntimeEnvironment, requestUrl: st
     throw new AuthHttpError(404, "PREVIEW_UNAVAILABLE", "Afprøvningen er ikke tilgængelig i dette miljø.");
   }
 }
+
+/** Page rendering checks the actual host and identity before exposing preview controls. */
+export function permitsKlePreviewPage(environment: RuntimeEnvironment, requestHost: string | null, provider: string) {
+  const origin = environment.DGITA_APP_ORIGIN ?? "";
+  return provider === "dev" && permitsKlePreview(environment, origin) && requestHost === new URL(origin).host;
+}

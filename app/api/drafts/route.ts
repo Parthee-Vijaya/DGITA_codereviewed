@@ -57,8 +57,8 @@ export async function POST(request: Request) {
       ? body.expectedRowVersion
       : null;
     const result = body.status === "submitted"
-      ? await submitApplication(actor, body.id, body.draft, expectedRowVersion)
-      : await saveApplicationDraft(actor, body.id, body.draft, expectedRowVersion);
+      ? await submitApplication(actor, body.id, body.draft, expectedRowVersion, request.url)
+      : await saveApplicationDraft(actor, body.id, body.draft, expectedRowVersion, request.url);
     return noStoreJson(result);
   } catch (error) {
     return applicationError(error);

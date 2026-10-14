@@ -2,12 +2,30 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { initialApplicationState } from "../features/application/engine.ts";
+import { SYNTHETIC_KLE_CATALOG } from "../features/kle/synthetic.ts";
 import {
   CaseDetailError,
   normalizeApplicationSnapshotJson,
   ownerScopeUserId,
   withSafeDraftAttachments,
 } from "../features/cases/detail-helpers.ts";
+
+test("case detail preserves structured historical KLE choices and never coerces them to strings", () => {
+  const { id, label, kind } = SYNTHETIC_KLE_CATALOG.source;
+  const { uuid, code, title } = SYNTHETIC_KLE_CATALOG.entries[1];
+  const kleSelection = { schemaVersion: 1, source: { id, version: "historical-publication", label, kind }, entries: [{ uuid, code, title }] };
+  const serialized = JSON.stringify({ ...initialApplicationState, kleSelection, kleTopics: ["Eksisterende fritekst"] });
+  const snapshot = normalizeApplicationSnapshotJson(serialized, initialApplicationState);
+  assert.deepEqual(snapshot.kleSelection, kleSelection);
+  assert.deepEqual(snapshot.kleTopics, ["Eksisterende fritekst"]);
+  assert.equal(JSON.parse(serialized).kleSelection.source.version, "historical-publication");
+  for (const empty of [{}, { kleSelection: null }]) {
+    assert.equal(normalizeApplicationSnapshotJson(JSON.stringify(empty), initialApplicationState).kleSelection, null);
+  }
+  for (const malformed of ["", [], { ...kleSelection, source: { ...kleSelection.source, internalNotes: "hidden" } }]) {
+    assert.throws(() => normalizeApplicationSnapshotJson(JSON.stringify({ kleSelection: malformed }), initialApplicationState), CaseDetailError);
+  }
+});
 
 test("brugeradgang afgrænses til brugerens ejer-id", () => {
   assert.equal(ownerScopeUserId("user", "user-1"), "user-1");

@@ -154,7 +154,7 @@ try {
   assert.ok(ready, `Server readiness timed out; inspect work/ci/${mode}/server.log`);
   if (workflowTest) {
     testLog = createWriteStream(join(output, "tests.log"));
-    const tests = launch("npm", mode === "kle-preview" ? ["exec", "--", "playwright", "test", "kle-preview.spec.ts"] : mode === "a11y" ? ["exec", "--", "playwright", "test"] : ["run", "test:e2e"], testLog);
+    const tests = launch("npm", mode === "kle-preview" ? ["exec", "--", "playwright", "test", "kle-preview.spec.ts", "kle-application.spec.ts"] : mode === "a11y" ? ["exec", "--", "playwright", "test"] : ["run", "test:e2e"], testLog);
     const result = await new Promise((done) => {
       const timeout = setTimeout(() => { stopProcess(tests); done({ timeout: true }); }, 240_000);
       tests.once("error", (error) => { clearTimeout(timeout); done({ error }); });

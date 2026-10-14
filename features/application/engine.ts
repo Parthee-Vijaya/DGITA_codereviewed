@@ -1,6 +1,7 @@
 import { relationError, type CatalogRelation, type RelationField } from "../catalog/relations";
 import { SYNTHETIC_APPROVERS } from "../workspace/model";
 import { AI_USAGE_OPTIONS, hasAiScreeningDetails, isSafeAiAssessmentUrl, MAX_AI_PURPOSE_LENGTH, type AiUsage } from "./ai-screening";
+import type { ApplicationKleSelection } from "./kle-selection";
 
 import { getProcurementErrors, isPersonalDataCategories, PROCUREMENT_ESTIMATE_FIELDS, type PersonalDataCategory, type ContractValueStatus, type ContractCoverage } from "./procurement";
 
@@ -90,6 +91,7 @@ export type ApplicationFormState = {
   purpose: string;
   functionDescription: string;
   kleTopics: string[];
+  kleSelection?: ApplicationKleSelection | null;
   existingProcessSystem: YesNo;
   existingProcessSystems: string;
   crossCutting: YesNo;
@@ -341,6 +343,7 @@ export const initialApplicationState: ApplicationFormState = {
   purpose: "",
   functionDescription: "",
   kleTopics: [],
+  kleSelection: null,
   existingProcessSystem: "nej",
   existingProcessSystems: "",
   crossCutting: "nej",

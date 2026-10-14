@@ -20,6 +20,8 @@ KLE-/NIS2-/KITOS-feedbackplanen fra 14. oktober er påbegyndt i et separat check
 
 Samme branch har nu integreret KLE-søgning via serveren med stikord, rangering, resultatsider, fejl/genforsøg og versionskontrol. Officiel dataforberedelse er en offline XML-import med validering og SHA-256; en klargjort pakke er ikke aktiveret eller godkendt. Kilden er fortsat syntetisk, og søgefunktionen er lukket i pilot/produktion. Se `docs/implementation/kle-search.md` for datavej, kommando og de konkrete skridt efter aftaleafklaring med KL. KLE-kilder og KL-opgavematch er stadig separate.
 
+`feat/kle-in-application` bygger videre på `fix/kle-meeting-guidance` (PR #30) og fører den valgfrie søgning ind ved ansøgningens spørgsmål 30 i lokal afprøvning. Valgte emner og kildeversion følger kladde, indsendelse og kvittering, mens tidligere fritekst bevares. Brugeren kan få hjælp til resten på mødet; der er ingen særskilt deling eller konsulentanmodning. Se `docs/implementation/kle-application.md`. Hver ny funktion får sin egen branch og PR; main ændres ikke som del af udviklingen.
+
 Læs README.md, docs/candidate-readiness.md, docs/governance/control-register.json, docs/municipal-acceptance.md, docs/production-operations.md og docs/ci-cd.md. Verificér altid aktuel Git-SHA, git status, seneste GitHub Quality gates og CodeQL-alerts. Rapporter fra 5. oktober 2026 er dateret evidens, ikke fremtidig driftsgaranti.
 
 Testlogin bevares lokalt/pilot; produktion afviser testidentiteter og automatisk demo-seed. Produktion kræver eksplicit migration og korrekt checksum-ledger, Entra, separat DB/privat Blob, scanner og mailopsætning. Den eksisterende onlinepilot er ikke deployet eller ændret af klargøringen.
