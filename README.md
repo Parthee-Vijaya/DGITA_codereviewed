@@ -16,6 +16,8 @@ Komponenterne er forfinet med inspiration fra [Fisher UI](https://jakobfisker.dk
 
 ## Status
 
+Den trinvise [gennemførelsesplan](docs/implementation/README.md) følger de 64 udestående krav og bevarer den eksisterende UX/UI.
+
 Den lokale [K01–K12-kandidat og dens restopgaver](docs/candidate-readiness.md) samler implementering, reproducerbare prøver og grænserne for evidensen. [Miljøacceptpakken](docs/municipal-acceptance.md) beskriver de efterfølgende kommunale prøver.
 
 Fremtidigt arbejde og releases hører til [DGITA_codereviewed](https://github.com/Parthee-Vijaya/DGITA_codereviewed). Det tidligere DGITA-repo er bevaret som `upstream`. Produktionsforberedelserne omfatter sikkerhedsrettelser og CI/CD, men en kommunal produktionsaccept kræver stadig de eksterne kontroller i [driftsvejledningen](docs/production-operations.md).

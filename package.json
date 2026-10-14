@@ -19,11 +19,13 @@
     "start:next": "next start",
     "test:ci:e2e": "node scripts/ci-server.mjs e2e",
     "test:ci:a11y": "node scripts/ci-server.mjs a11y",
+    "test:ci:kle-preview": "node scripts/ci-server.mjs kle-preview",
     "test:ci:next-e2e": "node scripts/ci-server.mjs next-e2e",
     "test:ci:production": "node scripts/ci-server.mjs production",
     "db:migrate": "node scripts/migrate.mjs",
     "db:manifest": "node scripts/migration-manifest.mjs",
-    "check:production": "node scripts/check-production-config.mjs"
+    "check:production": "node scripts/check-production-config.mjs",
+    "kle:prepare": "tsx scripts/kle-prepare.mts"
   },
   "dependencies": {
     "@libsql/client": "0.17.4",
@@ -48,6 +50,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.34",
+    "@xmldom/xmldom": "0.9.12",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.8",
@@ -64,6 +67,8 @@
     "sharp": "0.35.5",
     "@esbuild-kit/core-utils@3.3.2": {
       "esbuild": "0.25.12"
-    }
+    },
+    "sharp@0.35.4": "0.35.5",
+    "source-map-js@1.2.1": "1.2.2"
   }
 }

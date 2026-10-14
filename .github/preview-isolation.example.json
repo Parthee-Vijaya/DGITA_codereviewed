@@ -1,0 +1,20 @@
+{
+  "preview": {
+    "projectId": "prj_replacepreview",
+    "databaseUrl": "libsql://replace-preview.turso.io",
+    "blobStoreId": "store_replacepreview",
+    "appOrigin": "https://replace-preview.vercel.app"
+  },
+  "pilot": {
+    "projectId": "prj_replaceexistingpilot",
+    "databaseUrl": "libsql://replace-existing-pilot.turso.io",
+    "blobStoreId": "store_replaceexistingpilot",
+    "appOrigin": "https://replace-existing-pilot.vercel.app"
+  },
+  "production": {
+    "projectId": "prj_replaceproduction",
+    "databaseUrl": "libsql://replace-production.turso.io",
+    "blobStoreId": "store_replaceproduction",
+    "appOrigin": "https://replace-production.vercel.app"
+  }
+}

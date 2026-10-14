@@ -33,7 +33,7 @@ test("native invalid fields combine existing descriptions, question hint and err
   assert.match(html, /aria-invalid="true"/);
 });
 test("uploads expose document kind, requirements, errors and a persistent live region", () => {
-  const args = { kind: "contract", title: "Upload kontrakt", detail: "PDF · maks. 25 MB", files: [], onAdd() {}, onRemove() {} };
+  const args = { kind: "contract", title: "Upload kontrakt", detail: "Bilaget knyttes til sagen", files: [], onAdd() {}, onRemove() {} };
   const clean = render(h(UploadField, args));
   assert.match(clean, /aria-label="Vælg fil til Upload kontrakt"/);
   assert.match(clean, /aria-live="polite"/);
@@ -41,4 +41,16 @@ test("uploads expose document kind, requirements, errors and a persistent live r
   const invalid = render(h(UploadField, { ...args, error: "Vedhæft kontrakten" }));
   assert.match(invalid, /aria-invalid="true"/);
   for (const id of invalid.match(/aria-describedby="([^"]+)"/)[1].split(" ")) assert.ok(invalid.includes(`id="${id}"`));
+});
+
+
+test("risikovurderingens filvælger og hjælp viser kun de dokumenttyper serveren accepterer", () => {
+  const args = { title: "Upload risikovurdering", files: [], onAdd() {}, onRemove() {} };
+  const risk = render(h(UploadField, { ...args, kind: "risk-assessment" }));
+  assert.match(risk, /accept=".pdf,.doc,.docx,.xls,.xlsx"/);
+  assert.match(risk, /PDF, DOC, DOCX, XLS, XLSX · maks. 25 MB/);
+  assert.doesNotMatch(risk, /PNG|.png/);
+  const contract = render(h(UploadField, { ...args, kind: "contract" }));
+  assert.match(contract, /accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"/);
+  assert.match(contract, /PNG, JPG, JPEG · maks. 25 MB/);
 });

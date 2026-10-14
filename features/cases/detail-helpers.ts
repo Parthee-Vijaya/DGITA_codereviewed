@@ -1,3 +1,7 @@
+import { isCatalogRelation } from "../application/state-validation";
+import { isPersonalDataCategories, isContractValueStatus, isContractCoverage, PROCUREMENT_TEXT_LIMITS, normalizeProcurementChanges } from "../application/procurement";
+import { isAiUsage } from "../application/ai-screening";
+import type { CatalogRelation } from "../catalog/relations";
 import type {
   ApplicationFormState,
   AttachmentDraft,
@@ -75,7 +79,7 @@ export function normalizeApplicationSnapshotJson(
   const base = baseState as unknown as Record<string, unknown>;
 
   for (const [key, baseValue] of Object.entries(base)) {
-    if (key === "attachments" || key === "selectedSystem" || key === "schemaVersion") {
+    if (key === "attachments" || key === "selectedSystem" || key === "schemaVersion" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation") {
       continue;
     }
     const candidate = value[key];
@@ -87,6 +91,19 @@ export function normalizeApplicationSnapshotJson(
   normalized.schemaVersion = "dgita-v1";
   normalized.selectedSystem = normalizeSelectedSystem(value.selectedSystem);
   normalized.attachments = normalizeAttachments(value.attachments);
+  // Additive relation fields are absent from legacy versions. Project null in
+  // memory without inventing an id or rewriting any historical snapshot bytes.
+  normalized.replacementCatalogRelation = normalizeCatalogRelation(value.replacementCatalogRelation);
+  normalized.relatedCatalogRelation = normalizeCatalogRelation(value.relatedCatalogRelation);
+  // Missing legacy screening stays unanswered in this read projection. Never
+  // infer No or write this default back into immutable historical versions.
+  normalized.aiUsage = isAiUsage(value.aiUsage) ? value.aiUsage : "";
+  normalized.personalDataCategories = isPersonalDataCategories(value.personalDataCategories) ? [...value.personalDataCategories] : [];
+  normalized.contractValueStatus = isContractValueStatus(value.contractValueStatus) ? value.contractValueStatus : "";
+  normalized.contractCoverage = isContractCoverage(value.contractCoverage) ? value.contractCoverage : "";
+  for (const [field, limit] of Object.entries(PROCUREMENT_TEXT_LIMITS)) {
+    target[field] = typeof value[field] === "string" && value[field].length <= limit ? value[field] : "";
+  }
 
   if (value.schemaVersion !== "dgita-v1") {
     const legacy = isRecord(value._demo) ? value._demo : null;
@@ -98,7 +115,7 @@ export function normalizeApplicationSnapshotJson(
     }
   }
 
-  return normalized;
+  return normalizeProcurementChanges(normalized);
 }
 
 export type SafeDraftAttachment = {
@@ -126,6 +143,10 @@ export function withSafeDraftAttachments(
     });
   }
   return { ...snapshot, attachments } satisfies ApplicationFormState;
+}
+
+function normalizeCatalogRelation(value: unknown): CatalogRelation | null {
+  return value && isCatalogRelation(value) ? { ...value } : null;
 }
 
 function normalizeSelectedSystem(value: unknown): SelectedCatalogSystem | null {
@@ -231,7 +252,7 @@ function neutralApplicationState(baseState: ApplicationFormState) {
       neutral[key] = "dgita-v1";
     } else if (key === "attachments") {
       neutral[key] = emptyAttachments();
-    } else if (key === "selectedSystem") {
+    } else if (key === "selectedSystem" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation") {
       neutral[key] = null;
     } else if (key === "acquisitionType") {
       neutral[key] = "nyanskaffelse";

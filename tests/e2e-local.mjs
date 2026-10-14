@@ -88,6 +88,14 @@ async function main() {
   const user = await login("user");
   const consultant = await login("consultant");
   const admin = await login("admin");
+  if (process.env.DGITA_ENABLE_KLE_PREVIEW !== "true") {
+    const klePreview = await admin.json("/api/system-usages");
+    expectStatus(klePreview.response.status, 404, "KLE-afprøvning er lukket i almindelig pilot", klePreview.payload);
+    const kleWrite = await admin.json("/api/system-usages", { method: "POST", body: {} });
+    expectStatus(kleWrite.response.status, 404, "KLE-skrivning er lukket i almindelig pilot", kleWrite.payload);
+    const kleSearch = await admin.json("/api/kle/search", { method: "POST", body: { query: "login" } });
+    expectStatus(kleSearch.response.status, 404, "KLE-søgning er lukket i almindelig pilot", kleSearch.payload);
+  }
   if (providerFixtures) {
     assert.match(process.env.TURSO_DATABASE_URL || "", /^file:\/.*\/dgita-ci-next-e2e-[^/]+\/synthetic\.sqlite$/u);
     const { createClient } = await import("@libsql/client");
@@ -340,6 +348,10 @@ async function main() {
   assert.equal(fieldComment.payload.comment.fieldLabel, "Formål og ønsket effekt");
 
   const reviewer = await consultant.json("/api/auth/session");
+  const responsibleDirectory = await consultant.json("/api/workspace/responsible-people");
+  expectStatus(responsibleDirectory.response.status, 200, "hent ansvarlige", responsibleDirectory.payload);
+  const reviewPerson = responsibleDirectory.payload.people.find((person) => person.identifier === reviewer.payload.viewer.email);
+  assert.ok(reviewPerson, "reviewer must be selectable by stable identity");
   const reviewWorkspace = await consultant.json("/api/workspace");
   const loadedReview = reviewWorkspace.payload.workspace.approvals[caseNumber];
   const finalized = await consultant.json("/api/workspace", {
@@ -353,10 +365,12 @@ async function main() {
         approved: "Ja",
         date: new Date().toISOString().slice(0, 10),
         legalBasis: "GDPR",
-        responsible: reviewer.payload.viewer.displayName,
+        responsible: reviewPerson.name,
+        responsibleUserId: reviewPerson.id,
         hasAdditionalResponsible: "Nej",
         additionalResponsible: "",
-        itConsultant: "D-GITA E2E",
+        itConsultant: reviewPerson.name,
+        itConsultantUserId: reviewPerson.id,
         infrastructureChanges: "Nej",
         notes: `Afsluttet i E2E ${runId}`,
         internalComments: "Versionsbundet intern test",

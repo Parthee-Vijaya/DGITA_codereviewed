@@ -73,6 +73,27 @@ test("afslutning kræver beslutning og versionslåser teknisk status", () => {
   );
 });
 
+test("infrastructure changes require an explanation and clear hidden answers", () => {
+  for (const description of [undefined, "", "   "]) {
+    assert.throws(() => normalizeDgitaApprovalInput({
+      ...EMPTY_D_GITA_APPROVAL, infrastructureChanges: "Ja", infrastructureDescription: description,
+    }), /Beskriv ændringerne/u);
+  }
+  const explained = normalizeDgitaApprovalInput({
+    ...EMPTY_D_GITA_APPROVAL, infrastructureChanges: "Ja", infrastructureDescription: "  New test integration  ",
+  });
+  assert.equal(explained.infrastructureDescription, "New test integration");
+  for (const choice of ["", "Nej"]) {
+    assert.equal(normalizeDgitaApprovalInput({ ...explained, infrastructureChanges: choice }).infrastructureDescription, "");
+  }
+  assert.throws(() => normalizeDgitaApprovalInput({
+    ...explained, infrastructureDescription: "x".repeat(8001),
+  }), WorkspaceInputError);
+  const legacy = { ...EMPTY_D_GITA_APPROVAL };
+  delete legacy.infrastructureDescription;
+  assert.equal(normalizeDgitaApprovalInput(legacy).infrastructureDescription, "");
+});
+
 test("feltkommentar bruger serverens feltlabel og afviser ugyldige værdier", () => {
   const normalized = normalizeFieldCommentInput({
     id: "019c7a82-0181-7457-9c4a-8ebf2ce0121f",

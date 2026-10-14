@@ -12,6 +12,8 @@ import {
   resetWorkspaceContentForActor,
   resetWorkspaceImagesForActor,
   saveApprovalForActor,
+  rejectApplicationForActor,
+  requestApplicationInformationForActor,
   upsertContentForActor,
   upsertImageForActor,
 } from "../../../features/workspace/server-repository";
@@ -24,6 +26,8 @@ import type {
 import { WorkspaceInputError } from "../../../features/workspace/validation";
 
 type WorkspaceMutation =
+  | { action: "application.request-information"; caseId: string; reason: string; dueDate: string; expectedRowVersion: number; expectedVersionId: string }
+  | { action: "approval.reject"; caseId: string; reason: string; expectedVersionId: string; expectedRowVersion: number; expectedUpdatedAt: string | null }
   | { action: "content.upsert"; entry: ContentEntry }
   | { action: "content.delete"; id: string }
   | { action: "image.upsert"; entry: ImageEntry }
@@ -62,6 +66,10 @@ export async function POST(request: Request) {
       case "image.reset":
         await resetWorkspaceImagesForActor(actor);
         return noStoreJson({ ok: true });
+      case "application.request-information":
+        return noStoreJson({ request: await requestApplicationInformationForActor(actor, body.caseId, body) });
+      case "approval.reject":
+        return noStoreJson({ approval: await rejectApplicationForActor(actor, body.caseId, body) });
       case "approval.save":
         return noStoreJson({ approval: await saveApprovalForActor(actor, body.caseId, body.approval, body.expectedUpdatedAt, body.expectedRowVersion) });
       case "field-comment.add":

@@ -19,16 +19,28 @@ import {
   type ChangeEvent,
 } from "react";
 
+import { CatalogResult, CatalogSelection } from "../catalog/CatalogCards";
+import { CatalogRelationField } from "../catalog/CatalogRelationField";
+import { catalogFreshnessLabel } from "../catalog/metadata";
+import { normalizeRelationChanges } from "../catalog/relations";
 import type { CatalogSystem } from "../catalog/search";
 import { useUnsavedChanges } from "./use-unsaved-changes";
 import { Question, Money, UploadField, FormMessage, FieldErrorText } from "./ApplicationFields";
 import { SegmentedChoice } from "../ui/SegmentedChoice";
+import { DataCategoryFields } from "./DataCategoryFields";
+import { ProcurementFields } from "./ProcurementFields";
+import { normalizeProcurementChanges, personalDataCategoryLabels, contractValueStatusLabel, contractCoverageLabel, parseContractValue } from "./procurement";
+import { AiScreeningFields } from "./AiScreeningFields";
+import { aiUsageLabel, hasAiScreeningDetails, normalizeAiScreeningChanges } from "./ai-screening";
 import {
   isAllowedPrivateBlobUrl,
   isAllowedVercelBlobUploadUrl,
   sha256File,
 } from "./direct-upload-client";
 import {
+  ACQUISITION_METHODS,
+  DATA_CLASSIFICATIONS,
+  USER_COUNT_OPTIONS,
   canOpenStep,
   createAttachmentDraft,
   firstInvalidStep,
@@ -92,6 +104,10 @@ type CorrectionContext = {
   caseNumber: string;
   currentVersionNumber: number;
   nextVersionNumber: number;
+  informationRequest?: {
+    reason: string;
+    dueDate: string | null;
+  } | null;
   rejection: {
     approverName: string;
     comment: string;
@@ -233,6 +249,7 @@ export function ApplicationFormView({
             nextVersionNumber?: number;
             rowVersion: number;
             rejection?: CorrectionContext["rejection"];
+            informationRequest?: CorrectionContext["informationRequest"];
           } | null;
           error?: string;
         };
@@ -241,7 +258,7 @@ export function ApplicationFormView({
         }
         if (controller.signal.aborted) return;
         if (payload.draft?.state.schemaVersion === "dgita-v1") {
-          const restoredState = normalizeApprovingLeader(payload.draft.state);
+          const restoredState = normalizeProcurementChanges(normalizeApprovingLeader(payload.draft.state));
           draftIdRef.current = payload.draft.id;
           rowVersionRef.current = payload.draft.rowVersion;
           formRef.current = restoredState;
@@ -257,6 +274,7 @@ export function ApplicationFormView({
               currentVersionNumber: payload.draft.currentVersionNumber,
               nextVersionNumber: payload.draft.nextVersionNumber,
               rejection: payload.draft.rejection ?? null,
+              informationRequest: payload.draft.informationRequest ?? null,
             });
           }
           setSaveStatus("saved");
@@ -335,7 +353,12 @@ export function ApplicationFormView({
     updater: (current: ApplicationFormState) => ApplicationFormState,
   ) {
     if (submittingRef.current) return formRef.current;
-    const next = updater(formRef.current);
+    const changed = updater(formRef.current);
+    const next = normalizeProcurementChanges(normalizeAiScreeningChanges(formRef.current, normalizeRelationChanges(formRef.current, changed)));
+    if ((changed.replacementSystem && !next.replacementSystem && next.replacesExisting === "ja") ||
+        (changed.relatedSystem && !next.relatedSystem && next.acquisitionType === "tilkøb")) {
+      onToast("Systemvalget er ændret. Vælg de tilknyttede systemer igen, så ansøgningen bruger de rigtige relationer.");
+    }
     formRef.current = next;
     setForm(next);
     return next;
@@ -746,7 +769,7 @@ export function ApplicationFormView({
         </div>
         <div className="form-message warning" role="status">
           <Info size={20} />
-          <div><strong>{correctionCaseNumber ? "Klargør næste version" : "Klargør formularen"}</strong><p>{correctionCaseNumber ? "Formular og bilag hentes sikkert fra den afviste version." : "Vi henter den valgte kladde fra din konto."}</p></div>
+          <div><strong>{correctionCaseNumber ? "Klargør næste version" : "Klargør formularen"}</strong><p>{correctionCaseNumber ? "Formular og bilag hentes sikkert fra den tidligere indsendte version." : "Vi henter den valgte kladde fra din konto."}</p></div>
         </div>
       </div>
     );
@@ -781,6 +804,7 @@ export function ApplicationFormView({
           <span className="section-label dark">{correction ? `${correction.caseNumber} · Version ${correction.nextVersionNumber}` : "Ny IT-anskaffelse"}</span>
           <h1>{correction ? "Ret og genindsend ansøgning" : draftCaseNumber ? "Fortsæt kladde" : "Opret ansøgning"}</h1>
           <p>{correction ? `Version ${correction.currentVersionNumber} forbliver låst. Dine rettelser gemmes som en ny version, når du genindsender.${correction.rejection?.comment ? ` Afvisningsgrund fra ${correction.rejection.approverName}: ${correction.rejection.comment}` : ""}` : guidance?.intro ?? "Spørgsmålene følger D-GITA-processen og tilpasses dine svar undervejs."}</p>
+          {correction?.informationRequest ? <p><strong>Der er bedt om supplerende oplysninger:</strong> {correction.informationRequest.reason}{correction.informationRequest.dueDate ? <> <strong>Svarfrist:</strong> {formatDate(correction.informationRequest.dueDate)}.</> : null}</p> : null}
         </div>
         <div className="application-progress"><strong>{step + 1}</strong><span>af {steps.length}</span></div>
       </div>
@@ -852,9 +876,10 @@ export function ApplicationFormView({
                   <Choice value={form.replacesExisting} onChange={(value) => setYesNo("replacesExisting", value)} options={yesNoOptions} />
                   {isFieldVisible("replacementSystem", form) ? (
                     <div className="conditional-field">
-                      <label className="subfield-label" htmlFor="replacement-system">2.1 Hvilket system erstattes?</label>
-                      <input id="replacement-system" className={cx("clean-input", errorFor("replacementSystem") && "invalid")} value={form.replacementSystem} onChange={(event) => update("replacementSystem", event.target.value)} />
-                      <FieldErrorText message={errorFor("replacementSystem")} />
+                      <CatalogRelationField label="2.1 Hvilket system erstattes?" value={form.replacementSystem} relation={form.replacementCatalogRelation ?? null} error={errorFor("replacementSystem")} onChange={(value, relation) => {
+                        setSaveStatus("idle");
+                        changeForm((current) => ({ ...current, replacementSystem: value, replacementCatalogRelation: relation }));
+                      }} />
                     </div>
                   ) : null}
                 </Question>
@@ -876,6 +901,7 @@ export function ApplicationFormView({
                         }}
                       />
                     </div>
+                    <p className="catalog-empty">{catalogFreshnessLabel()}</p>
                     <FieldErrorText message={errorFor("selectedSystem")} />
                     {form.selectedSystem ? (
                       <CatalogSelection system={form.selectedSystem} />
@@ -942,14 +968,14 @@ export function ApplicationFormView({
                     <Question title="9. IT-systemnavn"><input className={cx("clean-input", errorFor("manualSystem") && "invalid")} value={form.manualSystemName} onChange={(event) => update("manualSystemName", event.target.value)} /><FieldErrorText message={errorFor("manualSystem")} /></Question>
                     <div className="two-column-fields">
                       <Question title="10. Forretningsmæssig type"><input className="clean-input" value={form.businessType} onChange={(event) => update("businessType", event.target.value)} /></Question>
-                      <Question title="12. Link til systembeskrivelse"><input className="clean-input" type="url" value={form.descriptionUrl} onChange={(event) => update("descriptionUrl", event.target.value)} /></Question>
+                      <Question title="12. Link til systembeskrivelse"><input className={cx("clean-input", errorFor("descriptionUrl") && "invalid")} type="url" value={form.descriptionUrl} onChange={(event) => update("descriptionUrl", event.target.value)} /><FieldErrorText message={errorFor("descriptionUrl")} /></Question>
                     </div>
                     <Question title="11. Kort systembeskrivelse"><textarea className="clean-input" rows={4} value={form.systemDescription} onChange={(event) => update("systemDescription", event.target.value)} /></Question>
                     <div className="two-column-fields">
                       <Question title="13. Leverandør"><input className="clean-input" value={form.supplier} onChange={(event) => update("supplier", event.target.value)} /></Question>
-                      <Question title="14. Leverandørens CVR"><input className="clean-input" value={form.supplierCvr} onChange={(event) => update("supplierCvr", event.target.value)} /></Question>
+                      <Question title="14. Leverandørens CVR"><input inputMode="numeric" className={cx("clean-input", errorFor("supplierCvr") && "invalid")} value={form.supplierCvr} onChange={(event) => update("supplierCvr", event.target.value)} /><FieldErrorText message={errorFor("supplierCvr")} /></Question>
                       <Question title="15. Rettighedshaver"><input className="clean-input" value={form.rightsHolder} onChange={(event) => update("rightsHolder", event.target.value)} /></Question>
-                      <Question title="16. Rettighedshaverens CVR"><input className="clean-input" value={form.rightsHolderCvr} onChange={(event) => update("rightsHolderCvr", event.target.value)} /></Question>
+                      <Question title="16. Rettighedshaverens CVR"><input inputMode="numeric" className={cx("clean-input", errorFor("rightsHolderCvr") && "invalid")} value={form.rightsHolderCvr} onChange={(event) => update("rightsHolderCvr", event.target.value)} /><FieldErrorText message={errorFor("rightsHolderCvr")} /></Question>
                     </div>
                     {form.knownSystem === "ja" ? <button className="inline-action" type="button" onClick={() => update("manualCatalogEntry", false)}>Tilbage til katalogsøgning</button> : null}
                   </>
@@ -973,18 +999,21 @@ export function ApplicationFormView({
                   <Question title="20. Systemadministratorer"><input className="clean-input" value={form.systemAdministrators} onChange={(event) => update("systemAdministrators", event.target.value)} /></Question>
                   <Question title="21. Superbrugere"><input className="clean-input" value={form.superUsers} onChange={(event) => update("superUsers", event.target.value)} /></Question>
                 </div>
-                <Question title="22. Link til kontraktsag i ESDH" hint="Gem kontrakt, korrespondance og øvrige bilag på sagen."><input className="clean-input" type="url" placeholder="https://esdh.kommune.dk/sag/..." value={form.esdhContractUrl} onChange={(event) => update("esdhContractUrl", event.target.value)} /></Question>
-                <Question title="23. Link til databehandleraftale i ESDH"><input className="clean-input" type="url" placeholder="https://esdh.kommune.dk/sag/..." value={form.esdhDpaUrl} onChange={(event) => update("esdhDpaUrl", event.target.value)} /></Question>
+                <Question title="22. Link til kontraktsag i ESDH" hint="Gem kontrakt, korrespondance og øvrige bilag på sagen."><input className={cx("clean-input", errorFor("esdhContractUrl") && "invalid")} type="url" placeholder="https://esdh.kommune.dk/sag/..." value={form.esdhContractUrl} onChange={(event) => update("esdhContractUrl", event.target.value)} /><FieldErrorText message={errorFor("esdhContractUrl")} /></Question>
+                <Question title="23. Link til databehandleraftale i ESDH"><input className={cx("clean-input", errorFor("esdhDpaUrl") && "invalid")} type="url" placeholder="https://esdh.kommune.dk/sag/..." value={form.esdhDpaUrl} onChange={(event) => update("esdhDpaUrl", event.target.value)} /><FieldErrorText message={errorFor("esdhDpaUrl")} /></Question>
               </>
             ) : null}
 
             {step === 2 ? (
               <>
-                <Question title="25. Anskaffelsesform" hint="Anskaffelsesformen har betydning for kravspecifikationens detaljeringsgrad."><select className={cx("clean-input", errorFor("acquisitionMethod") && "invalid")} value={form.acquisitionMethod} onChange={(event) => update("acquisitionMethod", event.target.value)}><option>DIGIT udbud/aftale</option><option>Direkte tildeling</option><option>Gratis</option><option>KOMBIT/KL/Offentligt projekt</option><option>SKI-aftale</option></select><FieldErrorText message={errorFor("acquisitionMethod")} /></Question>
+                <Question title="25. Anskaffelsesform" hint="Anskaffelsesformen har betydning for kravspecifikationens detaljeringsgrad."><select className={cx("clean-input", errorFor("acquisitionMethod") && "invalid")} value={form.acquisitionMethod} onChange={(event) => update("acquisitionMethod", event.target.value)}><option value="">Vælg anskaffelsesform</option>{ACQUISITION_METHODS.map((option) => <option key={option}>{option}</option>)}</select><FieldErrorText message={errorFor("acquisitionMethod")} /></Question>
                 <Question title="26. Er der gennemført markedsafdækning?" hint={guidance?.marketResearch ?? "Har du undersøgt, hvilke løsninger der bedst matcher behov, pris og kvalitet?"}><Choice value={form.marketResearch} onChange={(value) => setYesNo("marketResearch", value)} options={yesNoOptions} /></Question>
                 {isFieldVisible("marketResearchSystems", form) ? <Question title="26.1 Hvilke IT-systemer er afdækket?"><textarea className={cx("clean-input", errorFor("marketResearchSystems") && "invalid")} rows={4} value={form.marketResearchSystems} onChange={(event) => update("marketResearchSystems", event.target.value)} /><FieldErrorText message={errorFor("marketResearchSystems")} /></Question> : null}
                 <Question title="27. Nyanskaffelse / tilkøb"><Choice value={form.acquisitionType} onChange={(value) => update("acquisitionType", value as ApplicationFormState["acquisitionType"])} options={[{ value: "nyanskaffelse", label: "Nyanskaffelse" }, { value: "tilkøb", label: "Tilkøb" }]} /></Question>
-                {isFieldVisible("relatedSystem", form) ? <Question title="27.1 Hvilket eksisterende system vedrører tilkøbet?"><input className={cx("clean-input", errorFor("relatedSystem") && "invalid")} value={form.relatedSystem} onChange={(event) => update("relatedSystem", event.target.value)} /><FieldErrorText message={errorFor("relatedSystem")} /></Question> : null}
+                {isFieldVisible("relatedSystem", form) ? <Question title="27.1 Hvilket eksisterende system vedrører tilkøbet?"><CatalogRelationField label="Systemet, tilkøbet vedrører" value={form.relatedSystem} relation={form.relatedCatalogRelation ?? null} error={errorFor("relatedSystem")} onChange={(value, relation) => {
+                  setSaveStatus("idle");
+                  changeForm((current) => ({ ...current, relatedSystem: value, relatedCatalogRelation: relation }));
+                }} /></Question> : null}
               </>
             ) : null}
 
@@ -1004,28 +1033,31 @@ export function ApplicationFormView({
             {step === 4 ? (
               <>
                 <Question title="33. Er der et eksisterende budget at købe for?"><Choice value={form.hasBudget} onChange={(value) => setYesNo("hasBudget", value)} options={yesNoOptions} />{isFieldVisible("budgetAmount", form) ? <div className="conditional-field"><label className="subfield-label" htmlFor="budget-amount">33.1 Eksisterende budgetbeløb</label><Money id="budget-amount" value={form.budgetAmount} error={errorFor("budgetAmount")} onChange={(value) => update("budgetAmount", value)} /></div> : null}</Question>
-                <div className="finance-overview"><span>Samlet finansiering</span><strong>{formatDanishAmount(getFinanceTotal(form))} kr.</strong><small>Beregnet ud fra felterne nedenfor</small></div>
+                <div className="finance-overview"><span>Omkostninger i første år</span><strong>{formatDanishAmount(getFinanceTotal(form))} kr.</strong><small>Engangsomkostninger, ét års drift og andre omkostninger i første år</small></div>
                 <div className="three-column-fields">
                   <Question title="34. Engangsomkostninger"><Money value={form.oneTimeCost} error={errorFor("oneTimeCost")} onChange={(value) => update("oneTimeCost", value)} /></Question>
                   <Question title="35. Årlige driftsudgifter"><Money value={form.yearlyCost} error={errorFor("yearlyCost")} onChange={(value) => update("yearlyCost", value)} /></Question>
-                  <Question title="36. Andre omkostninger"><Money value={form.otherCost} error={errorFor("otherCost")} onChange={(value) => update("otherCost", value)} /></Question>
+                  <Question title="36. Andre omkostninger i første år"><Money value={form.otherCost} error={errorFor("otherCost")} onChange={(value) => update("otherCost", value)} /></Question>
                 </div>
+                <ProcurementFields form={form} errorFor={errorFor} onChange={update} />
                 <Question title="38. Beskrivelse af gevinsten"><textarea className={cx("clean-input", errorFor("benefits") && "invalid")} rows={4} value={form.benefits} onChange={(event) => update("benefits", event.target.value)} /><FieldErrorText message={errorFor("benefits")} /></Question>
               </>
             ) : null}
 
             {step === 5 ? (
               <>
+                <AiScreeningFields form={form} errorFor={errorFor} onChange={update} />
                 <Question title="Har du allerede lavet en risikovurdering?" hint="Risikovurderingen skal bruges, før ansøgningen kan vurderes."><Choice value={form.hasRiskAssessment} onChange={(value) => setYesNo("hasRiskAssessment", value)} options={yesNoOptions} /></Question>
                 {isFieldVisible("riskHelp", form) ? <Question title="Har du brug for hjælp til risikovurdering?"><Choice value={form.needsRiskHelp} onChange={(value) => setYesNo("needsRiskHelp", value)} options={yesNoOptions} /></Question> : null}
-                {isFieldVisible("risk-assessment", form) ? <UploadField kind="risk-assessment" title="Upload risikovurdering" detail="PDF, DOCX eller XLSX · maks. 25 MB" files={form.attachments["risk-assessment"]} onAdd={addFiles} onRemove={removeFile} /> : null}
+                {isFieldVisible("risk-assessment", form) ? <UploadField kind="risk-assessment" title="Upload risikovurdering" files={form.attachments["risk-assessment"]} onAdd={addFiles} onRemove={removeFile} /> : null}
                 <Question title="43. Behandler IT-systemet persondata?"><Choice value={form.personalData} onChange={(value) => setYesNo("personalData", value)} options={yesNoOptions} /></Question>
+                <DataCategoryFields form={form} errorFor={errorFor} onChange={update} />
                 {isFieldVisible("dpaQuestion", form) ? <Question title="44. Har du allerede en databehandleraftale?"><Choice value={form.hasDpa} onChange={(value) => setYesNo("hasDpa", value)} options={yesNoOptions} /></Question> : null}
-                {isFieldVisible("dataClassification", form) ? <Question title="41. Klassifikation af data"><select className={cx("clean-input", errorFor("dataClassification") && "invalid")} value={form.dataClassification} onChange={(event) => update("dataClassification", event.target.value)}><option>1. Almindelige personoplysninger</option><option>2. Følsomme personoplysninger</option><option>3. Fortrolige oplysninger</option><option>4. CPR data</option></select><FieldErrorText message={errorFor("dataClassification")} /></Question> : null}
+                {isFieldVisible("dataClassification", form) ? <Question title="41. Klassifikation af data"><select className={cx("clean-input", errorFor("dataClassification") && "invalid")} value={form.dataClassification} onChange={(event) => update("dataClassification", event.target.value)}><option value="">Vælg dataklassifikation</option>{DATA_CLASSIFICATIONS.map((option) => <option key={option}>{option}</option>)}</select><FieldErrorText message={errorFor("dataClassification")} /></Question> : null}
                 {isFieldVisible("data-processing-agreement", form) ? <UploadField kind="data-processing-agreement" title="Upload databehandleraftale" detail="Dokumentet er obligatorisk, når aftalen findes" files={form.attachments["data-processing-agreement"]} error={errorFor("data-processing-agreement")} onAdd={addFiles} onRemove={removeFile} /> : null}
                 <Question title="Har du allerede en kontrakt?"><Choice value={form.hasContract} onChange={(value) => setYesNo("hasContract", value)} options={yesNoOptions} /></Question>
-                {isFieldVisible("contract", form) ? <UploadField kind="contract" title="Upload kontrakt" detail="PDF, DOCX eller billede · maks. 25 MB" files={form.attachments.contract} error={errorFor("contract")} onAdd={addFiles} onRemove={removeFile} /> : null}
-                <Question title="Hvor mange medarbejdere får adgang til data?"><select className="clean-input" value={form.employeeAccess} onChange={(event) => update("employeeAccess", event.target.value)}><option>0-9</option><option>10-49</option><option>50-99</option><option>100-499</option><option>500-100000</option></select></Question>
+                {isFieldVisible("contract", form) ? <UploadField kind="contract" title="Upload kontrakt" files={form.attachments.contract} error={errorFor("contract")} onAdd={addFiles} onRemove={removeFile} /> : null}
+                <Question title="Hvor mange medarbejdere får adgang til data?"><select className={cx("clean-input", errorFor("employeeAccess") && "invalid")} value={form.employeeAccess} onChange={(event) => update("employeeAccess", event.target.value)}><option value="">Vælg antal</option>{USER_COUNT_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select><FieldErrorText message={errorFor("employeeAccess")} /></Question>
               </>
             ) : null}
 
@@ -1037,7 +1069,7 @@ export function ApplicationFormView({
                   <Question title="46. Forventet startdato"><input type="date" className={cx("clean-input", errorFor("startDate") && "invalid")} value={form.startDate} onChange={(event) => update("startDate", event.target.value)} /><FieldErrorText message={errorFor("startDate")} /></Question>
                   <Question title="47. Forventet slutdato"><input type="date" className={cx("clean-input", errorFor("endDate") && "invalid")} value={form.endDate} onChange={(event) => update("endDate", event.target.value)} /><FieldErrorText message={errorFor("endDate")} /></Question>
                 </div>
-                <Question title="49. Antal brugere"><select className={cx("clean-input", errorFor("implementationUsers") && "invalid")} value={form.implementationUsers} onChange={(event) => update("implementationUsers", event.target.value)}><option>0-9</option><option>10-49</option><option>50-99</option><option>100-499</option><option>500-100000</option></select><FieldErrorText message={errorFor("implementationUsers")} /></Question>
+                <Question title="49. Antal brugere"><select className={cx("clean-input", errorFor("implementationUsers") && "invalid")} value={form.implementationUsers} onChange={(event) => update("implementationUsers", event.target.value)}><option value="">Vælg antal</option>{USER_COUNT_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select><FieldErrorText message={errorFor("implementationUsers")} /></Question>
               </>
             ) : null}
 
@@ -1046,7 +1078,7 @@ export function ApplicationFormView({
                 <Question title="50. Er der indhentet arkitekturtegning og beskrivelse af IT-systemets sammenhænge?" hint="Materialet kan fås hos leverandøren."><Choice value={form.hasArchitecture} onChange={(value) => setYesNo("hasArchitecture", value)} options={yesNoOptions} /></Question>
                 {isFieldVisible("architecture", form) ? <UploadField kind="architecture" title="Vedhæft arkitekturtegning" detail="Dokumentet knyttes til sagen og kvitteringen" files={form.attachments.architecture} error={errorFor("architecture")} onAdd={addFiles} onRemove={removeFile} icon="paperclip" /> : null}
                 <Question title="Er ‘Tjekliste til leverandør’ udfyldt?"><Choice value={form.hasSupplierChecklist} onChange={(value) => setYesNo("hasSupplierChecklist", value)} options={yesNoOptions} /></Question>
-                {isFieldVisible("supplier-checklist", form) ? <UploadField kind="supplier-checklist" title="Vedhæft tjekliste til leverandør" detail="PDF, DOCX eller billede · maks. 25 MB" files={form.attachments["supplier-checklist"]} onAdd={addFiles} onRemove={removeFile} /> : null}
+                {isFieldVisible("supplier-checklist", form) ? <UploadField kind="supplier-checklist" title="Vedhæft tjekliste til leverandør" files={form.attachments["supplier-checklist"]} onAdd={addFiles} onRemove={removeFile} /> : null}
                 <Question title="51. Er tjeklisten journaliseret i ESDH?"><Choice value={form.checklistJournalized} onChange={(value) => setYesNo("checklistJournalized", value)} options={yesNoOptions} /></Question>
               </>
             ) : null}
@@ -1118,46 +1150,32 @@ function Choice({ value, onChange, options }: { value: string; onChange: (value:
   return <SegmentedChoice value={value} options={options} onChange={onChange} />;
 }
 
-function CatalogResult({ system, onChoose }: { system: CatalogSystem; onChoose: () => void }) {
-  const status = catalogStatus(system);
-  return <div className="lookup-card catalog-result"><span>{initials(system.name)}</span><div><strong>{system.name}</strong><small>{system.supplier || system.rightsHolder || "Leverandør ikke angivet"}</small><em className={status.local ? "local" : "kitos"}>{status.label}</em></div><button type="button" onClick={onChoose} aria-label={`Vælg ${system.name}`}>Vælg</button></div>;
-}
-
-function CatalogSelection({ system }: { system: SelectedCatalogSystem }) {
-  const status = catalogStatus(system);
-  return <div className="lookup-card catalog-selection"><span>{initials(system.name)}</span><div><strong>{system.name}</strong><small>{system.supplier || system.rightsHolder || "Leverandør ikke angivet"}</small><em className={status.local ? "local" : "kitos"}><Check size={12} /> Valgt · {status.label.toLocaleLowerCase("da-DK")}</em></div></div>;
-}
-
-function catalogStatus(system: Pick<CatalogSystem, "usedInKalundborg" | "localStatus" | "kitosStatus">) {
-  if (system.usedInKalundborg && system.localStatus === "Ikke aktivt") {
-    return { local: true, label: "Registreret i Kalundborg · ikke aktivt" };
-  }
-  if (system.usedInKalundborg && system.kitosStatus === "Ikke tilgængelig") {
-    return { local: true, label: "Bruges i Kalundborg · KITOS ikke tilgængelig" };
-  }
-  if (system.usedInKalundborg) return { local: true, label: "Bruges i Kalundborg" };
-  if (system.kitosStatus === "Ikke tilgængelig") {
-    return { local: false, label: "Kun i KITOS · ikke tilgængelig" };
-  }
-  return { local: false, label: "Kun i KITOS" };
-}
-
-function initials(value: string) {
-  return value.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
-
 function ReviewApplication({ form, error, onEdit, onConsent }: { form: ApplicationFormState; error?: string; onEdit: (step: number) => void; onConsent: (checked: boolean) => void }) {
   const errorId = "application-review-consent-error";
   const rows: Array<[string, string, number]> = [
     ["System", `${getDisplaySystemName(form)}${form.selectedSystem ? form.selectedSystem.usedInKalundborg ? " · bruges i Kalundborg" : " · fundet i KITOS" : " · manuelt registreret"}`, 0],
+    ...(form.replacesExisting === "ja" ? [["Erstatter system", form.replacementSystem, 0] as [string, string, number]] : []),
     ["Organisation", form.responsibleOrganization, 1],
     ["Anskaffelsesform", form.acquisitionMethod, 2],
+    ...(form.acquisitionType === "tilkøb" ? [["Tilkøb til system", form.relatedSystem, 2] as [string, string, number]] : []),
     ["Persondata", form.personalData === "ja" ? `Ja · ${form.dataClassification}` : "Nej", 5],
-    ["Samlet finansiering", `${formatDanishAmount(getFinanceTotal(form))} kr.`, 4],
+    ...(form.personalData === "ja" ? [["Personoplysningskategorier", personalDataCategoryLabels(form.personalDataCategories).join(", ") || "Ikke besvaret", 5] as [string, string, number]] : []),
+    ["AI i anskaffelsen", aiUsageLabel(form.aiUsage), 5],
+    ...(hasAiScreeningDetails(form.aiUsage) ? [["AI-formål", form.aiPurpose ?? "", 5] as [string, string, number], ["Link til AI-vurdering", form.aiAssessmentUrl || "Ikke angivet", 5] as [string, string, number]] : []),
+    ["Omkostninger i første år", `${formatDanishAmount(getFinanceTotal(form))} kr.`, 4],
+    ["Status for kontraktværdi", contractValueStatusLabel(form.contractValueStatus), 4],
+    ...(form.contractValueStatus === "estimated" ? [
+      ["Anslået samlet kontraktværdi ekskl. moms", parseContractValue(form.estimatedContractValueExVat) === null ? "Ikke angivet" : `${formatDanishAmount(parseContractValue(form.estimatedContractValueExVat)!)} kr.`, 4] as [string, string, number],
+      ["Kontraktperiode i måneder", form.contractDurationMonths || "Ikke angivet", 4] as [string, string, number],
+      ["Optioner og mulige forlængelser", form.contractOptionsDescription || "Ikke angivet", 4] as [string, string, number],
+      ["Grundlag for kontraktværdien", form.contractValueNote || "Ikke angivet", 4] as [string, string, number],
+    ] : []),
+    ["Aftaledækning", contractCoverageLabel(form.contractCoverage), 4],
+    ...(form.contractCoverage === "existing-agreement" ? [["Aftalereference", form.agreementReference || "Ikke angivet", 4] as [string, string, number]] : []),
     ["Implementering", `${formatDate(form.startDate)} – ${formatDate(form.endDate)}`, 6],
     ["Godkendende chef", form.approvingLeader, 8],
   ];
-  const warnings: FieldError[] = [getStepWarnings(form, 5), getStepWarnings(form, 7)].flat();
+  const warnings: FieldError[] = [getStepWarnings(form, 4), getStepWarnings(form, 5), getStepWarnings(form, 7)].flat();
   return <div className="review-block"><div className="review-status"><CheckCircle2 size={25} /><div><strong>Klar til kontrol</strong><p>Den indsendte version låses i databasen. PDF-kvitteringen kan hentes på sagen, og en kvitteringsmail lægges i den sikre Outlook-kø.</p></div></div>{warnings.length > 0 ? <FormMessage tone="warning" title="Ansøgningen kan indsendes med opmærksomhedspunkter" messages={warnings.map((warning) => warning.message)} /> : null}{rows.map(([label, value, targetStep]) => <div className="review-line" key={label}><span>{label}</span><strong>{value || "Ikke angivet"}</strong><button type="button" aria-label={`Redigér ${label}`} onClick={() => onEdit(targetStep)}>Redigér</button></div>)}<label className="consent-check"><input type="checkbox" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} checked={form.consent} onChange={(event) => onConsent(event.target.checked)} /><span>{form.consent ? <Check size={14} /> : null}</span>Jeg har kontrolleret oplysningerne og de vedlagte bilag.</label><FieldErrorText id={errorId} message={error} /></div>;
 }
 
