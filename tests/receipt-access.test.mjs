@@ -104,6 +104,41 @@ test("a closed decision and its reviewer snapshot remain frozen after profile ch
   assert.deepEqual(await getReceiptView(owner, submitted.caseNumber, "final", first.applicationVersionId), first);
 });
 
+test("a final PDF cannot be generated for a rejected historical version after its correction is closed", async () => {
+  const { beginApplicationCorrection, saveApplicationDraft } = await import("../features/application/server-repository.ts");
+  const { createLeaderApprovalRequest, decideLeaderApproval } = await import("../features/approval/server.ts");
+  const { approvalTokenForRequest } = await import("../features/approval/token-service.ts");
+  const { getOrCreateReceipt } = await import("../features/receipt/server.ts");
+  const { getPersistenceBindings } = await import("../db/persistence.ts");
+  const submitted = await create();
+  const first = await getReceiptView(owner, submitted.caseNumber, "submission");
+  const request = await createLeaderApprovalRequest(consultant, submitted.caseNumber, "https://portal.example.invalid");
+  await decideLeaderApproval(await approvalTokenForRequest(request.id), { decision: "rejected", comment: "Ret den syntetiske ansøgning" });
+  const correction = await beginApplicationCorrection(owner, submitted.caseNumber);
+  const corrected = { ...correction.state, manualSystemName: "Rettet syntetisk system" };
+  const saved = await saveApplicationDraft(owner, submitted.id, corrected, correction.rowVersion);
+  await submitApplication(owner, submitted.id, corrected, saved.rowVersion);
+  const approval = (await getWorkspaceForActor(consultant)).approvals[submitted.caseNumber];
+  await saveApprovalForActor(consultant, submitted.caseNumber, {
+    ...approval, phase: "Afsluttet", approved: "Ja", notes: "Version 2 er afsluttet",
+  }, approval.updatedAt ?? null, approval.revision);
+  assert.equal((await getReceiptView(owner, submitted.caseNumber, "final")).versionNumber, 2);
+
+  // The storage adapter is an external system boundary. The invalid request
+  // must fail before reading or creating any PDF object.
+  const { FILES } = await getPersistenceBindings();
+  const previous = { get: FILES.get, put: FILES.put };
+  let storageCalls = 0;
+  FILES.get = async () => { storageCalls += 1; return null; };
+  FILES.put = async (key) => { storageCalls += 1; return { key }; };
+  try {
+    await assert.rejects(getOrCreateReceipt(owner, submitted.caseNumber, "final", first.applicationVersionId), { status: 409 });
+    assert.equal(storageCalls, 0);
+  } finally {
+    Object.assign(FILES, previous);
+  }
+});
+
 
 test("HTML refuses ambiguous legacy decisions for the same version without choosing or rewriting history", async () => {
   const { createLeaderApprovalRequest, decideLeaderApproval } = await import("../features/approval/server.ts");

@@ -79,3 +79,24 @@ test("expired and cancelled bearer links never disclose an application snapshot"
     await assert.rejects(getPublicApprovalRequest(token), { status: 410 });
   }
 });
+
+test("team comment notifications with numeric UUID prefixes can be marked read by their recipient", async () => {
+  const { createCaseComment } = await import("../features/cases/dialog-repository.ts");
+  const { listNotifications, markNotificationsRead } = await import("../features/notifications/server.ts");
+  const submitted = await submitApplication(user, crypto.randomUUID(), state("Syntetisk teamnotifikation"));
+  const originalRandomUUID = crypto.randomUUID;
+  let sequence = 0;
+  crypto.randomUUID = () => `105c0b50-20d8-42af-a49b-${String(++sequence).padStart(12, "0")}`;
+  try {
+    await createCaseComment(user, submitted.caseNumber, { body: "Syntetisk spørgsmål til teamet", visibility: "applicant" });
+  } finally {
+    crypto.randomUUID = originalRandomUUID;
+  }
+  const feed = await listNotifications(consultant);
+  const notification = feed.notifications.find((item) => item.caseNumber === submitted.caseNumber && item.eventType === "case_comment.created");
+  assert.ok(notification);
+  assert.ok(notification.id.startsWith("105c0b50-"));
+  assert.equal(notification.status, "unread");
+  const updated = await markNotificationsRead(consultant, { id: notification.id });
+  assert.equal(updated.notifications.find((item) => item.id === notification.id).status, "read");
+});
