@@ -60,6 +60,27 @@ test("CSV output neutralizes formulas including whitespace-prefixed formulas", (
   assert.equal(csvCell('System "A"'), '"System ""A"""');
 });
 
+test("historical PDF system metadata uses the locked version after a correction changes the live name", async () => {
+  const state = {
+    ...structuredClone(demoApplicationState), knownSystem: "nej", selectedSystem: null,
+    manualSystemName: "FROZEN_V1_SYSTEM", catalogQuery: "",
+  };
+  const bytes = await renderReceipt({
+    case_number: "ITA-12345678", owner_name: "Testperson", owner_email: "test@example.invalid",
+    system_name: "MUTABLE_V2_SYSTEM", receipt_version_number: 1, submitted_at: "2026-09-05T10:00:00Z",
+  }, state, "submission");
+  const document = await PDFDocument.load(bytes);
+  const streams = document.getPages().flatMap((page) => {
+    const contents = page.node.Contents();
+    const refs = contents instanceof PDFArray ? contents.asArray() : [contents];
+    return refs.map((ref) => new TextDecoder().decode(decodePDFRawStream(document.context.lookup(ref)).decode()));
+  }).join("\n");
+  const text = [...streams.matchAll(/<([0-9A-Fa-f]+)>\s*Tj/g)]
+    .map((match) => Buffer.from(match[1], "hex").toString("latin1")).join(" ");
+  assert.ok(text.includes("FROZEN_V1_SYSTEM"));
+  assert.ok(!text.includes("MUTABLE_V2_SYSTEM"), "a V1 receipt must never name the newer correction");
+});
+
 test("final PDF includes actual decision and paginates all long answers safely", async () => {
   const state = structuredClone(demoApplicationState);
   state.purpose = "Langt svar med alle detaljer. ".repeat(650) + "SLUTMARKERING";

@@ -31,6 +31,7 @@ export async function runScheduledMaintenance(dependencies: Partial<Dependencies
     cleanupFailed = true;
     return { pendingQuarantined: 0, verifyingDiscarded: 0, blobsDeleted: 0, blobsPendingRetry: 0 };
   });
+  cleanupFailed ||= uploadCleanup.blobsPendingRetry > 0;
   const result = await mail(10).catch(() => ({ configured: false, tenants: 0, processed: 0, failed: 1, queueAgeSeconds: 0 }));
   const completed = now();
   const durationMs = Math.min(86400000, Math.max(0, Math.trunc(completed - started)));

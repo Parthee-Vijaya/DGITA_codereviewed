@@ -2,6 +2,7 @@ import { getPersistenceBindings } from "../../db/persistence";
 import type { ServerActor } from "../auth/types";
 import type { AttachmentDraft, UploadKind } from "./engine";
 import { applicationEditMode } from "./correction-policy";
+import { attemptQueuedApplicationAttachmentDeletion } from "./attachment-deletion";
 import {
   MAX_ACTIVE_DIRECT_UPLOADS_PER_APPLICATION,
   MAX_ACTIVE_DIRECT_UPLOADS_PER_USER,
@@ -12,7 +13,7 @@ import {
   type DirectUploadMetadata,
 } from "./direct-upload-policy";
 import { assertAttachmentScanAllowed, scanUploadBytes, type AttachmentScanStatus } from "./malware-scan";
-import { ApplicationRepositoryError, portalDb, findApplicationById, appendApplicationAudit, assertApplicationId, assertOwner, assertCanCreate, sha256Bytes } from "./repository-support";
+import { ApplicationRepositoryError, portalDb, findApplicationById, assertApplicationId, assertOwner, assertCanCreate, sha256Bytes } from "./repository-support";
 
 export async function getOwnedDraftForUpload(actor: ServerActor, id: string) {
   assertCanCreate(actor);
@@ -692,19 +693,25 @@ export async function deleteApplicationAttachment(
 ) {
   const { DB } = await getOwnedDraftForUpload(actor, applicationId);
   const row = await DB.prepare(`
-    SELECT storage_key FROM portal_attachments
+    SELECT storage_key, status FROM portal_attachments
     WHERE id = ? AND tenant_id = ? AND application_id = ? AND owner_user_id = ?
-      AND application_version_id IS NULL AND status = 'ready'
+      AND application_version_id IS NULL AND immutable_at IS NULL
+      AND status IN ('ready', 'deleting', 'deleted')
     LIMIT 1
   `)
     .bind(attachmentId, actor.tenantId, applicationId, actor.userId)
-    .first<{ storage_key: string }>();
+    .first<{ storage_key: string; status: string }>();
   if (!row) return false;
+  if (row.status === "deleted") return true;
+  if (row.status === "deleting") {
+    await attemptQueuedApplicationAttachmentDeletion(actor.tenantId, attachmentId);
+    return true;
+  }
   const now = new Date().toISOString();
-  const deleted = await DB.prepare(`
-    UPDATE portal_attachments SET status = 'deleted', deleted_at = ?
+  const [deleted] = await DB.batch([DB.prepare(`
+    UPDATE portal_attachments SET status = 'deleting', deleted_at = ?
     WHERE id = ? AND tenant_id = ? AND application_id = ?
-      AND application_version_id IS NULL AND status = 'ready'
+      AND application_version_id IS NULL AND immutable_at IS NULL AND status = 'ready'
       AND EXISTS (
         SELECT 1 FROM portal_applications
         WHERE id = ? AND tenant_id = ? AND owner_user_id = ?
@@ -718,18 +725,39 @@ export async function deleteApplicationAttachment(
     applicationId,
     actor.tenantId,
     actor.userId,
-  ).run();
+  ), DB.prepare(`
+    INSERT OR IGNORE INTO portal_audit_events
+      (id, tenant_id, application_id, actor_user_id, actor_subject, event_type,
+       entity_type, entity_id, payload_json, ip_hash, occurred_at)
+    SELECT ?, ?, ?, ?, ?, 'attachment.deleted', 'application', ?, ?, NULL, ?
+    WHERE EXISTS (
+      SELECT 1 FROM portal_attachments
+      WHERE id = ? AND tenant_id = ? AND application_id = ? AND owner_user_id = ?
+        AND application_version_id IS NULL AND immutable_at IS NULL
+        AND status = 'deleting' AND deleted_at = ?
+    )
+  `).bind(
+    `attachment-delete:${attachmentId}`, actor.tenantId, applicationId, actor.userId,
+    actor.subject, applicationId, JSON.stringify({ attachmentId }), now,
+    attachmentId, actor.tenantId, applicationId, actor.userId, now,
+  )]);
   if (Number(deleted.meta.changes ?? 0) !== 1) {
+    const current = await DB.prepare(`
+      SELECT status FROM portal_attachments
+      WHERE id = ? AND tenant_id = ? AND application_id = ? AND owner_user_id = ?
+        AND application_version_id IS NULL AND immutable_at IS NULL AND status IN ('deleting', 'deleted')
+      LIMIT 1
+    `).bind(attachmentId, actor.tenantId, applicationId, actor.userId).first<{ status: string }>();
+    if (current) {
+      await attemptQueuedApplicationAttachmentDeletion(actor.tenantId, attachmentId);
+      return true;
+    }
     throw new ApplicationRepositoryError(
       409,
       "Bilaget kunne ikke fjernes, fordi sagen blev ændret samtidig.",
     );
   }
-  const { FILES } = await getPersistenceBindings();
-  await FILES.delete(row.storage_key).catch(() => undefined);
-  await appendApplicationAudit(DB, actor, applicationId, "attachment.deleted", {
-    attachmentId,
-  });
+  await attemptQueuedApplicationAttachmentDeletion(actor.tenantId, attachmentId);
   return true;
 }
 

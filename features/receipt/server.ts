@@ -103,8 +103,8 @@ async function materializeReceipt(
   if (kind === "approval" && !application.approval_status) {
     throw new ReceiptError(409, "Lederbeslutningen er endnu ikke registreret.");
   }
-  if (kind === "final" && application.status !== "closed") {
-    throw new ReceiptError(409, "Sagen er endnu ikke afsluttet.");
+  if (kind === "final" && (application.status !== "closed" || !["approved", "rejected"].includes(application.dgita_status ?? ""))) {
+    throw new ReceiptError(409, "Denne version har endnu ingen afsluttende D-GITA-beslutning.");
   }
 
   const { FILES } = await getPersistenceBindings();
@@ -282,7 +282,7 @@ export async function renderReceipt(
   layout.meta("Version", String(application.receipt_version_number));
   layout.meta("Indsendt", formatDate(application.submitted_at));
   layout.meta("Anmoder", `${application.owner_name} · ${application.owner_email}`);
-  layout.meta("System", application.system_name || displaySystem(state));
+  layout.meta("System", displaySystem(state));
   if (kind === "approval") {
     layout.meta("Leders beslutning", application.approval_status === "approved" ? "Godkendt" : application.approval_status === "rejected" ? "Afvist" : "Ikke registreret");
     layout.meta("Godkendende leder", application.approver_name || state.approvingLeader);
