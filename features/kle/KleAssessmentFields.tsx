@@ -30,7 +30,7 @@ const MATCH_LABELS = {
   direct: "Direkte eksempelmatch",
   possible: "Muligt eksempelmatch",
   "no-match": "Ingen match i eksemplerne",
-  incomplete: "Afklares sammen med en D-GITA-konsulent",
+  incomplete: "Mangler afklaring",
 } as const;
 
 const LEVEL_LABELS = {
@@ -91,7 +91,7 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
     <div className={styles.content}>
       <div className={styles.notice}>
         <Info size={18} aria-hidden="true" />
-        <p><strong>Udfyld denne del sammen med en D-GITA-konsulent.</strong><br />Start med at beskrive arbejdsopgaven med dine egne ord. Du kan gemme registreringen og lade KLE-emner og kritikalitet stå åbne, indtil I har afklaret dem sammen.</p>
+        <p><strong>Udfyld det, du kan.</strong><br />Beskriv arbejdsopgaven med dine egne ord, og vælg de KLE-emner, du kender. Du kan få hjælp til resten på mødet med D-GITA-konsulenten. Du kan gemme, selv om nogle felter stadig står åbne.</p>
       </div>
       {error ? <p className="field-error" ref={errorSummary} tabIndex={-1} role="alert">{error}</p> : null}
 
@@ -100,7 +100,7 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
         <div className="question">
           <div className="question-copy">
             <label htmlFor={`${id}-search`}>Vælg KLE-emner fra eksemplerne</label>
-            <p id={`${id}-search-hint`}>Valgfrit nu. Du behøver ikke kende KLE-koderne; en D-GITA-konsulent hjælper dig med at finde de relevante emner. Du kan selv søge på kode, titel eller stikord. Valg af en gruppe tilføjer ikke automatisk dens underemner.</p>
+            <p id={`${id}-search-hint`}>Søg på kode, titel eller stikord, og vælg de emner, du kender. Du kan lade feltet stå åbent, hvis du er i tvivl. Valg af en gruppe tilføjer ikke automatisk dens underemner.</p>
           </div>
           <div><div className="lookup-field">
             <Search size={18} aria-hidden="true" />
@@ -140,7 +140,7 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
         <div className="question">
           <div className="question-copy">
             <label htmlFor={`${id}-task`}>Hvilken lokal arbejdsopgave understøttes?</label>
-            <p id={`${id}-task-hint`}>Beskriv med dine egne ord, hvad systemet skal bruges til. Nævn gerne afhængigheder til fx login eller andre systemer. Konsulenten kan hjælpe med at afklare resten. Brug fiktive oplysninger i afprøvningen.</p>
+            <p id={`${id}-task-hint`}>Beskriv med dine egne ord, hvad systemet skal bruges til. Nævn gerne afhængigheder til fx login eller andre systemer. Brug fiktive oplysninger i afprøvningen.</p>
           </div>
           <textarea id={`${id}-task`} className="clean-input" rows={3} maxLength={KLE_LIMITS.text}
             value={value.localTaskDescription} aria-describedby={`${id}-task-hint`}
@@ -157,14 +157,14 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
               <a href={`#${id}-sources`} aria-label={`Se kildegrundlag for ${match.taskTitle}`}>Se kildegrundlag</a>
             </li>)}
           </ul> : null}
-          {evaluation.issues.length ? <><p className={styles.meta}>Til den fælles gennemgang før bekræftelse — du kan stadig gemme:</p><ul className={styles.issues}>{evaluation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></> : null}
+          {evaluation.issues.length ? <><p className={styles.meta}>Dette mangler før bekræftelse — du kan stadig gemme:</p><ul className={styles.issues}>{evaluation.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></> : null}
           <p className={styles.meta}>Et match er et input til den lokale vurdering. Manglende match fritager ikke et system fra sikkerhedskrav.</p>
         </section>
 
         <div className="question">
           <div className="question-copy">
             <label htmlFor={`${id}-level`}>Lokal kritikalitet i afprøvningen</label>
-            <p id={`${id}-level-hint`}>Afklares sammen med en D-GITA-konsulent. Lad feltet stå åbent, hvis du er i tvivl. Niveauerne er eksempler i denne afprøvning.</p>
+            <p id={`${id}-level-hint`}>Lad feltet stå åbent, hvis du er i tvivl. Du kan få hjælp til vurderingen på mødet med D-GITA-konsulenten. Niveauerne er eksempler i denne afprøvning.</p>
           </div>
           <select id={`${id}-level`} className="clean-input" value={value.localAssessment?.level ?? ""}
             aria-describedby={`${id}-level-hint`} onChange={(event) => {
@@ -199,7 +199,7 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
           <p className={styles.confirmationStatus} role="status">{evaluation.confirmationCurrent ? "Registreringen er bekræftet af dig for disse oplysninger" : "Registreringen er endnu ikke bekræftet for disse oplysninger"}</p>
           {confirmedAt && value.confirmation ? <p><time dateTime={value.confirmation.confirmedAt}>{confirmedAt}</time></p> : null}
           <p id={`${id}-confirmation-hint`}>Bekræft, at du har gennemgået de valgte emner, arbejdsopgaven og vurderingen. Det registrerer din gennemgang; systemejerens mandat er endnu ikke verificeret.</p>
-          {!canConfirm ? <p id={`${id}-confirmation-missing`}>Du kan gemme nu. Bekræft først din gennemgang, når KLE-emner, arbejdsopgave og begrundet vurdering er afklaret sammen med en D-GITA-konsulent.</p> : null}
+          {!canConfirm ? <p id={`${id}-confirmation-missing`}>Du kan gemme nu. Bekræft først din gennemgang, når KLE-emner, arbejdsopgave og begrundet vurdering er afklaret.</p> : null}
           {onConfirm ? <button type="button" className="line-button" disabled={!canConfirm || evaluation.confirmationCurrent}
             aria-describedby={`${id}-confirmation-hint${!canConfirm ? ` ${id}-confirmation-missing` : ""}`}
             onClick={onConfirm}>{evaluation.confirmationCurrent ? "Registreringen er bekræftet" : "Bekræft min gennemgang"}</button> : <p>Gem kladden, før du bekræfter din gennemgang.</p>}
