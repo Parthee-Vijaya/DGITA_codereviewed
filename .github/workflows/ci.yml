@@ -60,7 +60,7 @@ jobs:
         run: npm run test:ci:next-e2e
       - name: Retain synthetic smoke evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-smoke-${{ github.run_attempt }}
           path: |
@@ -85,7 +85,7 @@ jobs:
       - run: npm run test:ci:e2e
       - name: Retain synthetic workflow evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: application-workflow-${{ github.run_attempt }}
           path: work/ci/e2e/
@@ -111,7 +111,7 @@ jobs:
       - run: npm run test:ci:a11y
       - name: Retain synthetic accessibility evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: accessibility-${{ github.run_attempt }}
           path: work/ci/a11y/
@@ -140,7 +140,7 @@ jobs:
         run: node scripts/ci-audit.mjs
       - name: Retain dependency evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-evidence-${{ github.run_attempt }}
           path: work/ci/dependencies/
@@ -166,7 +166,7 @@ jobs:
       - run: npm sbom --prefix .github/deployment-tools --sbom-format=cyclonedx > work/ci/deployment-tools/sbom.cdx.json
       - name: Retain deployment toolchain evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deployment-toolchain-${{ github.run_attempt }}
           path: work/ci/deployment-tools/
