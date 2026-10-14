@@ -1,5 +1,6 @@
 import type { ServerActor } from "../auth/types";
 import type { AttachmentDraft } from "./engine";
+import { cleanupDeletedApplicationAttachments } from "./attachment-deletion";
 import { assertAttachmentScanAllowed, MalwareScanError, scanUploadBytes } from "./malware-scan";
 import {
   acknowledgeApplicationAttachmentBlobDeletion,
@@ -172,12 +173,12 @@ export async function cancelDirectApplicationUpload(
 }
 
 export async function cleanupAbandonedDirectApplicationUploads(limit?: number) {
+  const deletions = await cleanupDeletedApplicationAttachments(limit);
   if (!isVercelBlobTransferEnabled()) {
     return {
       pendingQuarantined: 0,
       verifyingDiscarded: 0,
-      blobsDeleted: 0,
-      blobsPendingRetry: 0,
+      ...deletions,
     };
   }
 
@@ -189,8 +190,8 @@ export async function cleanupAbandonedDirectApplicationUploads(limit?: number) {
   return {
     pendingQuarantined: claimed.pendingQuarantined,
     verifyingDiscarded: claimed.verifyingDiscarded,
-    blobsDeleted,
-    blobsPendingRetry: claimed.deletionTargets.length - blobsDeleted,
+    blobsDeleted: blobsDeleted + deletions.blobsDeleted,
+    blobsPendingRetry: claimed.deletionTargets.length - blobsDeleted + deletions.blobsPendingRetry,
   };
 }
 

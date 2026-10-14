@@ -56,6 +56,7 @@ Formularmotoren understøtter blandt andet:
 - lokale aliaser og tidligere systemnavne uden at bruge navne som join-nøgle
 - upload af risikovurdering, databehandleraftale, kontrakt, leverandørtjekliste og arkitekturmateriale
 - filtype-, MIME- og størrelseskontrol samt SHA-256-registrering; højst 25 MB pr. fil
+- vedvarende slettekø for fjernede kladdebilag; storagefejl genforsøges automatisk ved planlagt oprydning, mens indsendte bilag forbliver låste
 - dansk beløbsformat, beregnet finansiering og kontrol af implementeringsdatoer
 - sikre, brugerejede kladder med individuel fortsættelse, beskyttelse af ugemte ændringer og konfliktkontrol mellem parallelle faner
 - versionslåst snapshot og bilagsmanifest ved indsendelse
@@ -143,17 +144,19 @@ Datamodellen dækker tenants, brugere, roller, sessions, ansøgninger, uforander
 
 ## Lokal kørsel
 
-Kræver Node.js `>=22.13.0`.
+Kræver Node.js `>=24.13.0 <25`. Den låste version findes i `.node-version`.
 
 ```bash
-git clone https://github.com/Parthee-Vijaya/DGITA.git
-cd DGITA
-npm install
+git clone https://github.com/Parthee-Vijaya/DGITA_codereviewed.git
+cd DGITA_codereviewed
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
 
 Åbn derefter [http://localhost:3000](http://localhost:3000). Vinext starter lokal D1 og R2 gennem Miniflare; den ignorerede state gemmes under `.wrangler/`.
+
+Fjernede og ubrugte kladdebilag skjules med det samme. De får status `deleting`, indtil filstorage bekræfter fysisk sletning, og derefter `deleted`. Fejlede storagekald og tabte databasekvitteringer efterlader en holdbar genforsøgsopgave. Det fælles oprydningsjob genforsøger på både R2 og privat Blob: Cloudflare hvert andet minut, den eksisterende Vercel-plan dagligt. Ventende fejl giver en fejlet heartbeat og indgår i eksisterende driftsalarmer. Samtidige rettelser bruger unikke fysiske kopier, så en langsom kopiering ikke kan genskabe et allerede slettet bilag. Den nye status kræver ingen SQL-migration; eksisterende migrationschecksums og indsendte versioner bevares.
 
 ### Kør den fulde E2E-test
 

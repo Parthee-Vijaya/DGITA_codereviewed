@@ -225,6 +225,107 @@ test("timeout afbryder kaldet og giver en retryable fejl", async () => {
   });
 });
 
+test("token response bodies remain covered by the request deadline after headers arrive", async () => {
+  let streamController;
+  let requestSignal;
+  const body = new ReadableStream({
+    start(controller) {
+      streamController = controller;
+      controller.enqueue(new TextEncoder().encode('{"access_token":'));
+    },
+  });
+  const transport = new MicrosoftGraphMailTransport(
+    { ...readGraphMailConfig(environment), timeoutMs: 10 },
+    { fetch: async (_input, init) => {
+      requestSignal = init.signal;
+      return new Response(body, { status: 200 });
+    } },
+  );
+  let watchdog;
+  try {
+    await assert.rejects(Promise.race([
+      transport.send(mail),
+      new Promise((_resolve, reject) => {
+        watchdog = setTimeout(() => reject(new Error("Token response body exceeded its deadline")), 300);
+      }),
+    ]), (error) => {
+      assert.ok(error instanceof GraphMailError);
+      assert.equal(error.code, "GRAPH_TIMEOUT");
+      assert.equal(error.stage, "token");
+      assert.equal(error.retryable, true);
+      return true;
+    });
+    assert.equal(requestSignal.aborted, true);
+  } finally {
+    clearTimeout(watchdog);
+    streamController.close();
+  }
+});
+
+test("an oversized token response is rejected before any mail is sent", async () => {
+  let sendAttempted = false;
+  const transport = new MicrosoftGraphMailTransport(readGraphMailConfig(environment), {
+    fetch: async (input) => {
+      if (String(input).includes("/oauth2/v2.0/token")) {
+        return Response.json({ access_token: "x".repeat(100_000), expires_in: 3600 });
+      }
+      sendAttempted = true;
+      return new Response(null, { status: 202 });
+    },
+  });
+  await assert.rejects(transport.send(mail), { code: "GRAPH_AUTHENTICATION_ERROR", stage: "token" });
+  assert.equal(sendAttempted, false);
+});
+
+test("stalled Graph error bodies retain the known rejection and retry policy without resending", async () => {
+  for (const status of [403, 429]) {
+    let streamController;
+    let requestSignal;
+    let sendAttempts = 0;
+    const body = new ReadableStream({
+      start(controller) {
+        streamController = controller;
+        controller.enqueue(new TextEncoder().encode('{"error":'));
+      },
+    });
+    const transport = new MicrosoftGraphMailTransport(
+      { ...readGraphMailConfig(environment), timeoutMs: 10 },
+      { fetch: async (input, init) => {
+        if (String(input).includes("/oauth2/v2.0/token")) {
+          return Response.json({ access_token: "synthetic-token", expires_in: 3600 });
+        }
+        sendAttempts += 1;
+        requestSignal = init.signal;
+        return new Response(body, { status, headers: { "request-id": "synthetic-rejection", "retry-after": "17" } });
+      } },
+    );
+    let watchdog;
+    try {
+      await assert.rejects(Promise.race([
+        transport.send(mail),
+        new Promise((_resolve, reject) => {
+          watchdog = setTimeout(() => reject(new Error("Graph error body exceeded its deadline")), 300);
+        }),
+      ]), (error) => {
+        assert.ok(error instanceof GraphMailError);
+        assert.equal(error.code, "GRAPH_SEND_ERROR");
+        assert.equal(error.stage, "send");
+        assert.equal(error.status, status);
+        assert.equal(error.retryable, status === 429);
+        assert.equal(error.retryAfterMs, 17_000);
+        assert.equal(error.requestId, "synthetic-rejection");
+        assert.equal(error.providerCode, null);
+        return true;
+      });
+      assert.equal(requestSignal.aborted, true);
+      assert.equal(sendAttempts, 1);
+    } finally {
+      clearTimeout(watchdog);
+      streamController.close();
+    }
+  }
+});
+
 test("ugyldig mail afvises før token eller Graph kaldes", async () => {
   let called = false;
   const transport = new MicrosoftGraphMailTransport(
