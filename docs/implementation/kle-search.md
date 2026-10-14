@@ -18,6 +18,8 @@ Søge- og vurderingsgrundlag skal pege på samme publicerede version. Klienten a
 
 Feltet venter kort på, at brugeren skriver færdig. Forældede svar og afbrudte søgninger erstatter ikke nyere resultater. Fejl giver mulighed for genforsøg, mens valgte emner og resten af kladden bevares. Resultatantal, indlæsning og fejl er tilgængelige for hjælpemidler.
 
+Vejledningen forklarer, at KLE-emner og kritikalitet udfyldes sammen med en D-GITA-konsulent. Brugeren kan starte med en beskrivelse og gemme registreringen med uafklarede felter; kun navnet er nødvendigt for en ny kladde. Krav før bekræftelse er tydeligt adskilt fra gemning. Dette er procesvejledning; automatisk deling, konsulentadgang og fælles redigering er fortsat ikke aktiveret.
+
 `POST /api/kle/search` modtager `{ query, offset, limit }`, kræver en aktiv lokal testbruger og samme oprindelse, begrænser søgeteksten til 256 tegn og returnerer højst 50 emner. Svaret indeholder kilde, resultater, total og sidetal. Kun den udtrykkeligt aktiverede lokale afprøvning har adgang; almindelig pilot og produktion returnerer 404.
 
 Søgeteksten ligger i forespørgslens body og gemmes ikke af funktionen. Den tilføjes ikke til browserhistorik, eksterne links eller appens log. KLE Online-linket åbner den officielle søgeside uden at sende den indtastede tekst. Kontrol af eventuel platform-/APM-logning er fortsat en del af miljøaccepten.

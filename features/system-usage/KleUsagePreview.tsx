@@ -95,7 +95,7 @@ export function KleUsagePreview({ initialUsages }: { initialUsages: SystemUsage[
 
   return <main className={styles.page}>
     <Link href="/" className={styles.back} onClick={(event) => { if (!confirmNavigation()) event.preventDefault(); }}><ArrowLeft size={17} aria-hidden="true" /> Tilbage til D-GITA</Link>
-    <header className={styles.header}><p className={styles.eyebrow}>D-GITA · Lokal afprøvning</p><h1>Arbejdsopgaver og kritikalitet</h1><p>Afprøv KLE-valg og den lokale vurdering for en systemanvendelse. Brug kun opdigtede oplysninger.</p></header>
+    <header className={styles.header}><p className={styles.eyebrow}>D-GITA · Lokal afprøvning</p><h1>Arbejdsopgaver og kritikalitet</h1><p>Beskriv arbejdsopgaven. KLE-emner og kritikalitet afklares i samarbejde med en D-GITA-konsulent. Brug kun opdigtede oplysninger i afprøvningen.</p></header>
     <div className={styles.note}><strong>Afprøvning med eksempeldata</strong><p>Koder og opgavematch er syntetiske. Bekræftelsen gælder din registrering og er ikke en formel ejeraccept. Der overføres ingen oplysninger til KITOS eller SHIELD.</p></div>
     <section className={styles.form} aria-label="Systemanvendelse">
       <Question title="Dine eksempelregistreringer"><select className="clean-input" value={saved?.id ?? ""} disabled={disabled} onChange={(event) => {
@@ -111,7 +111,7 @@ export function KleUsagePreview({ initialUsages }: { initialUsages: SystemUsage[
       }} /></Question>
       {legacyError ? <p id="legacy-topics-error" className="field-error">{legacyError}</p> : null}
       <KleAssessmentFields value={review} onChange={edit} disabled={disabled} initiallyOpen onConfirm={saved ? () => void save(true) : undefined} />
-      {!saved ? <p className={styles.helper}>Gem systemanvendelsen først. Derefter kan du bekræfte den udfyldte registrering.</p> : null}
+      {!saved ? <p className={styles.helper}>Du kan gemme din registrering, selv om KLE-emner og kritikalitet endnu ikke er afklaret. Angiv blot et navn på systemanvendelsen.</p> : null}
       {error ? <div className="form-message error" role="alert" tabIndex={-1} ref={errorRef}><div><strong>Registreringen kunne ikke gemmes</strong><p>{error}</p>{conflict ? <><p>Dine indtastninger er bevaret. Du kan hente den senest gemte version, når du er klar til at erstatte dem.</p><button type="button" className="line-button" disabled={busy} onClick={() => void reloadLatest()}>Hent seneste version</button></> : null}</div></div> : null}
       <footer className={styles.actions}><button type="button" className="solid-button" disabled={disabled} onClick={() => void save()}><Save size={17} aria-hidden="true" /> {busy ? "Gemmer…" : "Gem registrering"}</button><span role="status">{!hydrated ? "Gør formularen klar…" : status || (dirty ? "Du har ugemte ændringer." : saved ? `Gemt som version ${saved.rowVersion}.` : "")}</span></footer>
     </section>
