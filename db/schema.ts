@@ -329,7 +329,7 @@ export const portalAttachments = sqliteTable(
     storageKey: text("storage_key").notNull(),
     checksumSha256: text("checksum_sha256").notNull(),
     status: text("status", {
-      enum: ["pending", "verifying", "ready", "quarantined", "deleted"],
+      enum: ["pending", "verifying", "ready", "quarantined", "deleting", "deleted"],
     })
       .notNull()
       .default("pending"),
