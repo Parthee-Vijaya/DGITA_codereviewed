@@ -1,14 +1,17 @@
 "use client";
 
 import { ChevronDown, Info, Search, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import {
   evaluateKleReview,
   getKleInputBinding,
   KLE_LIMITS,
+  type KleCatalog,
   type KleReview,
+  type KlTaskCatalog,
 } from "./domain";
 import { SYNTHETIC_KLE_CATALOG, SYNTHETIC_KL_TASK_CATALOG } from "./synthetic";
+import { useKleSearch } from "./use-kle-search";
 import styles from "./KleAssessmentFields.module.css";
 
 type Props = {
@@ -19,6 +22,8 @@ type Props = {
   disabled?: boolean;
   error?: string;
   initiallyOpen?: boolean;
+  catalog?: KleCatalog;
+  taskCatalog?: KlTaskCatalog;
 };
 
 const MATCH_LABELS = {
@@ -37,18 +42,14 @@ const LEVEL_LABELS = {
 } as const;
 
 /** Synthetic preview only. The containing page and persistence API must be gated. */
-export function KleAssessmentFields({ value, onChange, onConfirm, disabled = false, error, initiallyOpen = false }: Props) {
+export function KleAssessmentFields({ value, onChange, onConfirm, disabled = false, error, initiallyOpen = false,
+  catalog = SYNTHETIC_KLE_CATALOG, taskCatalog: tasks = SYNTHETIC_KL_TASK_CATALOG }: Props) {
   const id = useId();
   const details = useRef<HTMLDetailsElement>(null);
   const errorSummary = useRef<HTMLParagraphElement>(null);
-  const [query, setQuery] = useState("");
-  const catalog = SYNTHETIC_KLE_CATALOG;
-  const tasks = SYNTHETIC_KL_TASK_CATALOG;
+  const search = useKleSearch(catalog);
   const evaluation = evaluateKleReview(value, catalog, tasks);
   const inputBinding = getKleInputBinding(value, catalog, tasks);
-  const normalizedQuery = query.trim().toLocaleLowerCase("da-DK");
-  const results = catalog.entries.filter((entry) => !entry.retired &&
-    `${entry.code} ${entry.title}`.toLocaleLowerCase("da-DK").includes(normalizedQuery));
   const selectedIds = new Set(value.selectedCodes.map((selection) => selection.uuid));
   const canConfirm = evaluation.state !== "incomplete" && evaluation.assessmentCurrent;
   const staleAssessment = Boolean(value.localAssessment && value.localAssessment.inputBinding !== inputBinding);
@@ -99,31 +100,39 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
         <div className="question">
           <div className="question-copy">
             <label htmlFor={`${id}-search`}>Vælg KLE-emner fra eksemplerne</label>
-            <p id={`${id}-search-hint`}>Søg på kode eller titel, og vælg de relevante emner. Valg af en gruppe tilføjer ikke automatisk dens underemner.</p>
+            <p id={`${id}-search-hint`}>Søg på kode, titel eller stikord, og vælg de relevante emner. Valg af en gruppe tilføjer ikke automatisk dens underemner.</p>
           </div>
           <div><div className="lookup-field">
             <Search size={18} aria-hidden="true" />
-            <input id={`${id}-search`} className="clean-input" type="search" autoComplete="off" value={query}
+            <input id={`${id}-search`} className="clean-input" type="search" autoComplete="off" value={search.query}
               aria-describedby={`${id}-search-hint`} placeholder="Søg i eksempeldata" maxLength={256}
-              onChange={(event) => setQuery(event.target.value)} />
+              onChange={(event) => search.setQuery(event.target.value)} />
           </div>
-          <p className={styles.meta} role="status">{results.length} {results.length === 1 ? "søgeresultat" : "søgeresultater"} · {value.selectedCodes.length} valgt</p>
-          <div className={styles.options} role="group" aria-label="KLE-søgeresultater">
-            {results.map((entry) => <label className={styles.option} key={entry.uuid}>
+          <p className={styles.meta} role="status" aria-atomic="true">{search.loading ? "Søger i KLE-grundlaget…" : search.error ? "Søgningen er midlertidigt utilgængelig" : `${search.total} ${search.total === 1 ? "søgeresultat" : "søgeresultater"}`}{` · ${value.selectedCodes.length} valgt`}</p>
+          {search.error ? <div className={styles.searchError}>
+            <p role="alert">{search.error}</p>
+            <button type="button" className="inline-action" onClick={search.retry}>Prøv søgningen igen</button>
+          </div> : null}
+          <div className={styles.options} role="group" aria-label="KLE-søgeresultater" aria-busy={search.loading}>
+            {search.results.map((entry) => <label className={styles.option} key={entry.uuid}>
               <input type="checkbox" checked={selectedIds.has(entry.uuid)}
-                disabled={!selectedIds.has(entry.uuid) && value.selectedCodes.length >= KLE_LIMITS.selectedCodes}
+                disabled={Boolean(search.error) || (!selectedIds.has(entry.uuid) && value.selectedCodes.length >= KLE_LIMITS.selectedCodes)}
                 onChange={() => toggleCode(entry.uuid)} />
-              <span><strong>{entry.code}</strong> {entry.title}<small>{entry.level === "group" ? "Gruppe" : "Emne"} · Eksempeldata</small></span>
+              <span><strong>{entry.code}</strong> {entry.title}<small>{entry.level === "main-group" ? "Hovedgruppe" : entry.level === "group" ? "Gruppe" : "Emne"} · Eksempeldata</small>
+                {entry.keywords?.length ? <small>Stikord: {entry.keywords.slice(0, 3).join(", ")}</small> : null}</span>
             </label>)}
-            {!results.length ? <p className={styles.meta}>Ingen eksempler passer til søgningen. Du kan stadig beskrive den lokale arbejdsopgave nedenfor.</p> : null}
+            {!search.loading && !search.error && !search.results.length ? <p className={styles.meta}>Ingen eksempler passer til søgningen. Prøv et andet stikord, eller beskriv den lokale arbejdsopgave nedenfor.</p> : null}
           </div>
+          {search.hasMore ? <button type="button" className={`inline-action ${styles.moreResults}`} onClick={search.loadMore}>Vis flere emner ({search.results.length} af {search.total})</button> : null}
           {value.selectedCodes.length ? <div className={styles.selected} aria-label="Valgte KLE-emner">
             {value.selectedCodes.map((selection) => <button className={styles.selection} type="button" key={selection.uuid}
               aria-label={`Fjern ${selection.code}`}
               onClick={() => update({ selectedCodes: value.selectedCodes.filter((item) => item.uuid !== selection.uuid) })}>
               {selection.code}<X size={15} aria-hidden="true" />
             </button>)}
-          </div> : null}</div>
+          </div> : null}
+          <p className={`${styles.meta} ${styles.searchSource}`}>Søgningen bruger eksempeldata, indtil aftalen med KL er afklaret. <a href="https://www.kle-online.dk/soegning" target="_blank" rel="noopener noreferrer">Åbn KLE Online (ny fane)</a></p>
+          </div>
         </div>
 
         {value.legacyTopics.length ? <p className={styles.legacy}>Tidligere fritekst er bevaret som ubekræftet grundlag: {value.legacyTopics.join(", ")}. Den bliver ikke automatisk til valgte KLE-koder.</p> : null}
@@ -200,7 +209,7 @@ export function KleAssessmentFields({ value, onChange, onConfirm, disabled = fal
       <section id={`${id}-sources`} className={styles.sources} aria-labelledby={`${id}-sources-title`} tabIndex={-1}>
         <h2 id={`${id}-sources-title`}>Kildegrundlag for afprøvningen</h2>
         <p>{catalog.source.label} · Version {catalog.source.version}<br />{tasks.source.label} · Version {tasks.source.version}</p>
-        <p>Begge kilder indeholder kun syntetiske testdata. Den licenserede KLE-fortegnelse og kommunens accepterede KL-grundlag er ikke tilsluttet.</p>
+        <p>Begge kilder indeholder kun syntetiske testdata. Officielle KLE-data tilsluttes først, når aftalen med KL er afklaret. Kommunens accepterede KL-grundlag er heller ikke tilsluttet.</p>
       </section>
     </div>
   </details>;

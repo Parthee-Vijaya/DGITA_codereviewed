@@ -1156,6 +1156,23 @@
         "features/kle/domain.ts",
         "app/api/system-usages/route.ts"
       ]
+    },
+    "kle-search-preview": {
+      "path": [
+        "Lokal testbrugers søgetekst (højst 256 tegn)",
+        "POST-body til autentificeret søgning med miljø- og Origin-kontrol",
+        "Søgning i serverens uforanderlige syntetiske katalog",
+        "Begrænsede resultater tilbage til samme bruger; søgetekst gemmes ikke"
+      ],
+      "external": [
+        "Ingen søgetekst sendes til KL eller andre eksterne tjenester. Eksternt link til KLE Online indeholder ingen indtastet tekst. Officiel katalogimport er offline og afventer aftale; pakker bliver ikke aktiveret automatisk. Platformens body-/APM-logning kræver fortsat miljøkontrol."
+      ],
+      "code": [
+        "app/api/kle/search/route.ts",
+        "features/kle/provider.ts",
+        "features/kle/search-request.ts",
+        "features/kle/search.ts"
+      ]
     }
   },
   "operational_logging": {

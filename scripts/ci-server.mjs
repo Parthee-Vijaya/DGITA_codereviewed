@@ -190,6 +190,8 @@ try {
     assert.equal(klePreview.status, 404, "Synthetic KLE preview must remain unavailable in production.");
     const klePreviewWrite = await request("/api/system-usages", { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: "{}" });
     assert.equal(klePreviewWrite.status, 404);
+    const kleSearch = await request("/api/kle/search", { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ query: "login" }) });
+    assert.equal(kleSearch.status, 404, "Synthetic KLE search must remain unavailable in production.");
     const devLogin = await request("/api/auth/dev-login", {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: origin },

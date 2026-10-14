@@ -5,8 +5,8 @@ export const SYNTHETIC_KLE_CATALOG: KleCatalog = {
   source: { id: "dgita-synthetic-kle", version: "2026-10-14.1", label: "Syntetiske KLE-eksempler til afprøvning", kind: "synthetic", status: "available", acceptedForUse: false },
   entries: [
     { uuid: "00000000-0000-4000-8000-000000000001", code: "DEMO.00", title: "Eksempelgruppe – fælles drift", level: "group", retired: false },
-    { uuid: "00000000-0000-4000-8000-000000000002", code: "DEMO.00.01", title: "Eksempel – lokal driftsopgave", level: "topic", retired: false },
-    { uuid: "00000000-0000-4000-8000-000000000003", code: "DEMO.00.02", title: "Eksempel – fælles adgang og integration", level: "topic", retired: false },
+    { uuid: "00000000-0000-4000-8000-000000000002", code: "DEMO.00.01", title: "Eksempel – lokal driftsopgave", level: "topic", retired: false, keywords: ["driftsstøtte", "service"], description: "Opdigtet eksempel på understøttelse af en lokal arbejdsopgave." },
+    { uuid: "00000000-0000-4000-8000-000000000003", code: "DEMO.00.02", title: "Eksempel – fælles adgang og integration", level: "topic", retired: false, keywords: ["login", "adgangsstyring", "fælles integration"], description: "Opdigtet eksempel på login og fælles adgang til systemer." },
     { uuid: "00000000-0000-4000-8000-000000000004", code: "DEMO.00.03", title: "Eksempel – opgave uden match i eksempelkilden", level: "topic", retired: false },
     { uuid: "00000000-0000-4000-8000-000000000005", code: "DEMO.00.04", title: "Eksempel – udgået emne", level: "topic", retired: true },
   ],

@@ -116,6 +116,35 @@
   font-size: 12px;
 }
 
+.option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.searchError {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.searchError p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.moreResults,
+.searchSource {
+  margin-top: 12px;
+}
+
+.searchSource a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .selected {
   display: flex;
   flex-wrap: wrap;

@@ -1,6 +1,7 @@
 import { test, expect, type Page, type Response } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { createEmptyKleReview } from "../../features/kle/domain";
+import { SYNTHETIC_KLE_CATALOG } from "../../features/kle/synthetic";
 
 const headers = { Origin: process.env.DGITA_E2E_BASE_URL! };
 const TASK_LABEL = "Hvilken lokal arbejdsopgave understøttes?";
@@ -15,6 +16,7 @@ async function login(page: Page) {
   await page.goto("/afproevning/kle");
   await expect(page.getByRole("heading", { name: "Arbejdsopgaver og kritikalitet", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Gem registrering", exact: true })).toBeEnabled();
+  await expect(page.getByRole("checkbox", { name: /DEMO\.00 Eksempelgruppe/ })).toBeVisible();
 }
 
 function waitForSave(page: Page, action: "create" | "save" | "confirm"): Promise<Response> {
@@ -199,6 +201,135 @@ test.describe("Local synthetic KLE preview", () => {
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 
+  test("@kle-preview integrated search finds keywords and retains choices across queries and empty results", async ({ page }) => {
+    const requests: { url: string; query: string; method: string }[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/kle/search") requests.push({ url: request.url(), query: request.postDataJSON()?.query, method: request.method() });
+    });
+    await login(page);
+    const search = page.getByLabel("Vælg KLE-emner fra eksemplerne", { exact: true });
+    await search.fill("login");
+    const result = page.getByRole("checkbox", { name: /DEMO\.00\.02/ });
+    await expect(result).toBeVisible();
+    await expect(page.getByRole("checkbox")).toHaveCount(1);
+    await expect(page.getByText(/Stikord:.*login/)).toBeVisible();
+    await result.check();
+    await search.fill("findes-ikke-i-eksemplerne");
+    await expect(page.getByText(/Ingen eksempler passer til søgningen/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Fjern DEMO.00.02", exact: true })).toBeVisible();
+    await search.fill("DEMO.00.02");
+    await expect(result).toBeChecked();
+    expect(requests.some((request) => request.query === "login")).toBe(true);
+    expect(requests.every((request) => request.method === "POST" && !new URL(request.url).search)).toBe(true);
+    await expect(page.getByRole("link", { name: "Åbn KLE Online (ny fane)", exact: true })).toHaveAttribute("href", "https://www.kle-online.dk/soegning");
+    expect(new URL(page.url()).search).toBe("");
+  });
+
+  test("@kle-preview a late earlier search cannot replace the latest results", async ({ page }) => {
+    await login(page);
+    let releaseEarlier!: () => void;
+    let earlierStarted!: () => void;
+    let earlierFinished!: () => void;
+    const held = new Promise<void>((resolve) => { releaseEarlier = resolve; });
+    const started = new Promise<void>((resolve) => { earlierStarted = resolve; });
+    const finished = new Promise<void>((resolve) => { earlierFinished = resolve; });
+    await page.route("**/api/kle/search", async (route) => {
+      if (route.request().postDataJSON().query !== "drift") return route.continue();
+      const response = await route.fetch();
+      earlierStarted();
+      await held;
+      try { await route.fulfill({ response }); } finally { earlierFinished(); }
+    });
+    const search = page.getByLabel("Vælg KLE-emner fra eksemplerne", { exact: true });
+    await search.fill("drift");
+    await started;
+    await search.fill("login");
+    await expect(page.getByRole("checkbox", { name: /DEMO\.00\.02/ })).toBeVisible();
+    releaseEarlier();
+    await finished;
+    await expect(search).toHaveValue("login");
+    await expect(page.getByRole("checkbox")).toHaveCount(1);
+    await expect(page.getByRole("checkbox", { name: /DEMO\.00\.02/ })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /DEMO\.00\.01/ })).toHaveCount(0);
+  });
+
+  test("@kle-preview search retries preserve choices and incompatible source results stay unavailable", async ({ page }) => {
+    await login(page);
+    await page.getByRole("checkbox", { name: /DEMO\.00\.01/ }).check();
+    let fail = true;
+    await page.route("**/api/kle/search", async (route) => {
+      if (route.request().postDataJSON().query === "login" && fail) {
+        fail = false;
+        return route.abort("failed");
+      }
+      if (route.request().postDataJSON().query === "ændret-kilde") {
+        return route.fulfill({ json: {
+          source: { ...SYNTHETIC_KLE_CATALOG.source, version: "future-version", kind: "licensed" },
+          results: [SYNTHETIC_KLE_CATALOG.entries[2]], total: 1, offset: 0, limit: 20, hasMore: false,
+        } });
+      }
+      return route.continue();
+    });
+    const search = page.getByLabel("Vælg KLE-emner fra eksemplerne", { exact: true });
+    await search.fill("login");
+    await expect(page.getByRole("alert")).toContainText("Søgningen kunne ikke hentes. Dine valgte emner er bevaret.");
+    await expect(page.getByRole("button", { name: "Fjern DEMO.00.01", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Prøv søgningen igen", exact: true }).click();
+    await expect(page.getByRole("checkbox", { name: /DEMO\.00\.02/ })).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await search.fill("ændret-kilde");
+    await expect(page.getByRole("alert")).toContainText("Kildegrundlaget er ændret eller kan ikke bruges til denne registrering.");
+    await expect(page.getByRole("checkbox")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Fjern DEMO.00.01", exact: true })).toBeVisible();
+    await search.fill("");
+    await expect(page.getByRole("checkbox", { name: /DEMO\.00\.01/ })).toBeChecked();
+  });
+
+  test("@kle-preview loading another result page keeps earlier results and selections", async ({ page }) => {
+    const entries = SYNTHETIC_KLE_CATALOG.entries.filter((entry) => !entry.retired);
+    await page.route("**/api/kle/search", async (route) => {
+      const { offset, query } = route.request().postDataJSON();
+      if (query) return route.continue();
+      const results = entries.slice(offset, offset + 2);
+      return route.fulfill({ json: { source: SYNTHETIC_KLE_CATALOG.source, results, total: entries.length,
+        offset, limit: 20, hasMore: offset + results.length < entries.length } });
+    });
+    await login(page);
+    await expect(page.getByRole("checkbox")).toHaveCount(2);
+    await page.getByRole("checkbox", { name: /DEMO\.00\.01/ }).check();
+    await page.getByRole("button", { name: "Vis flere emner (2 af 4)", exact: true }).click();
+    await expect(page.getByRole("checkbox")).toHaveCount(4);
+    await expect(page.getByRole("checkbox", { name: /DEMO\.00\.01/ })).toBeChecked();
+    await page.getByRole("checkbox", { name: /DEMO\.00\.02/ }).check();
+    await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(2);
+    await expect(page.getByRole("button", { name: /Vis flere emner/ })).toHaveCount(0);
+  });
+
+  test("@kle-preview a timed out search can be retried without losing selected topics", async ({ page }) => {
+    await login(page);
+    await page.getByRole("checkbox", { name: /DEMO\.00\.01/ }).check();
+    let release!: () => void;
+    let hang = true;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    await page.route("**/api/kle/search", async (route) => {
+      if (!hang) return route.continue();
+      hang = false;
+      await held;
+      return route.abort("timedout");
+    });
+    try {
+      await page.getByLabel("Vælg KLE-emner fra eksemplerne", { exact: true }).fill("login");
+      await expect(page.getByRole("status").filter({ hasText: "Søger i KLE-grundlaget" })).toBeVisible();
+      await expect(page.getByRole("alert")).toContainText("Søgningen kunne ikke hentes. Dine valgte emner er bevaret.", { timeout: 15_000 });
+      await expect(page.getByRole("button", { name: "Fjern DEMO.00.01", exact: true })).toBeVisible();
+      release();
+      await page.getByRole("button", { name: "Prøv søgningen igen", exact: true }).click();
+      await expect(page.getByRole("checkbox", { name: /DEMO\.00\.02/ })).toBeVisible();
+      await expect(page.getByRole("alert")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Fjern DEMO.00.01", exact: true })).toBeVisible();
+    } finally { release(); }
+  });
+
   test("@kle-preview API protects personal drafts, rejects stale or malformed writes and ignores forged confirmation", async ({ page, browser }) => {
     await login(page);
     const anonymous = await browser.newContext({ baseURL: process.env.DGITA_E2E_BASE_URL });
@@ -224,6 +355,16 @@ test.describe("Local synthetic KLE preview", () => {
 
       const anonymousRead = await anonymous.request.get(`/api/system-usages?id=${id}`, { headers });
       expect(anonymousRead.status()).toBe(401);
+      expect((await anonymous.request.post("/api/kle/search", { headers, data: { query: "login" } })).status()).toBe(401);
+      expect((await page.request.post("/api/kle/search", { headers: { Origin: "https://foreign.example.invalid" }, data: { query: "login" } })).status()).toBe(403);
+      for (const data of [{ query: "x".repeat(257) }, { query: "login", source: "licensed" }, { query: "login", offset: -1 }, { query: "login", limit: 51 }]) {
+        expect((await page.request.post("/api/kle/search", { headers, data })).status()).toBe(400);
+      }
+      const keywordSearch = await page.request.post("/api/kle/search", { headers, data: { query: "login", offset: 0, limit: 20 } });
+      expect(keywordSearch.status()).toBe(200);
+      expect(keywordSearch.headers()["cache-control"]).toContain("no-store");
+      expect((await keywordSearch.json()).results.map((entry: { code: string }) => entry.code)).toEqual(["DEMO.00.02"]);
+      expect((await page.request.get("/api/kle/search")).status()).toBe(405);
       const foreignOrigin = await page.request.post("/api/system-usages", {
         headers: { Origin: "https://foreign.example.invalid" },
         data: { action: "save", id, name: "Uønsket ændring", review, expectedRowVersion: 1 },

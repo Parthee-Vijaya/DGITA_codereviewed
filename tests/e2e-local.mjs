@@ -93,6 +93,8 @@ async function main() {
     expectStatus(klePreview.response.status, 404, "KLE-afprøvning er lukket i almindelig pilot", klePreview.payload);
     const kleWrite = await admin.json("/api/system-usages", { method: "POST", body: {} });
     expectStatus(kleWrite.response.status, 404, "KLE-skrivning er lukket i almindelig pilot", kleWrite.payload);
+    const kleSearch = await admin.json("/api/kle/search", { method: "POST", body: { query: "login" } });
+    expectStatus(kleSearch.response.status, 404, "KLE-søgning er lukket i almindelig pilot", kleSearch.payload);
   }
   if (providerFixtures) {
     assert.match(process.env.TURSO_DATABASE_URL || "", /^file:\/.*\/dgita-ci-next-e2e-[^/]+\/synthetic\.sqlite$/u);

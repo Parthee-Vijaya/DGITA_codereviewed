@@ -13,8 +13,11 @@ export type KleSource = {
 export type KleCodeReference = { uuid: string; code: string };
 export type KleCatalogEntry = KleCodeReference & {
   title: string;
-  level: "group" | "topic";
+  level: "main-group" | "group" | "topic";
   retired: boolean;
+  /** Search-only metadata. It is not part of the assessment or confirmation binding. */
+  keywords?: string[];
+  description?: string;
 };
 export type KleCatalog = { source: KleSource; entries: readonly KleCatalogEntry[] };
 export type KlTask = {

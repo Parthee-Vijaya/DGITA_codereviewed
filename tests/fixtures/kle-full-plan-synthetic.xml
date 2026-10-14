@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Entirely invented test records. No KLE catalogue content was downloaded. -->
+<KLE-Emneplan>
+  <UdgivelsesDato>2026-10-14</UdgivelsesDato>
+  <Hovedgruppe>
+    <HovedgruppeNr>00</HovedgruppeNr>
+    <HovedgruppeTitel>Opdigtet hovedgruppe</HovedgruppeTitel>
+    <HovedgruppeVejledning><VejledningTekst><p>Opdigtet <b>vejledning</b> med æ, ø og å.</p></VejledningTekst></HovedgruppeVejledning>
+    <HovedgruppeAdministrativInfo><OprettetDato>2020-01-01</OprettetDato></HovedgruppeAdministrativInfo>
+    <HovedgruppeStikord><Orden>1</Orden><Tekst>opdigtet hovedord</Tekst></HovedgruppeStikord>
+    <UUID>11000000-0000-4000-8000-000000000001</UUID>
+    <Gruppe>
+      <GruppeNr>00.01</GruppeNr>
+      <GruppeTitel>Opdigtet gruppe</GruppeTitel>
+      <GruppeAdministrativInfo><OprettetDato>2020-01-01</OprettetDato><RettetDato>2021-01-01</RettetDato></GruppeAdministrativInfo>
+      <GruppeStikord><Orden>1</Orden><Tekst>eksempelgruppe</Tekst></GruppeStikord>
+      <UUID>11000000-0000-4000-8000-000000000002</UUID>
+      <Emne>
+        <EmneNr>00.01.01</EmneNr>
+        <EmneTitel>Opdigtet fællesudlån &amp; udstyr</EmneTitel>
+        <EmneVejledning><VejledningTekst><p>En <i>opdigtet</i> lokal opgave.</p><p>Omfatter:<ul><li>lån</li><li>aflevering</li></ul></p></VejledningTekst></EmneVejledning>
+        <EmneRetskildeReference><RetskildeTitel>Opdigtet retskilde til formattest</RetskildeTitel><RetsinfoAccessionsNr>A000000</RetsinfoAccessionsNr></EmneRetskildeReference>
+        <EmneAdministrativInfo><OprettetDato>2020-01-01</OprettetDato></EmneAdministrativInfo>
+        <BevaringJaevnfoerArkivloven>tom</BevaringJaevnfoerArkivloven>
+        <SletningJaevnfoerPersondataloven>P2Y</SletningJaevnfoerPersondataloven>
+        <EmneStikord><Orden>1</Orden><Tekst>låneudstyr</Tekst></EmneStikord>
+        <EmneStikord><Orden>2</Orden><Tekst>fælles grej</Tekst></EmneStikord>
+        <EmneOgHandlingsfacetStikord><Orden>1</Orden><Tekst>afgrænset facetord</Tekst><HandlingsfacetNr>A00</HandlingsfacetNr></EmneOgHandlingsfacetStikord>
+        <UUID>11000000-0000-4000-8000-000000000003</UUID>
+      </Emne>
+      <Emne>
+        <EmneNr>00.01.02</EmneNr>
+        <EmneTitel>Opdigtet udgået emne</EmneTitel>
+        <EmneAdministrativInfo><OprettetDato>2020-01-01</OprettetDato><Historisk><UdgaaetDato>2025-01-01</UdgaaetDato></Historisk></EmneAdministrativInfo>
+        <EmneStikord><Orden>1</Orden><Tekst>opdigtet historisk eksempel</Tekst></EmneStikord>
+        <UUID>11000000-0000-4000-8000-000000000004</UUID>
+      </Emne>
+      <Emne>
+        <EmneNr>00.01.03</EmneNr>
+        <EmneTitel>Opdigtet flyttet emne</EmneTitel>
+        <EmneAdministrativInfo><OprettetDato>2020-01-01</OprettetDato><Historisk><Flyttet><FlyttetDato>2025-01-01</FlyttetDato><AfloestAf><EmneNr>00.01.01</EmneNr></AfloestAf></Flyttet></Historisk></EmneAdministrativInfo>
+        <EmneStikord><Orden>1</Orden><Tekst>opdigtet flyttet eksempel</Tekst></EmneStikord>
+        <UUID>11000000-0000-4000-8000-000000000005</UUID>
+      </Emne>
+    </Gruppe>
+  </Hovedgruppe>
+</KLE-Emneplan>

@@ -10,6 +10,8 @@ Denne levering er en lokal afprøvning af den manuelle kæde: KLE-valg → opgav
 
 ## Hvad der virker
 
+Integreret søgning er nu udvidet til kode, titel, stikord og beskrivelse via en beskyttet søgefunktion med rangering og resultatsider. Katalogkontrakt og offline klargøring forbereder en senere officiel kilde; den aktive kilde er stadig syntetisk. Se [KLE-søgning og aktivering](kle-search.md).
+
 - Søgning og valg af flere emner. Koder behandles som tekst; indledende nuller bevares. Grupper udvider ikke automatisk til underemner, og udgåede emner kan ikke nyvælges eller bekræftes.
 - Flere opgaver kan matche samme kode. Direkte match, muligt match, intet match og uafklaret grundlag er forskellige tilstande. Intet match udgør ikke en sikkerheds- eller NIS2-afgørelse.
 - Lokal opgave og afhængigheder beskrives manuelt. Ældre fritekst bevares særskilt; der udledes ingen autoritative koder fra den.

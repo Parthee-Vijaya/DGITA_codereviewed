@@ -43,7 +43,8 @@
       "existingPlanRefs": [
         "F03",
         "F06"
-      ]
+      ],
+      "delivered": "Integreret serversøgning på kode, titel, stikord og beskrivelse med rangering, pagination og bevarede valg. Stadig syntetisk afprøvning."
     },
     {
       "id": "K04",
@@ -62,7 +63,8 @@
       "acceptance": "Accepter brugsgrundlag; importér fuld fortegnelse/keywords, kildehash, versioner og ændringsreview.",
       "existingPlanRefs": [
         "F03"
-      ]
+      ],
+      "delivered": "Katalogkontrakt, validering, uforanderlig søgekilde og offline XML-klargøring med SHA-256. Ingen officielle records indlæst; aftale, kontrol af faktisk eksport og publicering afventer."
     },
     {
       "id": "K06",
