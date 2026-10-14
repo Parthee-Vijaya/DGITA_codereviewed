@@ -28,7 +28,7 @@
     "kle:prepare": "tsx scripts/kle-prepare.mts"
   },
   "dependencies": {
-    "@libsql/client": "0.17.4",
+    "@libsql/client": "0.18.0",
     "@vercel/blob": "2.8.0",
     "drizzle-orm": "0.45.3",
     "geist": "1.7.2",
