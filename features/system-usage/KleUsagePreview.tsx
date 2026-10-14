@@ -95,7 +95,7 @@ export function KleUsagePreview({ initialUsages }: { initialUsages: SystemUsage[
 
   return <main className={styles.page}>
     <Link href="/" className={styles.back} onClick={(event) => { if (!confirmNavigation()) event.preventDefault(); }}><ArrowLeft size={17} aria-hidden="true" /> Tilbage til D-GITA</Link>
-    <header className={styles.header}><p className={styles.eyebrow}>D-GITA · Lokal afprøvning</p><h1>Arbejdsopgaver og kritikalitet</h1><p>Beskriv arbejdsopgaven. KLE-emner og kritikalitet afklares i samarbejde med en D-GITA-konsulent. Brug kun opdigtede oplysninger i afprøvningen.</p></header>
+    <header className={styles.header}><p className={styles.eyebrow}>D-GITA · Lokal afprøvning</p><h1>Arbejdsopgaver og kritikalitet</h1><p>Beskriv arbejdsopgaven, og udfyld de oplysninger, du kender. Brug kun opdigtede oplysninger i afprøvningen.</p></header>
     <div className={styles.note}><strong>Afprøvning med eksempeldata</strong><p>Koder og opgavematch er syntetiske. Bekræftelsen gælder din registrering og er ikke en formel ejeraccept. Der overføres ingen oplysninger til KITOS eller SHIELD.</p></div>
     <section className={styles.form} aria-label="Systemanvendelse">
       <Question title="Dine eksempelregistreringer"><select className="clean-input" value={saved?.id ?? ""} disabled={disabled} onChange={(event) => {
