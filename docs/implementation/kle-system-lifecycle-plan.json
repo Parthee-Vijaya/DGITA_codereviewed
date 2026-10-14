@@ -44,7 +44,7 @@
         "F03",
         "F06"
       ],
-      "delivered": "Integreret serversøgning på kode, titel, stikord og beskrivelse med rangering, pagination og bevarede valg. Stadig syntetisk afprøvning."
+      "delivered": "Integreret serversøgning på kode, titel, stikord og beskrivelse med rangering, pagination og bevarede valg. Valgfri søgning ved ansøgningens spørgsmål 30 i lokal afprøvning; tidligere fritekst bevares. Stadig syntetisk."
     },
     {
       "id": "K04",
@@ -54,7 +54,8 @@
       "existingPlanRefs": [
         "F23",
         "R05"
-      ]
+      ],
+      "delivered": "Systemanvendelsens revisionshistorik er bevaret. Ansøgningens separate KLE-valg og kildeversion følger kladde, indsendt version, rettelsesforløb og kvittering. Ingen ejerfuldmagt eller delingsfunktion tilføjet."
     },
     {
       "id": "K05",

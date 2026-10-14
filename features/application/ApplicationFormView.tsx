@@ -31,6 +31,8 @@ import { DataCategoryFields } from "./DataCategoryFields";
 import { ProcurementFields } from "./ProcurementFields";
 import { normalizeProcurementChanges, personalDataCategoryLabels, contractValueStatusLabel, contractCoverageLabel, parseContractValue } from "./procurement";
 import { AiScreeningFields } from "./AiScreeningFields";
+import { KleApplicationField } from "../kle/KleApplicationField";
+import { applicationKleSummaryRows } from "./kle-selection";
 import { aiUsageLabel, hasAiScreeningDetails, normalizeAiScreeningChanges } from "./ai-screening";
 import {
   isAllowedPrivateBlobUrl,
@@ -124,6 +126,7 @@ type Props = {
   onToast: (message: string) => void;
   correctionCaseNumber?: string | null;
   draftCaseNumber?: string | null;
+  klePreviewEnabled?: boolean;
   guidance?: {
     intro?: string;
     catalog?: string;
@@ -138,6 +141,7 @@ export function ApplicationFormView({
   guidance,
   correctionCaseNumber = null,
   draftCaseNumber = null,
+  klePreviewEnabled = false,
 }: Props) {
   const [step, setStep] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -1021,7 +1025,9 @@ export function ApplicationFormView({
               <>
                 <Question title="28. Formålsbeskrivelse" hint="Hvorfor er anskaffelsen nødvendig? Beskriv effekt og resultater."><textarea className={cx("clean-input", errorFor("purpose") && "invalid")} rows={5} value={form.purpose} onChange={(event) => update("purpose", event.target.value)} /><FieldErrorText message={errorFor("purpose")} /></Question>
                 <Question title="29. Funktionsbeskrivelse" hint="Overvej først, om et eksisterende system allerede kan løse opgaven."><textarea className={cx("clean-input", errorFor("functionDescription") && "invalid")} rows={5} value={form.functionDescription} onChange={(event) => update("functionDescription", event.target.value)} /><FieldErrorText message={errorFor("functionDescription")} /></Question>
-                <Question title="30. Hvilke arbejdsprocesser understøttes?" hint="Angiv de KLE-emner, du kender, adskilt med komma. Er du i tvivl, kan du lade feltet stå åbent og få hjælp til resten på mødet med D-GITA-konsulenten."><input className="clean-input" value={form.kleTopics.join(", ")} onChange={(event) => update("kleTopics", splitList(event.target.value))} /></Question>
+                <Question title="30. Hvilke arbejdsprocesser understøttes?" hint={klePreviewEnabled ? "Udfyld det, du kan. Er du i tvivl om KLE-emnerne, kan du lade feltet stå åbent og få hjælp til resten på mødet med D-GITA-konsulenten." : "Angiv de KLE-emner, du kender, adskilt med komma. Er du i tvivl, kan du lade feltet stå åbent og få hjælp til resten på mødet med D-GITA-konsulenten."}>
+                  {klePreviewEnabled ? <KleApplicationField value={form.kleSelection} onChange={(value) => update("kleSelection", value)} legacyTopics={form.kleTopics} onLegacyTopicsChange={(value) => update("kleTopics", value)} /> : <input className="clean-input" value={form.kleTopics.join(", ")} onChange={(event) => update("kleTopics", splitList(event.target.value))} />}
+                </Question>
                 <Question title="31. Understøttes processen allerede af et eksisterende system?"><Choice value={form.existingProcessSystem} onChange={(value) => setYesNo("existingProcessSystem", value)} options={yesNoOptions} /></Question>
                 {isFieldVisible("existingProcessSystems", form) ? <Question title="31.1 Hvilke systemer understøtter processen i dag?"><textarea className={cx("clean-input", errorFor("existingProcessSystems") && "invalid")} rows={3} value={form.existingProcessSystems} onChange={(event) => update("existingProcessSystems", event.target.value)} /><FieldErrorText message={errorFor("existingProcessSystems")} /></Question> : null}
                 <Question title="32. Kan andre centre eller teams have gavn af funktionaliteten?"><Choice value={form.crossCutting} onChange={(value) => setYesNo("crossCutting", value)} options={yesNoOptions} /></Question>
@@ -1158,6 +1164,8 @@ function ReviewApplication({ form, error, onEdit, onConsent }: { form: Applicati
     ["Organisation", form.responsibleOrganization, 1],
     ["Anskaffelsesform", form.acquisitionMethod, 2],
     ...(form.acquisitionType === "tilkøb" ? [["Tilkøb til system", form.relatedSystem, 2] as [string, string, number]] : []),
+    ...(form.kleTopics.length ? [["KLE-oplysninger med egne ord", form.kleTopics.join(", "), 3] as [string, string, number]] : []),
+    ...applicationKleSummaryRows(form.kleSelection).map(([label, value]): [string, string, number] => [label, value, 3]),
     ["Persondata", form.personalData === "ja" ? `Ja · ${form.dataClassification}` : "Nej", 5],
     ...(form.personalData === "ja" ? [["Personoplysningskategorier", personalDataCategoryLabels(form.personalDataCategories).join(", ") || "Ikke besvaret", 5] as [string, string, number]] : []),
     ["AI i anskaffelsen", aiUsageLabel(form.aiUsage), 5],

@@ -173,6 +173,22 @@
       "necessity_acceptance": "U",
       "retention_decision": "U"
     },
+    "kle-selection": {
+      "fields": [
+        "kleSelection"
+      ],
+      "purpose": "Valgfri opgaveklassifikation af ansøgningen med sporbar kildeversion. Valgene følger kladde, indsendt version, sagsvisning og kvittering; de er ikke en faglig eller juridisk godkendelse.",
+      "category": "case-linked",
+      "source": "Brugerens valg i et lokalt syntetisk KLE-katalog; serveren kontrollerer miljø, kilde og emner før lagring. Officielle KL-data er ikke aktiveret.",
+      "storage": [
+        "portal_applications.draft_state_json",
+        "portal_application_versions.snapshot_json"
+      ],
+      "flow": "application",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    },
     "ai-screening": {
       "fields": [
         "aiUsage",
@@ -193,6 +209,7 @@
     }
   },
   "nested_structures": {
+    "kleSelection": "Valgfrit objekt eller null: schemaVersion=1, source med id/version/label/kind og højst 50 entries med uuid/code/title. Ingen kontaktpersoner eller fritekst i objektet. Katalogreferencerne er sagsknyttede. Historiske snapshots bevarer deres kildeversion og titler. Eksisterende kleTopics-fritekst gemmes separat og konverteres ikke automatisk til emner. Ingen eksterne KL-kald i den lokale afprøvning.",
     "selectedSystem": "Katalog: id, name, supplier, rightsHolder, source, usedInKalundborg, optional localSystemId/localStatus/kitosStatus. Identifikatorer og fritekst kan være personhenførbare i kontekst.",
     "attachments": "Fem dokumenttyper; id, kind, name, size, type, status, valgfri error. Server accepterer ikke browsermetadata som bevis for storage, ejer eller scan.",
     "internal_fields_json": "DgitaApproval med approved/date/legalBasis/responsible/hasAdditionalResponsible/additionalResponsible/itConsultant/infrastructureChanges/infrastructureDescription/notes/internalComments/phase; rammen legalBasis er ikke GDPR-hjemmel. Vurderingshistorik gemmer samme interne snapshot uden offentlig projektion. Ansvar gemmes desuden som responsibleUserId, additionalResponsibleUserIds og itConsultantUserId; navnefelterne er læsbare snapshots. Personopslag er kommuneafgrænset til aktive konsulenter/admins og giver ikke approver-mandat. Valgfrie privacyAssessment og procurementAssessment indeholder dokumentationsstatus, konkrete faglige begrundelser og dokumentreferencer. Privacy har processingBasis/controllerRelation/relationReason/dpaNeed/dpaReason/dpiaScreening/dpiaReason/reference; procurement har procedure/rationale/reference/ruleCheckedOn. Serveren tilføjer recordedBy (bruger-id), recordedByName, recordedAt og applicationVersionId ved indholdsændringer. Kun konsulent/admin kan se felterne; de kopieres ikke til brugerprojektion, CSV eller kvittering. Dokumenteret er ikke juridisk godkendt. Nye versioner arver ikke tidligere vurdering.",

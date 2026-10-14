@@ -56,6 +56,7 @@ import type { Actor } from "../features/auth/types";
 import { BrandLockup } from "../features/brand/BrandLockup";
 import { PartnerFooter } from "../features/brand/PartnerFooter";
 import { ApplicationFormView } from "../features/application/ApplicationFormView";
+import { applicationKleSummaryRows } from "../features/application/kle-selection";
 import { confirmNavigation, useUnsavedChanges } from "../features/application/use-unsaved-changes";
 import { labelQuestionControls, QuestionLabelContext } from "../features/application/QuestionContent";
 import { SegmentedChoice } from "../features/ui/SegmentedChoice";
@@ -190,7 +191,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
+export function PortalClient({ initialViewer, klePreviewEnabled = false }: { initialViewer: Actor; klePreviewEnabled?: boolean }) {
   const router = useRouter();
   const [viewer, setViewer] = useState<Actor>(initialViewer);
   const role = viewer.role;
@@ -507,6 +508,7 @@ export function PortalClient({ initialViewer }: { initialViewer: Actor }) {
             key={`${viewer.subject}:${correctionCaseNumber ?? draftCaseNumber ?? `new-${newFormKey}`}`}
             correctionCaseNumber={correctionCaseNumber}
             draftCaseNumber={draftCaseNumber}
+            klePreviewEnabled={klePreviewEnabled && viewer.provider === "dev"}
             onBack={() => {
               const caseNumber = correctionCaseNumber ?? draftCaseNumber;
               if (caseNumber) {
@@ -1422,7 +1424,7 @@ function applicationSnapshotSections(snapshot: ApplicationFormState) {
     { title: "Generelle oplysninger", rows: [{ label: "System", value: getDisplaySystemName(snapshot) }, ...(snapshot.replacesExisting === "ja" ? catalogRelationRows("System, der erstattes", snapshot.replacementSystem, snapshot.replacementCatalogRelation) : []), { label: "Kontaktperson", value: snapshot.contactPerson }, { label: "Afdeling", value: snapshot.department }, { label: "Forretningsområde", value: snapshot.businessType }] },
     { title: "Systemoplysninger", rows: [{ label: "Beskrivelse", value: snapshot.systemDescription }, { label: "Leverandør", value: snapshot.supplier }, { label: "Rettighedshaver", value: snapshot.rightsHolder }, { label: "Dataejer", value: snapshot.dataOwner }, { label: "Systemejer", value: snapshot.systemOwner }] },
     { title: "System og anskaffelsesform", rows: [{ label: "Anskaffelsesform", value: snapshot.acquisitionMethod }, { label: "Anskaffelsestype", value: snapshot.acquisitionType === "tilkøb" ? "Tilkøb" : "Nyanskaffelse" }, { label: "Markedsafdækning", value: yesNo(snapshot.marketResearch) }, { label: "Undersøgte systemer", value: snapshot.marketResearchSystems }, ...(snapshot.acquisitionType === "tilkøb" ? catalogRelationRows("System, tilkøbet vedrører", snapshot.relatedSystem, snapshot.relatedCatalogRelation) : [])] },
-    { title: "Værdi for kommunen", rows: [{ label: "Formål", value: snapshot.purpose }, { label: "Funktionalitet", value: snapshot.functionDescription }, { label: "KLE-emner", value: list(snapshot.kleTopics) }, { label: "Tværgående", value: yesNo(snapshot.crossCutting) }, { label: "Afdelinger", value: list(snapshot.crossDepartments) }] },
+    { title: "Værdi for kommunen", rows: [{ label: "Formål", value: snapshot.purpose }, { label: "Funktionalitet", value: snapshot.functionDescription }, { label: snapshot.kleSelection ? "KLE-oplysninger med egne ord" : "KLE-emner", value: list(snapshot.kleTopics) }, ...applicationKleSummaryRows(snapshot.kleSelection).map(([label, value]) => ({ label, value })), { label: "Tværgående", value: yesNo(snapshot.crossCutting) }, { label: "Afdelinger", value: list(snapshot.crossDepartments) }] },
     { title: "Investering", rows: [{ label: "Budget", value: yesNo(snapshot.hasBudget) }, { label: "Budgetbeløb for første år", value: `${snapshot.budgetAmount || "0"} kr.` }, { label: "Engangsomkostning", value: `${snapshot.oneTimeCost || "0"} kr.` }, { label: "Årlig omkostning", value: `${snapshot.yearlyCost || "0"} kr.` }, { label: "Forventede gevinster", value: snapshot.benefits }, ...procurementSummaryRows(snapshot).map(([label, value]) => ({ label, value }))] },
     { title: "Risikovurdering", rows: [{ label: "Risikovurdering udført", value: yesNo(snapshot.hasRiskAssessment) }, { label: "Behov for hjælp", value: yesNo(snapshot.needsRiskHelp) }, { label: "Personoplysninger", value: yesNo(snapshot.personalData) }, { label: "Dataklassifikation", value: snapshot.dataClassification }, { label: "Personoplysningskategorier", value: snapshot.personalData === "ja" ? personalDataCategoryLabels(snapshot.personalDataCategories).join(", ") || "Ikke besvaret" : "Ingen personoplysninger oplyst" }, { label: "AI-anvendelse", value: aiUsageLabel(snapshot.aiUsage) }, ...(hasAiScreeningDetails(snapshot.aiUsage) ? [{ label: "Formål med AI", value: snapshot.aiPurpose || "Ikke oplyst" }, { label: "Reference til AI-vurdering", value: isSafeAiAssessmentUrl(snapshot.aiAssessmentUrl) ? snapshot.aiAssessmentUrl.trim() : "Ingen gyldig reference angivet", href: isSafeAiAssessmentUrl(snapshot.aiAssessmentUrl) ? snapshot.aiAssessmentUrl.trim() : undefined }] : []), { label: "Bilag", value: files("risk-assessment") }] },
     { title: "Databehandleraftale", rows: [{ label: "Databehandleraftale", value: yesNo(snapshot.hasDpa) }, { label: "Kontrakt", value: yesNo(snapshot.hasContract) }, { label: "DPA-bilag", value: files("data-processing-agreement") }, { label: "Kontraktbilag", value: files("contract") }] },

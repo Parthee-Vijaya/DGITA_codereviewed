@@ -7,6 +7,7 @@ import { demoApplicationState } from "../features/application/engine.ts";
 import { createReceiptView } from "../features/receipt/view-model.ts";
 import { ReceiptDocument } from "../features/receipt/ReceiptDocument.tsx";
 import { renderTaggedReceiptPrototype } from "../features/receipt/tagged-pdf-prototype.ts";
+import { SYNTHETIC_KLE_CATALOG } from "../features/kle/synthetic.ts";
 
 function source() {
   return { case_number: "ITA-12345678", receipt_version_id: "version-immutable", receipt_version_number: 2,
@@ -37,6 +38,22 @@ test("HTML view binds case/version/decision, escapes markup and omits private/li
 test("nonfinal decisions are never presented as accepted receipt outcomes", () => {
   assert.throws(() => createReceiptView({ ...source(), dgita_status: "in_review" }, "final"), /not final/);
   assert.throws(() => createReceiptView({ ...source(), approval_status: null }, "approval"), /not final/);
+});
+
+test("receipt keeps the submitted KLE source and choices alongside the original free text", () => {
+  const row = source();
+  const state = JSON.parse(row.snapshot_json);
+  const { id, label, kind } = SYNTHETIC_KLE_CATALOG.source;
+  const { uuid, code } = SYNTHETIC_KLE_CATALOG.entries[1];
+  state.kleSelection = { schemaVersion: 1, source: { id, label, kind, version: "historical-version" }, entries: [{ uuid, code, title: "Titel fra den indsendte version" }] };
+  state.kleTopics = ["Oprindelig fritekst"];
+  row.snapshot_json = JSON.stringify(state);
+  const view = createReceiptView(row, "submission");
+  const rows = view.sections.flatMap((section) => section.rows);
+  assert.match(rows.find(([name]) => name === "KLE-kilde og version")[1], /historical-version/);
+  assert.equal(rows.find(([name]) => name === "Valgte KLE-emner")[1], `${code} – Titel fra den indsendte version`);
+  assert.equal(rows.find(([name]) => name === "KLE-oplysninger med egne ord")[1], "Oprindelig fritekst");
+  assert.equal(JSON.parse(row.snapshot_json).kleSelection.source.version, "historical-version");
 });
 
 test("tagged prototype has language, semantic order, complete MCID parent map and tagged login link", async () => {

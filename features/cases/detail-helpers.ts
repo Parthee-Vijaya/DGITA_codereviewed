@@ -1,6 +1,7 @@
 import { isCatalogRelation } from "../application/state-validation";
 import { isPersonalDataCategories, isContractValueStatus, isContractCoverage, PROCUREMENT_TEXT_LIMITS, normalizeProcurementChanges } from "../application/procurement";
 import { isAiUsage } from "../application/ai-screening";
+import { isApplicationKleSelection } from "../application/kle-selection";
 import type { CatalogRelation } from "../catalog/relations";
 import type {
   ApplicationFormState,
@@ -79,7 +80,7 @@ export function normalizeApplicationSnapshotJson(
   const base = baseState as unknown as Record<string, unknown>;
 
   for (const [key, baseValue] of Object.entries(base)) {
-    if (key === "attachments" || key === "selectedSystem" || key === "schemaVersion" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation") {
+    if (key === "attachments" || key === "selectedSystem" || key === "schemaVersion" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation" || key === "kleSelection") {
       continue;
     }
     const candidate = value[key];
@@ -95,6 +96,8 @@ export function normalizeApplicationSnapshotJson(
   // memory without inventing an id or rewriting any historical snapshot bytes.
   normalized.replacementCatalogRelation = normalizeCatalogRelation(value.replacementCatalogRelation);
   normalized.relatedCatalogRelation = normalizeCatalogRelation(value.relatedCatalogRelation);
+  if (value.kleSelection !== undefined && value.kleSelection !== null && !isApplicationKleSelection(value.kleSelection)) throw invalidSnapshot();
+  normalized.kleSelection = value.kleSelection === undefined || value.kleSelection === null ? null : structuredClone(value.kleSelection);
   // Missing legacy screening stays unanswered in this read projection. Never
   // infer No or write this default back into immutable historical versions.
   normalized.aiUsage = isAiUsage(value.aiUsage) ? value.aiUsage : "";
@@ -252,7 +255,7 @@ function neutralApplicationState(baseState: ApplicationFormState) {
       neutral[key] = "dgita-v1";
     } else if (key === "attachments") {
       neutral[key] = emptyAttachments();
-    } else if (key === "selectedSystem" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation") {
+    } else if (key === "selectedSystem" || key === "replacementCatalogRelation" || key === "relatedCatalogRelation" || key === "kleSelection") {
       neutral[key] = null;
     } else if (key === "acquisitionType") {
       neutral[key] = "nyanskaffelse";

@@ -1,0 +1,30 @@
+.field {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.search {
+  margin-top: 8px;
+}
+
+.selection {
+  max-width: 100%;
+  text-align: left;
+}
+
+.selection > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.selection > svg {
+  flex: 0 0 auto;
+}

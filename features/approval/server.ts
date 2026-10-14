@@ -5,6 +5,7 @@ import { assertAttachmentScanAllowed } from "../application/malware-scan";
 import { getPersistenceBindings } from "../../db/persistence";
 import type { ServerActor } from "../auth/types";
 import type { ApplicationFormState } from "../application/engine";
+import { applicationKleSummaryRows, isApplicationKleSelection } from "../application/kle-selection";
 import { preparePortalData, resolveActorUserId } from "../workspace/server-repository";
 import {
   APPROVAL_TOKEN_PLACEHOLDER,
@@ -891,7 +892,8 @@ function approvalDetails(state: ApplicationFormState) {
       ["Type", state.acquisitionType],
       ["Formål", state.purpose],
       ["Funktion", state.functionDescription],
-      ["KLE-emner", state.kleTopics],
+      [state.kleSelection ? "KLE-oplysninger med egne ord" : "KLE-emner", state.kleTopics],
+      ...applicationKleSummaryRows(state.kleSelection),
       ["Eksisterende proces-systemer", state.existingProcessSystems],
       ["Tværgående funktionalitet", state.crossFunctionality],
       ["Berørte enheder", state.crossDepartments],
@@ -972,6 +974,7 @@ function parseSnapshot(value: string) {
   try {
     const state = JSON.parse(value) as ApplicationFormState;
     if (state.schemaVersion !== "dgita-v1") throw new Error("schema");
+    if (state.kleSelection !== undefined && state.kleSelection !== null && !isApplicationKleSelection(state.kleSelection)) throw new Error("kle-selection");
     return state;
   } catch {
     throw new ApprovalWorkflowError(422, "SNAPSHOT_INVALID", "Den indsendte version kan ikke læses.");

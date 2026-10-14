@@ -2,6 +2,7 @@ import type { ApplicationFormState } from "../application/engine";
 import { personalDataCategoryLabels } from "../application/procurement";
 import { procurementSummaryRows } from "../cases/procurement-summary";
 import { aiUsageLabel, hasAiScreeningDetails, isSafeAiAssessmentUrl } from "../application/ai-screening";
+import { applicationKleSummaryRows } from "../application/kle-selection";
 
 export function receiptSections(state: ApplicationFormState) {
   return [
@@ -26,6 +27,8 @@ export function receiptSections(state: ApplicationFormState) {
         ["Anskaffelsestype", state.acquisitionType === "tilkøb" ? "Tilkøb" : "Nyanskaffelse"],
         ["Formål", state.purpose],
         ["Funktionalitet", state.functionDescription],
+        [state.kleSelection ? "KLE-oplysninger med egne ord" : "KLE-emner", state.kleTopics.join(", ")],
+        ...applicationKleSummaryRows(state.kleSelection),
         ["Tværgående", yesNo(state.crossCutting)],
         ["Berørte enheder", state.crossDepartments.join(", ")],
         ["Gevinster", state.benefits],

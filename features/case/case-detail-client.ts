@@ -4,6 +4,7 @@ import type {
   SelectedCatalogSystem,
   UploadKind,
 } from "../application/engine";
+import { isApplicationKleSelection } from "../application/kle-selection";
 
 export type CaseDetailStatus =
   | "draft"
@@ -184,6 +185,7 @@ const uploadKinds = [
 
 function isApplicationFormState(value: unknown): value is ApplicationFormState {
   if (!isRecord(value) || value.schemaVersion !== "dgita-v1") return false;
+  if (value.kleSelection !== undefined && value.kleSelection !== null && !isApplicationKleSelection(value.kleSelection)) return false;
   if (
     typeof value.manualCatalogEntry !== "boolean" ||
     typeof value.consent !== "boolean" ||
