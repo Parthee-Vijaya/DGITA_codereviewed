@@ -30,5 +30,9 @@
   {
     "id": "0007_dgita_review_history",
     "checksum": "5950125c838f524e562314fd29505e849e87d35f9a0f98340d7cc21cd19aca29"
+  },
+  {
+    "id": "0008_system_usage_reviews",
+    "checksum": "339c965fcc0054c2d97c81f0e0651a538238de161f25e15388ba70b93b76316c"
   }
 ]

@@ -1,3 +1,4 @@
+import { systemUsageSchemaStatements } from "./system-usage-schema";
 import type {
   ApplicationFormState,
   AttachmentDraft,
@@ -580,6 +581,7 @@ export const portalSchemaStatements = [
         ))
     )
     BEGIN SELECT RAISE(ABORT, 'review history must match the current case revision and tenant'); END`,
+  ...systemUsageSchemaStatements,
 ] as const;
 
 let legacySchemaPromise: Promise<void> | null = null;

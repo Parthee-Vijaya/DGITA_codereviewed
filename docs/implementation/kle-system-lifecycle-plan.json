@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "updatedOn": "2026-10-14",
+  "branch": "feat/kle-system-lifecycle",
+  "goal": "Kommunen kan holde systemanvendelser, arbejdsopgaver, lokal kritikalitet og ejerbekræftelser ajour på et versionsbundet kildegrundlag uden at ændre eksisterende anskaffelsesoplevelse eller overskrive andres KITOS-oplysninger.",
+  "sourceDocument": {
+    "name": "DGITA_Plan_KLE_NIS2_KITOS_2026-10-14.docx",
+    "sha256": "35173812c516623e2c93fa630cb24039e5ce090280f78f96d6620984dff9223c",
+    "modified": false
+  },
+  "boundaries": {
+    "mainChanged": false,
+    "productionAccepted": false,
+    "liveKitosWrites": false,
+    "realKleDataImported": false,
+    "formalOwnerAcceptanceEnabled": false,
+    "automaticScoreIncrease": false
+  },
+  "tasks": [
+    {
+      "id": "K01",
+      "title": "Saml seneste rettelser på isoleret branch",
+      "status": "implemented",
+      "acceptance": "Bevar tidligere etaper og main-rettelser; ingen merge til main.",
+      "existingPlanRefs": [
+        "F01"
+      ]
+    },
+    {
+      "id": "K02",
+      "title": "Adskil systemanvendelse fra anskaffelsessag",
+      "status": "prototype",
+      "acceptance": "Selvstændigt register med intern identitet; KITOS-binding og flere sagsrelationer følger senere.",
+      "existingPlanRefs": [
+        "F03"
+      ]
+    },
+    {
+      "id": "K03",
+      "title": "Manuelt KLE-valg og deterministisk opgavematch",
+      "status": "prototype",
+      "acceptance": "Syntetisk søgning/multivalg, gruppe/udgået kode, flere match og lokal opgave; ingen automatisk juridisk afgørelse.",
+      "existingPlanRefs": [
+        "F03",
+        "F06"
+      ]
+    },
+    {
+      "id": "K04",
+      "title": "Versionshistorik og registrantbekræftelse",
+      "status": "prototype",
+      "acceptance": "Serveridentitet, inputbinding, CAS, atomisk historik og idempotent oprettelse; ingen ejerfuldmagt.",
+      "existingPlanRefs": [
+        "F23",
+        "R05"
+      ]
+    },
+    {
+      "id": "K05",
+      "title": "KLE-licens og kontrolleret import",
+      "status": "requires_source_acceptance",
+      "acceptance": "Accepter brugsgrundlag; importér fuld fortegnelse/keywords, kildehash, versioner og ændringsreview.",
+      "existingPlanRefs": [
+        "F03"
+      ]
+    },
+    {
+      "id": "K06",
+      "title": "KL-grundlag og henvisninger",
+      "status": "requires_source_acceptance",
+      "acceptance": "Godkend kilde, PDF-sidehenvisninger og kontrolleret konvertering samt fagligt review.",
+      "existingPlanRefs": [
+        "F05",
+        "F06"
+      ]
+    },
+    {
+      "id": "K07",
+      "title": "KITOS-identitet og feltmapping",
+      "status": "planned",
+      "acceptance": "Verificér organisation/anvendelse-UUID; lokale KLE-tilføjelser minus fravalg og eksisterende kritikalitetsfelter.",
+      "existingPlanRefs": [
+        "F03"
+      ]
+    },
+    {
+      "id": "K08",
+      "title": "Ejer, stedfortræder og koordinator",
+      "status": "requires_municipal_decision",
+      "acceptance": "Stabile identiteter, gyldighed og mandat; ingen automatisk fuldmagt ud fra sagsansøger eller navn.",
+      "existingPlanRefs": [
+        "F02",
+        "F23",
+        "R05"
+      ]
+    },
+    {
+      "id": "K09",
+      "title": "Manuel pilot på 10–15 anvendelser",
+      "status": "planned",
+      "acceptance": "Medtag fælles login/integrationer, flere indkøb pr. anvendelse og manglende ejer; mål oversete opgaver og tidsforbrug.",
+      "existingPlanRefs": [
+        "F03",
+        "F06"
+      ]
+    },
+    {
+      "id": "K10",
+      "title": "Årscyklus og ejeropfølgning",
+      "status": "planned",
+      "acceptance": "Perioder, frister, gentagelsessikre jobs, ejerskifte og eskalation; tavshed må aldrig bekræfte.",
+      "existingPlanRefs": [
+        "F23",
+        "R11",
+        "R12"
+      ]
+    },
+    {
+      "id": "K11",
+      "title": "Kravprofiler og dokumentationsstatus",
+      "status": "requires_municipal_decision",
+      "acceptance": "Grundkrav plus lokal risiko, scope/periode/status/afvigelsesmandat; certifikat er ikke godkendelse.",
+      "existingPlanRefs": [
+        "F05",
+        "F15"
+      ]
+    },
+    {
+      "id": "K12",
+      "title": "Versionsbundne SHIELD-pakker",
+      "status": "planned",
+      "acceptance": "Eksport/import med SHA-256, anvendelses-/sagsversion, forældelsesstatus og genforsøg; SHIELD ejer analyse, DGITA lokal beslutning.",
+      "existingPlanRefs": [
+        "F06"
+      ]
+    },
+    {
+      "id": "K13",
+      "title": "Målte AI-forslag og JEV-kontrol",
+      "status": "planned",
+      "acceptance": "Menneskeligt mærket facit, måling af oversete relevante opgaver, kildebevis og manuel reservevej.",
+      "existingPlanRefs": [
+        "F06"
+      ]
+    },
+    {
+      "id": "K14",
+      "title": "Kontrolleret KITOS-skrivning",
+      "status": "requires_integration_evidence",
+      "acceptance": "Ændringsliste først; verificér delvise felter, samtidighed, konflikter, retries og readback før automatisk skrivning.",
+      "existingPlanRefs": [
+        "F03",
+        "R29"
+      ]
+    },
+    {
+      "id": "K15",
+      "title": "Bevaring, adgang og miljøaccept",
+      "status": "requires_municipal_decision",
+      "acceptance": "Fastlæg sletning/bevaring, dokumentation af rettigheder, drift, backup og integrationer før rigtige data.",
+      "existingPlanRefs": [
+        "R25",
+        "R26",
+        "R29"
+      ]
+    }
+  ]
+}

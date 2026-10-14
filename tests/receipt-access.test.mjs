@@ -122,6 +122,8 @@ test("a final PDF cannot be generated for a rejected historical version after it
   const corrected = { ...correction.state, manualSystemName: "Rettet syntetisk system" };
   const saved = await saveApplicationDraft(owner, submitted.id, corrected, correction.rowVersion);
   await submitApplication(owner, submitted.id, corrected, saved.rowVersion);
+  const correctedRequest = await createLeaderApprovalRequest(consultant, submitted.caseNumber, "https://portal.example.invalid");
+  await decideLeaderApproval(await approvalTokenForRequest(correctedRequest.id), { decision: "approved", comment: "Godkendt rettet version" });
   const approval = (await getWorkspaceForActor(consultant)).approvals[submitted.caseNumber];
   await saveApprovalForActor(consultant, submitted.caseNumber, {
     ...approval, phase: "Afsluttet", approved: "Ja", notes: "Version 2 er afsluttet",

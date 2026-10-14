@@ -10,7 +10,7 @@ export default defineConfig({
   timeout: 45_000,
   workers: 1,
   retries: 0,
-  outputDir: "work/ci/a11y/browser",
-  reporter: [["list"], ["json", { outputFile: "work/ci/a11y/browser-results.json" }]],
+  outputDir: process.env.DGITA_E2E_KLE_PREVIEW === "true" ? "work/ci/kle-preview/browser" : "work/ci/a11y/browser",
+  reporter: [["list"], ["json", { outputFile: process.env.DGITA_E2E_KLE_PREVIEW === "true" ? "work/ci/kle-preview/browser-results.json" : "work/ci/a11y/browser-results.json" }]],
   use: { baseURL, timezoneId: "Europe/Copenhagen", browserName: "chromium", viewport: { width: 1280, height: 900 }, trace: "off", screenshot: "off", video: "off" },
 });

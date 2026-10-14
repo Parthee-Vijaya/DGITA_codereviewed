@@ -1,5 +1,9 @@
 # Værktøjsgæld, kontrolleret 9. oktober 2026
 
+## Lokal skrifttypehåndtering · observeret 14. oktober 2026
+
+Vinexts udviklingsshim til `next/font/local` sender Geists relative filsti videre som en browser-URL. De pågældende fontfiler ligger ikke under `public`, så både den eksisterende forside og den nye indlejrede KLE-rute anvender fallbackskrifttypen i Worker-preview. Det er reproduceret lokalt; den nye KLE-leverance ændrer ikke globale skrifttyper eller navigation. Næste font-/værktøjsopgradering skal verificere fontindlæsning både på rod- og underruter, samt sammenligne med den normale Next-runtime.
+
 ## Sikkerhedsrettelser 9. oktober 2026
 
 En ny audit viste 13 high-fund i det samlede træ og 2 high-fund blandt produktionsafhængighederne. De to nye advisories vedrørte `sharp@0.35.4` og `source-map-js@1.2.1`, som også nås via Next. De er rettet med præcise patch-overrides: `sharp@0.35.4 → 0.35.5` og `source-map-js@1.2.1 → 1.2.2`. Sharp-patchen opdaterer tilhørende native pakker og libvips. Ingen direkte framework-, React-, Node- eller majorversion er ændret.

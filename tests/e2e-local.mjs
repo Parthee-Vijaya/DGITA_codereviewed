@@ -88,6 +88,12 @@ async function main() {
   const user = await login("user");
   const consultant = await login("consultant");
   const admin = await login("admin");
+  if (process.env.DGITA_ENABLE_KLE_PREVIEW !== "true") {
+    const klePreview = await admin.json("/api/system-usages");
+    expectStatus(klePreview.response.status, 404, "KLE-afprøvning er lukket i almindelig pilot", klePreview.payload);
+    const kleWrite = await admin.json("/api/system-usages", { method: "POST", body: {} });
+    expectStatus(kleWrite.response.status, 404, "KLE-skrivning er lukket i almindelig pilot", kleWrite.payload);
+  }
   if (providerFixtures) {
     assert.match(process.env.TURSO_DATABASE_URL || "", /^file:\/.*\/dgita-ci-next-e2e-[^/]+\/synthetic\.sqlite$/u);
     const { createClient } = await import("@libsql/client");

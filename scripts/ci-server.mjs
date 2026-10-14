@@ -12,9 +12,9 @@ import { readSourceState, requireCleanSource, requireUnchangedSource, sourceEvid
 import { startProviderFixtures } from "../tests/runtime/provider-server.mjs";
 
 const mode = process.argv[2];
-if (!["e2e", "a11y", "next-e2e", "production"].includes(mode)) throw new Error("Usage: node scripts/ci-server.mjs e2e|a11y|next-e2e|production");
+if (!["e2e", "a11y", "kle-preview", "next-e2e", "production"].includes(mode)) throw new Error("Usage: node scripts/ci-server.mjs e2e|a11y|kle-preview|next-e2e|production");
 const workflowTest = mode !== "production";
-const workerRuntime = mode === "e2e" || mode === "a11y";
+const workerRuntime = mode === "e2e" || mode === "a11y" || mode === "kle-preview";
 const project = resolve(import.meta.dirname, "..");
 const output = join(project, "work", "ci", mode);
 const temporary = await mkdtemp(join(tmpdir(), `dgita-ci-${mode}-`));
@@ -101,7 +101,9 @@ try {
     NEXT_PUBLIC_SITE_URL: origin,
     DGITA_E2E_BASE_URL: origin,
     DGITA_ENABLE_DEV_LOGIN: workflowTest ? "true" : "false",
-    DGITA_ENVIRONMENT: workflowTest ? "pilot" : "production",
+    DGITA_ENVIRONMENT: mode === "kle-preview" ? "local" : workflowTest ? "pilot" : "production",
+    DGITA_ENABLE_KLE_PREVIEW: mode === "kle-preview" ? "true" : "false",
+    DGITA_E2E_KLE_PREVIEW: mode === "kle-preview" ? "true" : "false",
     DGITA_APPROVAL_TOKEN_SECRET: randomBytes(32).toString("hex"),
   };
   if (mode === "next-e2e") {
@@ -121,7 +123,7 @@ try {
     });
   }
   if (workerRuntime) {
-    const workerKeys = ["DGITA_ENVIRONMENT", "DGITA_ENABLE_DEV_LOGIN", "DGITA_APPROVAL_TOKEN_SECRET", "DGITA_APP_ORIGIN", "NEXT_PUBLIC_SITE_URL"];
+    const workerKeys = ["DGITA_ENVIRONMENT", "DGITA_ENABLE_DEV_LOGIN", "DGITA_ENABLE_KLE_PREVIEW", "DGITA_APPROVAL_TOKEN_SECRET", "DGITA_APP_ORIGIN", "NEXT_PUBLIC_SITE_URL"];
     await writeFile(join(workspace, ".dev.vars"), workerKeys.map((key) => `${key}=${JSON.stringify(environment[key])}`).join("\n") + "\n", { mode: 0o600 });
   }
   function launch(command, args, log) {
@@ -152,13 +154,13 @@ try {
   assert.ok(ready, `Server readiness timed out; inspect work/ci/${mode}/server.log`);
   if (workflowTest) {
     testLog = createWriteStream(join(output, "tests.log"));
-    const tests = launch("npm", mode === "a11y" ? ["exec", "--", "playwright", "test"] : ["run", "test:e2e"], testLog);
+    const tests = launch("npm", mode === "kle-preview" ? ["exec", "--", "playwright", "test", "kle-preview.spec.ts"] : mode === "a11y" ? ["exec", "--", "playwright", "test"] : ["run", "test:e2e"], testLog);
     const result = await new Promise((done) => {
       const timeout = setTimeout(() => { stopProcess(tests); done({ timeout: true }); }, 240_000);
       tests.once("error", (error) => { clearTimeout(timeout); done({ error }); });
       tests.once("exit", (code, signal) => { clearTimeout(timeout); done({ code, signal }); });
     });
-    if (mode === "a11y") await cp(join(workspace, "work", "ci", "a11y"), output, { recursive: true }).catch(() => undefined);
+    if (mode === "a11y" || mode === "kle-preview") await cp(join(workspace, "work", "ci", mode), output, { recursive: true }).catch(() => undefined);
     assert.equal(result.code, 0, `E2E failed (${JSON.stringify(result)}); inspect work/ci/${mode}/tests.log`);
     if (providers) {
       const report = providers.evidence;
@@ -184,6 +186,10 @@ try {
     const cases = await request("/api/cases");
     assert.equal(cases.status, 401);
     assert.match(cases.headers.get("cache-control") || "", /no-store/u);
+    const klePreview = await request("/api/system-usages");
+    assert.equal(klePreview.status, 404, "Synthetic KLE preview must remain unavailable in production.");
+    const klePreviewWrite = await request("/api/system-usages", { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(klePreviewWrite.status, 404);
     const devLogin = await request("/api/auth/dev-login", {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: origin },

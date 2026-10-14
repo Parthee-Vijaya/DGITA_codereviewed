@@ -19,6 +19,7 @@
     "start:next": "next start",
     "test:ci:e2e": "node scripts/ci-server.mjs e2e",
     "test:ci:a11y": "node scripts/ci-server.mjs a11y",
+    "test:ci:kle-preview": "node scripts/ci-server.mjs kle-preview",
     "test:ci:next-e2e": "node scripts/ci-server.mjs next-e2e",
     "test:ci:production": "node scripts/ci-server.mjs production",
     "db:migrate": "node scripts/migrate.mjs",

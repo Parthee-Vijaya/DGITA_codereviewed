@@ -44,6 +44,8 @@ Se [formular og kontraktværdi](procurement-information.md), [vurderingsmodel](c
 
 ## Næste leverance
 
+Feedbackplanen fra 14. oktober er påbegyndt på den særskilte branch `feat/kle-system-lifecycle`. Se [KLE, kritikalitet og systemanvendelse](kle-system-lifecycle.md) og den [strukturerede fortsættelsesplan](kle-system-lifecycle-plan.json). Første levering er en lokal, syntetisk afprøvning med eget register og versionshistorik. Officielle kilder, ejerfuldmagt, årscyklus, AI/SHIELD og KITOS-skrivning er særskilte efterfølgende leveringer.
+
 Indhent faglig accept af F13 og det autoritative F05-kravgrundlag før F15 kan accepteres. F14 kræver fortsat gældende tærskler med gyldighed, kommunal indkøbspolitik og en godkendt overdragelse til indkøbsfunktionen. F23-procesvalget og den resterende person-/organisationskilde under F02 skal fortsat afklares. Udbyg konkrete delresultater i parallelle pakker; en hel pakke skal ikke være færdig, før en anden starter.
 
 B01–B08 i den godkendte gennemførelsesplan er anbefalinger, ikke allerede vedtagne kommunale regler. Fastlæg især platform/identitet, egne sager, ledermandat, genindsendelsesregler, juridiske krav, journal og bevaring før berørte produktionsregler aktiveres. AI-analyse forbliver en særskilt leverance med målt kvalitet og menneskelig beslutning. Navngiv menneskelige ejere og uafhængig frigiver før kalender og driftsaccept fastlåses.

@@ -16,6 +16,8 @@ Fjerde etape ligger på `feat/privacy-and-procurement-assessments` oven på den 
 
 ## Status og kildeorden
 
+KLE-/NIS2-/KITOS-feedbackplanen fra 14. oktober er påbegyndt i et separat checkout på `feat/kle-system-lifecycle`. Branchen samler fjerde etape og main-rettelser til og med `3c41099`; main og de tidligere branches er ikke ændret. Lokal afprøvning findes på `/afproevning/kle` med syntetiske data, egne systemanvendelser og uforanderlig historik via migration 0008. Se `docs/implementation/kle-system-lifecycle.md` og den tilhørende JSON-plan. Den oprindelige anskaffelsesformular og navigation er bevaret. KLE-brugsgrundlag og F23-mandater kræver fortsat accept før rigtige kilder eller formel ejeraccept aktiveres.
+
 Læs README.md, docs/candidate-readiness.md, docs/governance/control-register.json, docs/municipal-acceptance.md, docs/production-operations.md og docs/ci-cd.md. Verificér altid aktuel Git-SHA, git status, seneste GitHub Quality gates og CodeQL-alerts. Rapporter fra 5. oktober 2026 er dateret evidens, ikke fremtidig driftsgaranti.
 
 Testlogin bevares lokalt/pilot; produktion afviser testidentiteter og automatisk demo-seed. Produktion kræver eksplicit migration og korrekt checksum-ledger, Entra, separat DB/privat Blob, scanner og mailopsætning. Den eksisterende onlinepilot er ikke deployet eller ændret af klargøringen.

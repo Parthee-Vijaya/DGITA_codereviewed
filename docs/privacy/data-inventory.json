@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "reviewed_at": "2026-10-09",
+  "reviewed_at": "2026-10-14",
   "status": "Teknisk feltfortegnelse; kommunal nødvendighed/hjemmel/retention/accept U",
   "scope": "Applikationsformularens topniveau og deklarerede DB-kolonner; JSON-understruktur beskrevet særskilt. Ingen inspektion af live persondata.",
   "decision_legend": {
@@ -873,6 +873,58 @@
       },
       "ordinary_log": "forbidden",
       "retention_decision": "U"
+    },
+    {
+      "table": "portal_system_usages",
+      "purpose": "Personlig syntetisk systemanvendelse i lokal afprøvning; særskilt fra anskaffelser og uden ejerfuldmagt.",
+      "flow": "system-usage-preview",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "source",
+          "kitos_org_uuid",
+          "kitos_usage_uuid",
+          "row_version",
+          "created_at",
+          "updated_at"
+        ],
+        "direct-or-linked-personal": [
+          "recorded_by_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "name",
+          "review_json"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U"
+    },
+    {
+      "table": "portal_system_usage_revisions",
+      "purpose": "Uforanderlige versioner af lokal KLE-registrering og registrantbekræftelse, med serverbestemt tidspunkt og identitet.",
+      "flow": "system-usage-preview",
+      "columns_by_category": {
+        "linked-operational-metadata": [
+          "id",
+          "tenant_id",
+          "usage_id",
+          "row_version",
+          "event_type",
+          "created_at"
+        ],
+        "direct-or-linked-personal": [
+          "recorded_by_user_id"
+        ],
+        "unstructured-potential-personal": [
+          "name",
+          "review_json"
+        ]
+      },
+      "ordinary_log": "forbidden",
+      "retention_decision": "U",
+      "necessity_acceptance": "U"
     }
   ],
   "flows": {
@@ -1087,6 +1139,23 @@
       "code": [
         "db/schema.ts"
       ]
+    },
+    "system-usage-preview": {
+      "path": [
+        "Lokal testbruger med syntetiske oplysninger",
+        "Loopback/miljø/Origin/adgang og bounded validering",
+        "Personligt tenantafgrænset register og atomisk append-only historik",
+        "Samme registrants visning og bekræftelse"
+      ],
+      "external": [
+        "Ingen ekstern KLE-, KITOS-, SHIELD- eller AI-integration. Rigtige oplysninger og formelle mandater er ikke aktiveret. Bevaring og autoriseret sletning afventer accept."
+      ],
+      "code": [
+        "features/system-usage/preview-policy.ts",
+        "features/system-usage/repository.ts",
+        "features/kle/domain.ts",
+        "app/api/system-usages/route.ts"
+      ]
     }
   },
   "operational_logging": {
@@ -1122,5 +1191,26 @@
     "Journal-/arkivansvarlig beslutter bevaring/kassation, legal hold og eksterne kopier.",
     "Drift afprøver platformlogredigering, logadgang/retention samt scanner-/mail-/storageaftaler.",
     "Tekniske token/lease-udløb er ikke vedtagne generelle slettefrister. Ingen fysisk sletning aktiveres af dette register."
-  ]
+  ],
+  "json_structures": {
+    "system_usage_review": {
+      "fields": [
+        "schemaVersion",
+        "selectedCodes.uuid",
+        "selectedCodes.code",
+        "localTaskDescription",
+        "legacyTopics",
+        "localAssessment.level",
+        "localAssessment.rationale",
+        "localAssessment.inputBinding",
+        "confirmation.inputBinding",
+        "confirmation.confirmedBy",
+        "confirmation.confirmedAt"
+      ],
+      "purpose": "Versionsbundet lokal registrering; binding indeholder også kilde-ID/version og matchsnapshot. Bekræftelse er ikke ejerfuldmagt.",
+      "ordinary_log": "forbidden",
+      "necessity_acceptance": "U",
+      "retention_decision": "U"
+    }
+  }
 }

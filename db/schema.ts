@@ -19,6 +19,42 @@ const updatedAt = () =>
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`);
 
+// A system usage outlives individual procurement cases. The first delivery is
+// deliberately restricted to synthetic records; registrants are not owners.
+export const portalSystemUsages = sqliteTable("portal_system_usages", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => portalTenants.id, { onDelete: "restrict" }),
+  recordedByUserId: text("recorded_by_user_id").notNull().references(() => portalUsers.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  source: text("source", { enum: ["synthetic"] }).notNull().default("synthetic"),
+  kitosOrgUuid: text("kitos_org_uuid"),
+  kitosUsageUuid: text("kitos_usage_uuid"),
+  rowVersion: integer("row_version").notNull().default(1),
+  reviewJson: text("review_json").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  check("portal_system_usages_synthetic", sql`${table.source} = 'synthetic' AND ${table.kitosOrgUuid} IS NULL AND ${table.kitosUsageUuid} IS NULL`),
+  check("portal_system_usages_revision", sql`${table.rowVersion} >= 1`),
+  index("portal_system_usages_registrant_idx").on(table.tenantId, table.recordedByUserId, table.updatedAt),
+  uniqueIndex("portal_system_usages_kitos_uidx").on(table.tenantId, table.kitosOrgUuid, table.kitosUsageUuid),
+]);
+
+export const portalSystemUsageRevisions = sqliteTable("portal_system_usage_revisions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => portalTenants.id, { onDelete: "restrict" }),
+  usageId: text("usage_id").notNull().references(() => portalSystemUsages.id, { onDelete: "restrict" }),
+  rowVersion: integer("row_version").notNull(),
+  recordedByUserId: text("recorded_by_user_id").notNull().references(() => portalUsers.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  reviewJson: text("review_json").notNull(),
+  eventType: text("event_type", { enum: ["saved", "confirmed"] }).notNull(),
+  createdAt: createdAt(),
+}, (table) => [
+  check("portal_system_usage_revisions_event", sql`${table.eventType} IN ('saved', 'confirmed')`),
+  uniqueIndex("portal_system_usage_revisions_usage_uidx").on(table.tenantId, table.usageId, table.rowVersion),
+]);
+
 export const portalEnvironment = sqliteTable("portal_environment", {
   id: integer("id").primaryKey(),
   purpose: text("purpose", { enum: ["test", "production"] }).notNull(),
