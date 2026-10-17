@@ -1,0 +1,160 @@
+{
+  "verifiedAt": "2026-10-17",
+  "sourceSha": "935d9e2d240a93e9e8d1b8a914161903f29e73f6",
+  "sourceBranch": "preview/vercel-2026-10-17",
+  "featurePr": 36,
+  "mainSha": "3c41099c613f4bcc08d0cbe6b22b30d7c39f7f39",
+  "deployment": {
+    "id": "dpl_9cC4nD49AoGC2MEKCnizrvCXvC78",
+    "projectId": "prj_BytzGz8xHr2OfKXPfJTRCJfPTnys",
+    "alias": "https://dgita-feature-preview.vercel.app",
+    "immutableUrl": "https://dgita-feature-preview-76s8yxpht-parthee-vijayas-projects.vercel.app",
+    "readyState": "READY",
+    "apiTarget": null,
+    "environment": "preview",
+    "region": "dub1",
+    "buildPlatform": "Vercel Linux",
+    "protection": "Vercel Authentication on all deployments",
+    "gitConnected": false
+  },
+  "localChecks": {
+    "unitTestsPassed": 539,
+    "kleBrowserTestsPassed": 12,
+    "lint": "passed",
+    "types": "passed",
+    "codeHealth": "passed",
+    "productionGuardRuntime": "passed",
+    "productionDependencyFindings": 0,
+    "appAcceptedDevNodes": 9,
+    "deploymentToolsAcceptedDevNodes": 21,
+    "auditExceptionExpiry": "2026-11-04"
+  },
+  "cloudChecks": [
+    {
+      "origin": "https://dgita-feature-preview.vercel.app",
+      "startedAt": "2026-10-17T11:31:26.312Z",
+      "finishedAt": "2026-10-17T11:31:37.060Z",
+      "passed": true,
+      "checks": [
+        {
+          "name": "deployment remains protected without trusted access",
+          "passed": true
+        },
+        {
+          "name": "health and database readiness",
+          "passed": true
+        },
+        {
+          "name": "app authentication and origin rejection",
+          "passed": true
+        },
+        {
+          "name": "user: login, session, workspace and browser",
+          "passed": true
+        },
+        {
+          "name": "consultant: login, session, workspace and browser",
+          "passed": true
+        },
+        {
+          "name": "admin: login, session, workspace and browser",
+          "passed": true
+        },
+        {
+          "name": "KLE authenticated search uses synthetic source",
+          "passed": true
+        },
+        {
+          "name": "KLE create, save and persisted reread",
+          "passed": true
+        },
+        {
+          "name": "create synthetic application draft and show question 30",
+          "passed": true
+        },
+        {
+          "name": "real private Blob upload from browser and verified download",
+          "passed": true
+        },
+        {
+          "name": "no browser application errors",
+          "passed": true
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "origin": "https://dgita-feature-preview.vercel.app",
+      "startedAt": "2026-10-17T11:32:33.905Z",
+      "finishedAt": "2026-10-17T11:32:39.691Z",
+      "passed": true,
+      "checks": [
+        {
+          "name": "deployment remains protected without trusted access",
+          "passed": true
+        },
+        {
+          "name": "health and database readiness",
+          "passed": true
+        },
+        {
+          "name": "app authentication and origin rejection",
+          "passed": true
+        },
+        {
+          "name": "user: login, session, workspace and browser",
+          "passed": true
+        },
+        {
+          "name": "consultant: login, session, workspace and browser",
+          "passed": true
+        },
+        {
+          "name": "admin: login, session, workspace and browser",
+          "passed": true
+        },
+        {
+          "name": "no browser application errors",
+          "passed": true
+        }
+      ],
+      "pageErrors": []
+    }
+  ],
+  "blobTransfer": [
+    {
+      "stage": "/api/uploads/presign",
+      "status": 201
+    },
+    {
+      "stage": "external-blob-put",
+      "status": 200
+    },
+    {
+      "stage": "/api/uploads/complete",
+      "status": 200
+    }
+  ],
+  "browserDownload": {
+    "verified": true,
+    "mode": "Browser inline PDF status, MIME and content length; separate delegated HTTP bytes verified by SHA-256",
+    "bytes": 104
+  },
+  "database": {
+    "purpose": "test",
+    "profile": "synthetic-v1",
+    "syntheticIdentities": 5,
+    "migrations": "0000-0008",
+    "integrity": "ok",
+    "foreignKeyViolations": 0,
+    "attachmentScanStatus": "not_configured"
+  },
+  "mailCron": {
+    "status": 503,
+    "code": "CRON_SECRET_NOT_CONFIGURED"
+  },
+  "limitations": [
+    "Synthetic isolated preview only.",
+    "No configured malware scanner, real municipal login, mail delivery or official KLE data."
+  ]
+}
