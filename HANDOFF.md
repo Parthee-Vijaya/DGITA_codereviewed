@@ -1,6 +1,8 @@
-# DGITA — handoff pr. 14. oktober 2026
+# DGITA — handoff pr. 14. oktober 2026 med Vercel-tillæg 17. oktober
 
 Dette dokument beskriver, hvad der er ændret, hvorfor, hvor arbejdet findes, hvad der er verificeret, og hvad næste person skal gøre. Status er et dateret øjebliksbillede, ikke en frigivelsesgodkendelse. Kontrollér aktuelle PR-heads, baser og checks før fortsættelse.
+
+**Opdatering 17. oktober:** Der er nu oprettet et særskilt, beskyttet Vercel-testmiljø med den samlede funktionskode. Afsnit 1–10 nedenfor bevarer status fra 14. oktober. Se [deployment-tillægget](#tillæg-isoleret-vercel-afprøvning--17-oktober-2026) for den aktuelle hosted afprøvning og restopgaver.
 
 ## 1. Aktuel tilstand og aftalt ramme
 
@@ -355,3 +357,45 @@ npm run test:ci:next-e2e
 | F22 | Ensartet validering og filvejledning | Implementeret; afventer samlet review |
 | F23 | Bevidst rollemodel for admin og konsulent | Afventer procesvalg |
 | F24 | Paritetsprøve og flytning af eksisterende sager | Planlagt |
+
+## Tillæg: isoleret Vercel-afprøvning · 17. oktober 2026
+
+Parthee har godkendt en hosted afprøvning af den samlede løsning. Arbejdet ligger fortsat på separate branches. `main` er uændret på `3c41099c613f4bcc08d0cbe6b22b30d7c39f7f39`, og den eksisterende pilots data og domæner er bevaret.
+
+### Kilde og ændringer
+
+- **PR #36**, commit `679e9a9`: åbner KLE-afprøvningen i et eksplicit godkendt, isoleret Vercel Preview-projekt. Adgang kræver matchende projekt-ID, korrekte preview-/testflags, en stærk testadgangskode, tilladt HTTPS-origin og testidentitet. Lokal adgang og produktionsafvisning er bevaret. Alle **13 GitHub-kontroller** er grønne på denne PR.
+- Den samlede leverance er commit `935d9e2d240a93e9e8d1b8a914161903f29e73f6` på branch `preview/vercel-2026-10-17`. Den indeholder KLE-funktionerne, handoffen, de gennemgåede dependencyopdateringer og den nye hosted preview-policy. Denne samling er ikke merged til `main`.
+- Funktionernes UI, layout og arbejdsgange er bevaret. Den nye kode afgrænser hosted KLE-adgang og tilpasser teksten »lokal testbruger« til »testbruger«. De eksisterende beskyttede releaseworkflows og produktionsgodkendelser er bevaret.
+
+### Dedikerede testressourcer
+
+| Ressource | Registreret opsætning |
+| --- | --- |
+| Vercel-projekt | `dgita-feature-preview`, projekt-ID `prj_BytzGz8xHr2OfKXPfJTRCJfPTnys`; Next.js og Node 24; deploymentbeskyttelse bevaret |
+| Turso | Ny database på gratisplanen, region `dub1`, integrationsressource `store_pA4nTCuna0pRR1rL` |
+| Vercel Blob | Nyt privat lager, region `dub1`, `store_waDbdKtCDxCWHkIo`; adgang via projektets OIDC, uden langlivet Blob-token |
+
+Projektet bruger egne testcredentials og syntetiske data. Rigtig mailafsendelse, kommunal identitet, malwaretjeneste, officielle KLE-data samt KITOS-/SHIELD-integration er ikke aktiveret. Secrets, sessionscookies og rå miljøfiler hører ikke til denne handoff eller Git.
+
+### Verificeret og aktuelt deploymentforløb
+
+Den samlede kode har bestået **539 tests**, lint, typecheck, code-health, dependency-/deployment-toolchain-audit, **12 lokale KLE-browserforløb** og kontrol af produktionsafvisninger. Audit viser ingen kendte produktionsfund. De eksisterende præcise udviklingsundtagelser består: ni noder i appens dependencytræ og 21 i deploymentværktøjerne, alle under samme braces-advisory og med udløb 4. november 2026. Disse er ikke fjernet af en grøn auditpolicy.
+
+Et lokalt prebuilt build fra Mac indeholdt libSQL 0.18-klientens Darwin-native modul og gav derfor 503 på `/api/readyz` i Vercels Linux-runtime. Den samme kildecommit blev derefter bygget direkte på Vercel Linux, hvor readiness og testlogin fungerer. Den første deployment blev desuden oprettet som Production-target trods det ønskede previewvalg; den accepterede leverance er verificeret som Preview (API-target `null`). De to mislykkede kandidater er fjernet efter kontrol af, at det nye stabile alias peger på den fungerende Linux-deployment. Den første kandidat må ikke angives som den godkendte preview eller som en produktionsaccept. Dette vedrører det nye projekt; eksisterende pilot og `main` er bevaret.
+
+**Hosted testmiljø verificeret 17. oktober 2026:** 11/11 samlede cloud-/browserkontroller og 7/7 supplerende rollekontroller bestod. Administratorens indlæste portaltekster/integrationer, konsulentens filtrerede sagsliste og brugerens ansøgninger er også visuelt kontrolleret. [Struktureret evidens](docs/implementation/evidence/vercel-preview-2026-10-17.json).
+
+- Stabil adresse: [dgita-feature-preview.vercel.app/login](https://dgita-feature-preview.vercel.app/login). Kræver Vercel-adgang og derefter DGITA-testadgangskoden; koden opbevares uden for Git.
+- Deployment: `dpl_9cC4nD49AoGC2MEKCnizrvCXvC78`, immutable URL [Linux-preview](https://dgita-feature-preview-76s8yxpht-parthee-vijayas-projects.vercel.app), `READY`, API-target `null`/Preview, runtime-region `dub1`, kilde `935d9e2d240a93e9e8d1b8a914161903f29e73f6`. Aliasets faktiske deployment-ID er kontrolleret særskilt.
+- Beskyttelse: Vercel Authentication på alle deployments; ubeskyttet anmodning om login omdirigeres til Vercel. QA bruger kortlivet, origin-afgrænset OIDC. Det midlertidige automation-bypass, som CLI oprettede ved en health-kontrol, er tilbagekaldt; der er ingen sådanne bypassnøgler tilbage.
+- `/api/healthz` og `/api/readyz` returnerer 200. Anonyme appkald, forkert kode og login uden korrekt Origin afvises. Bruger, konsulent og administrator kan logge ind; KLE-søgning, oprettelse/gem/genindlæs samt spørgsmål 30 på desktop/mobil fungerer. Ingen registrerede browser-appfejl.
+- Browserens direkte bilagsforløb er prøvet mod det faktiske private Blob-lager: presign 201, Blob PUT 200 og complete 200. Download kræver appadgang, og de hentede bytes matcher SHA-256. Chromium viser PDF inline; status, MIME og længde er kontrolleret i browser, mens checksum er kontrolleret på separat autentificeret download. Anonym download afvises.
+- Databasen er mærket `test`, fixtureprofilen er `synthetic-v1`, og alle fem konti har Test-navne og `@example.invalid`. Migrationer 0000–0008 er anvendt; integritet og fremmednøgler er kontrolleret. Bilag er `ready` med scanning `not_configured`, ikke malwaregodkendte.
+- Mailcron returnerer 503 `CRON_SECRET_NOT_CONFIGURED`. Graph, tilladte mailmodtagere og kommunal login/scanner er ikke konfigureret. Ingen rigtig mailafsendelse er forsøgt.
+
+Projektet har ingen Git-forbindelse eller automatisk promotion. En senere ændring kræver en bevidst Preview-deployment og ny live-verifikation. `preview/vercel-2026-10-17` er en publiceret samlingsbranch til denne afprøvning; de enkelte ændringer forbliver til review i separate PR’er. Denne dokumentationsopdatering ændrer ikke den deployede applikation. Testaccepten er ikke kommunal produktionsaccept.
+
+### Før egentlig produktion
+
+Produktion kræver fortsat organisatorisk og teknisk accept: godkendt hosting-/databehandlergrundlag, særskilte driftsressourcer og backups, kommunal identitet og roller, scanner og mailintegration, officiel KLE-aftale/datakilde, migrations-/rollbackprøve, overvågning og beredskab samt dokumenteret rolle-, sikkerheds- og tilgængelighedsaccept. De øvrige restopgaver i handoffen gælder fortsat. Testlogin og demo-seed skal være slået fra i produktion, og produktionsgates må først åbnes efter den særskilte accept.

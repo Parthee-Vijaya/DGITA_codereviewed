@@ -10,6 +10,14 @@ Feature-previewen leveres særskilt af operatøren fra den autoriserede funktion
 
 Før deployment registreres den konkrete, rene commit og dens testresultater. Operatøren kontrollerer projekt-ID, ejerskab og faktisk adskillelse fra alle eksisterende database-/Blob-ressourcer. En lokal test af en miljøvariabel beviser ikke i sig selv, at en cloudressource er isoleret eller adgangsbeskyttet.
 
+## Build og faktisk deployment-target
+
+Byg denne løsning på Linux til Vercels Linux-runtime. Et macOS-prebuilt artifact fra 17. oktober indeholdt kun `@libsql/darwin-arm64`; den statiske native import fejlede i cloud og gav 503 fra readiness/login. Lokal build og `READY` alene er derfor utilstrækkelig verifikation. Den accepterede kandidat blev bygget fra samme rene kilde direkte på Vercel med `vercel deploy --target=preview`; alternativt kan et gennemgået Linux-CI-build bruges. Undlad at uploade et macOS-prebuilt artifact.
+
+Kontrollér altid det returnerede target efter deployment. I et helt nyt projekt blev første upload automatisk placeret på Production-target trods `--target=preview`. Aflever ikke sådan en kandidat som Preview. De to mislykkede første kandidater er fjernet; den accepterede deployment har API-target `null` (Vercels almindelige Preview), og runtime `VERCEL_ENV=preview` er krævet af KLE-policyen.
+
+Det stabile testdomæne må kun knyttes til den verificerede Preview i det dedikerede projekt. Projektet er ikke Git-forbundet; et push til main eller en anden branch udløser derfor ikke deployment. Næste opdatering kræver en ny, bevidst deployment og gentaget live-test. Den aktuelle URL, kilde og kontrolresultater fremgår af [handoffens tillæg](../../HANDOFF.md#tillæg-isoleret-vercel-afprøvning--17-oktober-2026).
+
 ## KLE-adgang i den nye profil
 
 `features/system-usage/preview-policy.ts` tillader fortsat den eksisterende lokale loopback-afprøvning. Hosted KLE kræver derudover samtlige følgende betingelser:
