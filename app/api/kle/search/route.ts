@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     assertKlePreview(environment, request.url);
     assertSameOrigin(request, environment);
     const actor = await requireActor(request);
-    if (actor.provider !== "dev") throw new AuthHttpError(403, "PREVIEW_IDENTITY_REQUIRED", "Afprøvningen kræver en lokal testbruger.");
+    if (actor.provider !== "dev") throw new AuthHttpError(403, "PREVIEW_IDENTITY_REQUIRED", "Afprøvningen kræver en testbruger.");
     const parameters = readKleSearchParameters(await readJsonObject(request));
     return noStoreJson(previewKleProvider.search(parameters));
   } catch (error) { return authErrorResponse(error); }
